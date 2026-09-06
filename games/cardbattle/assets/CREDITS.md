@@ -33,3 +33,48 @@
 - **改変**: なし
 - **備考**: 既存の曲・録音・サンプルを使用していない。22,050 Hz・16 bit・モノラル PCM。BGM はループ境界で残響を重ねている。
 - **生成**: Codex による作曲・Python 標準ライブラリの正弦波合成 / プロンプトの要点: 穏やかな短調アルペジオの 16 秒ループ、ドロー・召喚・攻撃・破壊・被ダメージ・勝利を区別する短い音。
+
+## カード別イラスト (`assets/art/cards/`)
+
+- **素材名**: 日輪と月影の全 30 カード (`boost.svg`, `destroy.svg`, `draw.svg`, `m00.svg`, `m01.svg`, `m02.svg`, `m03.svg`, `m04.svg`, `m05.svg`, `m06.svg`, `m07.svg`, `m08.svg`, `m09.svg`, `m10.svg`, `m11.svg`, `m12.svg`, `m13.svg`, `m14.svg`, `m15.svg`, `m16.svg`, `m17.svg`, `m18.svg`, `m19.svg`, `m20.svg`, `m21.svg`, `m22.svg`, `m23.svg`, `mist.svg`, `snare.svg`, `spark.svg`)
+- **作者**: godotpractice プロジェクト
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/polish/cardbattle/games/cardbattle/scripts/dev/generate_card_art.py
+- **ライセンス**: 本プロジェクト独自制作。第三者素材の利用なし
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **備考**: 画像生成サービスや第三者画像を使用していない。再生成は python3 scripts/dev/generate_card_art.py。
+- **生成**: Codex による独自 SVG 記述・Python 標準ライブラリ / プロンプトの要点: 紺・青緑・金の天体ファンタジー。24 体の剣士・斥候・獣・翼ある衛士・魔術師・巨兵・槍使い・竜・番人・戦乙女・王を個別の輪郭、装備、顔、姿勢で描く。6 種の魔法・罠も独自の絵にする。320×240 SVG、陰影を持つ金属・布・宝石。
+
+## アニメーション用のキャラ部位 (`assets/art/characters/`)
+
+- **素材名**: 24 体の頭・胴・装備とカード背景 (`m00/accent.svg`, `m00/background.svg`, `m00/body.svg`, `m00/head.svg`, `m01/accent.svg`, `m01/background.svg`, `m01/body.svg`, `m01/head.svg`, `m02/accent.svg`, `m02/background.svg`, `m02/body.svg`, `m02/head.svg`, `m03/accent.svg`, `m03/background.svg`, `m03/body.svg`, `m03/head.svg`, `m04/accent.svg`, `m04/background.svg`, `m04/body.svg`, `m04/head.svg`, `m05/accent.svg`, `m05/background.svg`, `m05/body.svg`, `m05/head.svg`, `m06/accent.svg`, `m06/background.svg`, `m06/body.svg`, `m06/head.svg`, `m07/accent.svg`, `m07/background.svg`, `m07/body.svg`, `m07/head.svg`, `m08/accent.svg`, `m08/background.svg`, `m08/body.svg`, `m08/head.svg`, `m09/accent.svg`, `m09/background.svg`, `m09/body.svg`, `m09/head.svg`, `m10/accent.svg`, `m10/background.svg`, `m10/body.svg`, `m10/head.svg`, `m11/accent.svg`, `m11/background.svg`, `m11/body.svg`, `m11/head.svg`, `m12/accent.svg`, `m12/background.svg`, `m12/body.svg`, `m12/head.svg`, `m13/accent.svg`, `m13/background.svg`, `m13/body.svg`, `m13/head.svg`, `m14/accent.svg`, `m14/background.svg`, `m14/body.svg`, `m14/head.svg`, `m15/accent.svg`, `m15/background.svg`, `m15/body.svg`, `m15/head.svg`, `m16/accent.svg`, `m16/background.svg`, `m16/body.svg`, `m16/head.svg`, `m17/accent.svg`, `m17/background.svg`, `m17/body.svg`, `m17/head.svg`, `m18/accent.svg`, `m18/background.svg`, `m18/body.svg`, `m18/head.svg`, `m19/accent.svg`, `m19/background.svg`, `m19/body.svg`, `m19/head.svg`, `m20/accent.svg`, `m20/background.svg`, `m20/body.svg`, `m20/head.svg`, `m21/accent.svg`, `m21/background.svg`, `m21/body.svg`, `m21/head.svg`, `m22/accent.svg`, `m22/background.svg`, `m22/body.svg`, `m22/head.svg`, `m23/accent.svg`, `m23/background.svg`, `m23/body.svg`, `m23/head.svg`)
+- **作者**: godotpractice プロジェクト
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/polish/cardbattle/games/cardbattle/scripts/dev/generate_card_art.py
+- **ライセンス**: 本プロジェクト独自制作。第三者素材の利用なし
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **備考**: 画像生成サービスや第三者画像を使用していない。再生成は python3 scripts/dev/generate_card_art.py。
+- **生成**: Codex による独自 SVG 記述・Python 標準ライブラリ / プロンプトの要点: 各キャラを同じ 320×240 キャンバスの透明な head・body・accent と背景へ分離。装備は武器・翼・尾・炎・書物・結晶をキャラごとに選ぶ。形状はカード原画を唯一の定義として分割している。
+
+## 多層背景とタイトル (`assets/art/`)
+
+- **素材名**: 天文台の多層背景と二王の紋章 (`far.svg`, `mid.svg`, `near.svg`, `title_keyart.svg`, `logo.svg`)
+- **作者**: godotpractice プロジェクト
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/polish/cardbattle/games/cardbattle/scripts/dev/generate_card_art.py
+- **ライセンス**: 本プロジェクト独自制作。第三者素材の利用なし
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **備考**: 画像生成サービスや第三者画像を使用していない。再生成は python3 scripts/dev/generate_card_art.py。
+- **生成**: Codex による独自 SVG 記述・Python 標準ライブラリ / プロンプトの要点: 星雲と星の遠景、天球儀と尖塔の中景、柱と対戦盤の近景を独立した SVG にする。日輪の王と星辰の王のタイトル用キーアート、金と青緑の星環紋章。
+# 素材クレジット
+
+## 場面別のオリジナル音声 (`assets/audio/`)
+
+- **素材名**: 星環の五つの旋律と魔法の効果音 (`bgm_title.wav`, `bgm_duel.wav`, `bgm_boss.wav`, `bgm_victory.wav`, `bgm_defeat.wav`, `draw.wav`, `summon.wav`, `attack.wav`, `destroy.wav`, `damage.wav`, `victory.wav`, `boost.wav`, `trap.wav`, `transition.wav`)
+- **作者**: godotpractice プロジェクト
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/main/games/cardbattle/scripts/dev/generate_audio.py
+- **ライセンス**: 本プロジェクト独自制作。第三者素材の利用なし
+- **クレジット表記**: **不要**
+- **改変**: 第 1 ラウンドの効果音を再作曲・再合成。場面別 BGM と強化・罠・遷移音を新規制作
+- **備考**: 22,050 Hz・16 bit・ステレオ PCM。既存楽曲・録音・サンプルは不使用。固定の旋律・乱数による再現生成。BGM は残響を先頭へ折り返すループ。再生成は python3 scripts/dev/generate_audio.py。
+- **生成**: Codex による作曲、Python 標準ライブラリによる倍音・FM・ノイズ・打楽器合成 / プロンプトの要点: タイトルは鐘と静かな余韻、決闘は低音と打楽器、強敵は速い金管風の短調、勝利は長調のファンファーレ、敗北は疎らな短調。ドロー・召喚・攻撃・破壊・被ダメージ・勝利・強化・罠・遷移を区別する音色。
