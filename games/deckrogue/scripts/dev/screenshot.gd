@@ -63,6 +63,7 @@ func _capture_scenes() -> bool:
 	await _capture("map-overlay")
 	await _key(KEY_ESCAPE)
 	await _capture_large_hand()
+	await _capture_statuses()
 	await _complete_run()
 	await _capture("victory")
 	_check(run.phase == "result" and run.won, "通常操作でクリア結果に到達")
@@ -107,6 +108,21 @@ func _capture_large_hand() -> void:
 	_check(scroll.scroll_horizontal > 0, "フォーカスで手札の末尾へスクロール")
 	await _capture("hand-scrolled")
 	run.hand.assign(previous)
+	main._render(false)
+
+
+func _capture_statuses() -> void:
+	var previous: Array[int] = [run.weak, run.vulnerable, run.enemy.weak, run.enemy.vulnerable]
+	run.weak = 2
+	run.vulnerable = 2
+	run.enemy.weak = 2
+	run.enemy.vulnerable = 2
+	main._render(false)
+	await _capture("statuses")
+	run.weak = previous[0]
+	run.vulnerable = previous[1]
+	run.enemy.weak = previous[2]
+	run.enemy.vulnerable = previous[3]
 	main._render(false)
 
 

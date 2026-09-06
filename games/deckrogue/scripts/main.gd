@@ -136,7 +136,7 @@ func _draw_route(parent: Control, interactive: bool) -> void:
 
 func _battle(draw_cards: bool) -> void:
 	UI.label(screen, "第 %d ターン" % Run.turn, Rect2(54, 100, 300, 38), 26, UI.GOLD)
-	UI.label(screen, "意図を読んで、攻撃と防御を組み立てる。", Rect2(54, 145, 620, 32), 18, UI.MUTED)
+	UI.label(screen, "弱体：与ダメージ−25%　脆弱：被ダメージ＋50%", Rect2(54, 145, 640, 32), 17, UI.MUTED)
 	UI.art(screen, "hero", Rect2(139, 172, 190, 240))
 	UI.label(screen, "灯守", Rect2(146, 400, 200, 34), 24)
 	UI.label(screen, "防御 %d  /  力 %d" % [Run.block, Run.strength],
@@ -262,9 +262,9 @@ func _relic_text() -> String:
 func _status_text(weak: int, vulnerable: int) -> String:
 	var parts: PackedStringArray = []
 	if weak > 0:
-		parts.append("弱体 %d（与ダメージ減）" % weak)
+		parts.append("弱体 %d" % weak)
 	if vulnerable > 0:
-		parts.append("脆弱 %d（被ダメージ増）" % vulnerable)
+		parts.append("脆弱 %d" % vulnerable)
 	return "  ".join(parts)
 
 
@@ -338,7 +338,7 @@ func _play_card(index: int) -> void:
 	Run.play_card(index)
 	await get_tree().create_timer(0.38).timeout
 	busy = false
-	_render(false)
+	_render(int(Catalog.CARDS[id].effects.get("draw", 0)) > 0)
 
 
 func _end_turn() -> void:
@@ -423,10 +423,12 @@ func _open_modal(kind: String) -> void:
 	_close_modal()
 	modal = kind
 	screen.process_mode = Node.PROCESS_MODE_DISABLED
+	screen.hide()
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(overlay)
+	UI.art(overlay, "background", Rect2(0, 0, 1280, 720))
 	UI.panel(overlay, Rect2(24, 50, 1232, 622), Color("122e36"), UI.GOLD)
 
 
@@ -434,6 +436,7 @@ func _close_modal() -> void:
 	modal = ""
 	if is_instance_valid(screen):
 		screen.process_mode = Node.PROCESS_MODE_INHERIT
+		screen.show()
 	if is_instance_valid(overlay):
 		remove_child(overlay)
 		overlay.queue_free()
