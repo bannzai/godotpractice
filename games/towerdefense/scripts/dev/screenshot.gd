@@ -117,6 +117,7 @@ func _battle_to_results() -> void:
 		run.events.clear()
 	main._show_phase()
 	await create_timer(0.5).timeout
+	main.result_count.text = "守り抜いた灯  %02d / %02d" % [run.hp, Catalog.MAX_HP]
 	await _capture("lose")
 
 

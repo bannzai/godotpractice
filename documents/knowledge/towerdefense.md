@@ -32,7 +32,18 @@
 
 ## 検証記録
 
-最終のコマンド結果・CI・Web実操作・公開証拠は検証完了後にここへ追記する。
+- `make test GAMES=towerdefense` はexit 0。lint・import・起動・selfcheck・入力統合・指定フレーム終了を通した。通常資金の戦略で全10波を拠点HP20のまま突破した。
+- `make screenshot GAMES=towerdefense` はexit 0。代表画面、9キャラの5動作の開始/途中/終了、建設・強化・被弾・撃破・拠点被害・4塔の発射を含む31枚を目視した。処理を止めた敗北撮影ではカウントアップも停止するため、撮影時に最終HPを明示的に反映する。
+- `make movie GAMES=towerdefense` と `make -C games/towerdefense movie-play` はexit 0。5秒の起動と30秒の実入力プレイの2秒間隔/末尾フレームを目視した。プレイ録画では建設・強化・3倍速・第4波までの戦闘を操作し、HPや資金は書き換えていない。
+- `make build-all GAMES=towerdefense` と `make build-web GAMES=towerdefense` はexit 0。macOS・Windows・LinuxとWebの成果物を生成した。
+- `make towerdefense-run RUN_FLAGS='--script res://scripts/dev/runcheck.gd'` はexit 0。描画・通常の音声出力・Escによる終了を確認した。実音声付きの `--quit-after 1/30/120` と描画付きF11往復もexit 0。最終ログ全文にWARNING/ERROR、終了時のObjectDB/リソース警告はなかった。
+- PR #49へ画像と録画を `puts upload` で公開し、公開URLから取得した内容のSHA256をローカルと照合した。CIとWebの最終証拠・実行リンクはPRの検証欄に集約する。
+
+## Web検証で得た知見
+
+- このリポジトリのcaller workflowは8000番ポートで配信する。runner上で開くURLは `http://localhost:8000/index.html`。CDPのポートとは別であり、一般例の8080番をそのまま使うと接続できない。
+- 1280×656のブラウザ表示ではゲーム全体を縦に合わせるため左右に余白が付く。ゲームの座標に縮尺と左余白を反映してクリックし、建設地点の選択を実画像で確認した。
+- Tailscale越しのagent-browserのPNG転送が応答待ちになったため、同じrunnerのChromiumにCDP接続しJPEGで取得した。CDPのキー/マウス入力で操作し、ゲーム状態を書き換える評価式は使っていない。
 
 ## 残した判断点と再利用候補
 
