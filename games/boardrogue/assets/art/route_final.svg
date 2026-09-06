@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#15232c"/><stop offset=".54" stop-color="#496465"/><stop offset="1" stop-color="#818478"/></linearGradient>
+<linearGradient id="armor" x2=".9" y2="1"><stop stop-color="#617876"/><stop offset=".46" stop-color="#293f44"/><stop offset="1" stop-color="#101d26"/></linearGradient>
+<linearGradient id="cloth" x2=".9" y2="1"><stop stop-color="#d47952"/><stop offset=".5" stop-color="#a54839"/><stop offset="1" stop-color="#482932"/></linearGradient>
+<linearGradient id="white" x2=".5" y2="1"><stop stop-color="#f6edcf"/><stop offset=".55" stop-color="#d3c5a3"/><stop offset="1" stop-color="#7e887d"/></linearGradient>
+<linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#f0d399"/><stop offset=".5" stop-color="#ba9857"/><stop offset="1" stop-color="#735b38"/></linearGradient>
+<radialGradient id="halo"><stop stop-color="#d7d0a4" stop-opacity=".42"/><stop offset="1" stop-color="#d7d0a4" stop-opacity="0"/></radialGradient>
+<radialGradient id="glow"><stop stop-color="#ffffff"/><stop offset=".2" stop-color="#ffffff" stop-opacity=".8"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+</defs><path d="M12 7L26 22L32 3L39 22L55 7L48 39L32 60L16 39ZM20 31L28 35M37 35L44 30M23 44L32 39L40 44L32 53Z" fill="#aa4839" stroke="#c1a466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>

@@ -36,7 +36,7 @@ check: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import
+selfcheck: import integration artcheck
 	"$(GODOT)" --log-file "$(CURDIR)/$(LOG_DIR)/godot.log" --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
@@ -65,7 +65,7 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --log-file "$(CURDIR)/$(LOG_DIR)/godot.log" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
+	BOARDROGUE_MOVIE_FRAMES=$(MOVIE_FRAMES) "$(GODOT)" --log-file "$(CURDIR)/$(LOG_DIR)/godot.log" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --script res://scripts/dev/movie.gd > $(LOG_DIR)/movie.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
@@ -110,3 +110,33 @@ build-all: build-macos build-windows build-linux
 
 clean:
 	rm -rf build $(LOG_DIR)
+
+.PHONY: integration artcheck movie-play assets
+
+# 実入力と素材コマの検証もselfcheckから実行し、既存CIと同じ入口に含める。
+integration: import
+	"$(GODOT)" --log-file "$(CURDIR)/$(LOG_DIR)/integration-engine.log" --headless --path . --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/integration.log; \
+	tail -n 1 $(LOG_DIR)/integration.log | grep -q '^exit=0$$'
+	grep -q '^integration OK' $(LOG_DIR)/integration.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
+
+artcheck: import
+	"$(GODOT)" --log-file "$(CURDIR)/$(LOG_DIR)/artcheck-engine.log" --headless --path . --script res://scripts/dev/artcheck.gd > $(LOG_DIR)/artcheck.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/artcheck.log; \
+	tail -n 1 $(LOG_DIR)/artcheck.log | grep -q '^exit=0$$'
+	grep -q '^artcheck OK' $(LOG_DIR)/artcheck.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/artcheck.log
+
+movie-play: import
+	"$(GODOT)" --log-file "$(CURDIR)/$(LOG_DIR)/demo-engine.log" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/demo.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/demo.log; \
+	tail -n 1 $(LOG_DIR)/demo.log | grep -q '^exit=0$$'
+	grep -q '^demo OK$$' $(LOG_DIR)/demo.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/demo.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+
+# 同じ入力から同じ素材を再生成する。画像・音源の内容は各生成器で定義する。
+assets:
+	python3 scripts/dev/generate_art.py --out-dir assets
+	python3 scripts/dev/generate_audio.py --out-dir assets
