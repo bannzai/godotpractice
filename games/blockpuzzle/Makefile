@@ -16,7 +16,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint test integration screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -25,6 +25,7 @@ import:
 	"$(GODOT)" --headless --path . --log-file $(abspath $(LOG_DIR)/engine.log) --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/import.log
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
@@ -35,7 +36,7 @@ check: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import
+selfcheck: import integration
 	"$(GODOT)" --headless --path . --log-file $(abspath $(LOG_DIR)/engine.log) --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
@@ -47,7 +48,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -64,7 +65,7 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --path . --log-file $(abspath $(LOG_DIR)/engine.log) $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
+	"$(GODOT)" --path . --log-file $(abspath $(LOG_DIR)/engine.log) $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --script res://scripts/dev/movie.gd -- --movie-frames $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
@@ -72,6 +73,22 @@ movie: import
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 実イベントでキーボード・パッド・マウスからの状態遷移を確認する。
+integration: import
+	"$(GODOT)" --headless --path . --log-file $(abspath $(LOG_DIR)/engine.log) --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1
+	grep -q '^integration OK' $(LOG_DIR)/integration.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
+
+# 通常のゲームへ実入力を投入した26秒の録画。
+movie-play: import
+	"$(GODOT)" --path . --log-file $(abspath $(LOG_DIR)/engine.log) $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1
+	grep -q 'プレイ録画 OK' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf "fps=1/2,scale=320:180,tile=4x4" -frames:v 1 $(LOG_DIR)/movie-play-frames.png
+	ffmpeg -loglevel error -y -sseof -1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
