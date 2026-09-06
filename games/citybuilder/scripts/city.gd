@@ -80,11 +80,23 @@ func set_tax(value: float) -> void:
 func save_city() -> bool:
 	if not saving_enabled:
 		return true
-	var file: FileAccess = FileAccess.open(save_path, FileAccess.WRITE)
+	# 前回の保存は、同じディレクトリに書いた内容の検証が済むまで保持する。
+	var temporary_path: String = save_path + ".tmp"
+	var serialized: String = JSON.stringify(state)
+	var file: FileAccess = FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
 		notice.emit("保存できませんでした。空き容量を確認してください")
 		return false
-	file.store_string(JSON.stringify(state))
+	var stored: bool = file.store_string(serialized)
+	file.flush()
+	var write_error: Error = file.get_error()
+	file.close()
+	if not stored or write_error != OK or FileAccess.get_file_as_string(temporary_path) != serialized:
+		notice.emit("保存できませんでした。空き容量を確認してください")
+		return false
+	if DirAccess.rename_absolute(temporary_path, save_path) != OK:
+		notice.emit("保存できませんでした。空き容量を確認してください")
+		return false
 	return true
 
 

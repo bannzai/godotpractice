@@ -114,13 +114,31 @@ func _save_and_resume() -> void:
 	_check(city.phase == "title", "Escape で保存してタイトル")
 	_check(FileAccess.file_exists(city.save_path), "検証専用ファイルへ保存")
 	_check(city.saved_city() == saved, "保存内容は現在の街と一致")
+	_check_failed_save(saved)
+	main.displayed_population = 9999.0
 	await _click(Vector2(220, 540))
 	_check(city.phase == "playing", "再開ボタンでプレイへ復帰")
 	_check(city.state == saved, "再開後に資金・区画・月・税率を復元")
+	_check(main.displayed_population == float(saved.population), "再開直後の人口表示を保存値に同期")
 	_check(main.view.overlay == "power" and main.overlay_index == 1, "タイトルから再開しても電力表示と地図が一致")
 	await _key(KEY_SPACE)
 	await _key(KEY_ESCAPE)
 	_check(city.phase == "title", "再開した街からタイトルへ戻る")
+
+
+# 検証専用の空ディレクトリで書き込み失敗を再現し、片付けまで一巡する。
+func _check_failed_save(saved: Dictionary) -> void:
+	var temporary_path: String = city.save_path + ".tmp"
+	_check(DirAccess.make_dir_absolute(temporary_path) == OK, "保存失敗の検証用障害を準備")
+	city.saving_enabled = true
+	city.state.money += 1
+	_check(not city.save_city(), "一時保存先に書けない場合は失敗を返す")
+	_check(city.saved_city() == saved, "保存失敗後も前回の街を保持")
+	_check(DirAccess.remove_absolute(temporary_path) == OK, "保存失敗の検証用障害を解除")
+	_check(city.save_city(), "障害解除後に保存を再試行できる")
+	city.state = saved.duplicate(true)
+	_check(city.save_city(), "次の操作へ保存状態を復元")
+	city.saving_enabled = false
 
 
 func _gamepad() -> void:

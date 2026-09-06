@@ -26,6 +26,20 @@ func _run() -> void:
 	await create_timer(1.2).timeout
 	_check(DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED, "F11でウィンドウ復帰")
 	await _shot("windowed")
+	var city: Node = root.get_node("City")
+	city.start_city()
+	for month: int in 3:
+		city.next_month()
+	city.save_path = "res://tmp/native-resume-save.json"
+	city.saving_enabled = true
+	_check(city.save_city(), "再開画面用の街を保存")
+	city.saving_enabled = false
+	city.set_phase("title")
+	main.displayed_population = 9999.0
+	main._resume()
+	city.speed = 0
+	_check(main.displayed_population == float(city.state.population), "再開時の人口表示を即時同期")
+	await _shot("resume")
 	await root.get_node("Sound").shutdown()
 	main.queue_free()
 	await process_frame

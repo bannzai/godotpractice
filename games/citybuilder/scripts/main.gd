@@ -420,7 +420,10 @@ func _start() -> void:
 
 
 func _resume() -> void:
-	City.resume_city()
+	if not City.resume_city():
+		return
+	displayed_population = float(City.state.population)
+	_refresh()
 	if City.phase == "playing":
 		get_viewport().gui_release_focus()
 
