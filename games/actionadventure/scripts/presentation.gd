@@ -84,6 +84,7 @@ func _style(fill: Color, border: Color, width: int, radius: int) -> StyleBoxFlat
 
 
 func _rebuild() -> void:
+	var initial_screen: bool = not is_instance_valid(_screen)
 	if _coin_tween:
 		_coin_tween.kill()
 	if _fade_tween:
@@ -110,6 +111,8 @@ func _rebuild() -> void:
 			_result(true)
 		"gameover":
 			_result(false)
+	if initial_screen:
+		return
 	_screen.modulate.a = 0.0
 	_fade_tween = create_tween()
 	_fade_tween.tween_property(_screen, "modulate:a", 1.0, 0.2)

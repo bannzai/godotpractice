@@ -25,9 +25,7 @@ func _run() -> void:
 		await process_frame
 		if frame >= TOTAL_FRAMES - 12:
 			main.stop_audio()
-	main.queue_free()
-	await process_frame
-	await process_frame
+	# 録画末尾を空画面にしないよう、シーンの解放は終了時のSceneTreeに任せる。
 	if not failed:
 		print("demo OK")
 	quit(1 if failed else 0)
