@@ -34,6 +34,8 @@ func popup(pos: Vector2, text: String, color: Color) -> void:
 	label.position = pos + Vector2(-45, -35)
 	label.size = Vector2(90, 36)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Node2D 配下では画面の Theme を継承しないため、日本語フォントを明示する。
+	label.add_theme_font_override("font", preload("res://assets/fonts/NotoSansJP.ttf"))
 	label.add_theme_font_size_override("font_size", 23)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color(0.035, 0.025, 0.05))
