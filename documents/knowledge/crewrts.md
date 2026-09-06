@@ -39,7 +39,7 @@ Godot の skill に「固定刻みモデルによる通常ステージの操作�
 
 ## 検証環境に関する追加の知見
 
-録画の `--quit-after` による即時終了では、再生中の WAV が終了時にリークした。録画用 SceneTree で終わりの6フレーム前に音声を停止する。撮影・性能計測・通常のウィンドウ終了でも停止後に0.15秒を確保する。警告行を除外して成功にするのではなく、終了前の解放を行う。関連する Godot の報告: https://github.com/godotengine/godot/issues/76745 。
+録画の `--quit-after` による即時終了では、再生中の WAV が終了時にリークした。録画用 SceneTree で終わりの6フレーム前に音声を停止する。性能計測・通常のウィンドウ終了では停止後に0.15秒を確保する。撮影は 0.15 秒の待ちが CI で足りない回があったため、時間ではなく WAV の解放を観測して待つ (後述「撮影の終了時のリーク (CI の flaky) と解放の観測」)。警告行を除外して成功にするのではなく、終了前の解放を行う。関連する Godot の報告: https://github.com/godotengine/godot/issues/76745 。
 
 macOS の export は editor_settings を保存する。サンドボックス外への書き込みを避けるため、tmp 内へコピーしたバイナリに `_sc_` を置く self-contained mode を使用した。コピーしたバイナリには ad-hoc 署名を行い、既存 export_templates へは読み取り用シンボリックリンクを置いた。元の Godot.app やシステム設定は変更しない。仕様: https://docs.godotengine.org/en/4.7/classes/class_editorpaths.html 。既存の macOS zip を Godot がゴミ箱へ動かそうとするため、再生成可能な zip は export 前にゲームの build ディレクトリ内で除去する。
 
@@ -110,6 +110,16 @@ BGM はタイトル・庭・戦闘・成功・失敗の 5 曲、SE は笛・投�
 - webtunnel の caller はポート 8000 を指定する。参照手順のサンプルにある 8080 をそのまま使うと接続拒否になるため、実際の workflow の設定を読む。`--software-webgl --ref polish/crewrts` で WebGL2 が有効になり、タイトル・プレイ・投擲・結晶回収・増員・通常の 5 分経過による結果表示・タイトル復帰を実入力で確認できた。撮影後は `down crewrts` で専用セッションを終了した。
 - runner の SwiftShader は 640×360 でも約 2 fps で、ローカルの GPU とは挙動が異なる。状態遷移と入力経路の確認には使えるが、滑らかさの判定はローカル録画と実描画性能計測で行う。待機区間は 320×180 へ縮め、証拠撮影時に元の領域へ戻す運用にした。Web の通常の 5 分制限は変更していない。
 - PR #33 の検証欄に、最終 CI の run、Web の結果画面と終了後の録画、アップロードした各証拠画像を集約する。画像が変わる変更を加えた場合は該当する撮影を更新する。
+
+### 撮影の終了時のリーク (CI の flaky) と解放の観測
+
+PR #23 の CI で `screenshot-and-movie (crewrts)` が 1 回だけ、撮影 19 枚の成功後の終了時に「2 ObjectDB instances were leaked」「1 resources still in use」を出して失敗した (再実行は成功。 https://github.com/bannzai/godotpractice/issues/24 )。ローカルで撮影と同じ起動 (`--audio-driver Dummy`・描画付き) に `--verbose` を付け、停止直後に終了させて再現した。リークしたのは再生中だった BGM の `AudioStreamWAV` (`title.wav` / `garden.wav`) とそれを参照する `AudioStreamPlaybackWAV` の対で、CI で出た 2 Object + 1 resource は playback 1 つと WAV 1 つに一致する。
+
+原因は待ち方にある。`AudioStreamPlayer.stop()` は再生を即座には捨てず、音声スレッド (Dummy ドライバも独自スレッドで混合する) が次の周期でフェードアウトして削除待ちにし、その後のメインスレッドのフレーム (`AudioServer` の更新) で playback と WAV の参照を手放す。この完了は秒数ともフレーム数とも一致しない。ローカルの実測では停止から解放まで 20〜60 ms で、60 fps なら 2〜7 フレーム、120 Hz の画面では 10 フレームでも足りない回がある。CI の llvmpipe では逆に 1 フレームが長い一方、音声スレッドが描画スレッドに押されて 0.15 秒では周期が回らない回がある。
+
+撮影 (`scripts/dev/screenshot.gd`) は停止後に `AudioDirector.is_released()` が true になるまで `process_frame` を待つ。`AudioDirector` は読み込んだ全 WAV (BGM 5 曲・SE 7 種) の `weakref` を持ち、`stop_audio()` で自前の参照 (`_streams` と各 player の `stream`) を捨てた後、weakref がすべて null になった時点を「音声スレッドが playback を手放して WAV が解放された」と判定する。`load()` のキャッシュは参照を保持しないため、解放されれば weakref は null になる (実測)。10 秒以内に解放されなければ `push_error` と `quit(1)` で明示的に失敗させ、リーク WARNING に頼らない。録画 (`movie.gd`) は Movie Maker が音声をフレームごとに同期で混合するため終了 6 フレーム前の停止で決定的に解放され、変更していない。通常のウィンドウ終了 (`NOTIFICATION_WM_CLOSE_REQUEST`) と `--quit-after` の 0.15 秒待ちも変更していない (CI の検査対象ではない。同じ観測で置き換えられる)。
+
+共有物への提案: godot-development skill の雛形 `scripts/dev/audio_stop.gd` と `screenshot.gd` は停止後に 0.2 秒待つ方式のままで、同じ flaky が他ゲームでも起こり得る (issue #24 のコメントで cardbattle / deckrogue / fighter / platformer / survivors の `--quit-after` 終了でも同じ警告を実測)。雛形側でも WAV の weakref による解放の観測に置き換えるとよい。
 
 ### 本番に向けて足りない道具
 
