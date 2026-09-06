@@ -85,7 +85,12 @@ func _event(frame: int) -> void:
 		555:
 			_key(KEY_D, false)
 			_key(KEY_W, true)
-		600: _key(KEY_W, false)
+		600:
+			_key(KEY_W, false)
+			# ボス戦中に自然に得た追加強化も、実入力で決定してから結末へ進める。
+			state.xp = 0
+			_key(KEY_ENTER, true)
+		602: _key(KEY_ENTER, false)
 		615: state.elapsed = Rules.DURATION - 0.1
 		660: _check(state.phase == "result" and state.won, "時間満了によるクリア結果")
 		690: _key(KEY_RIGHT, true)
