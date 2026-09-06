@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="240" viewBox="0 0 200 240">
+    <ellipse cx="100" cy="224" rx="67" ry="10" fill="#101a30" opacity=".32"/>
+    <g stroke="#27364d" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M142 177 Q192 197 185 140 Q157 150 151 134 L130 160" fill="#ed9164"/>
+    <path d="M174 145 L185 140 Q189 163 180 176 L166 161" fill="#fff0ce"/>
+    <path d="M59 191 L51 217 Q60 231 83 218 L90 185 M112 185 L119 218 Q143 231 150 215 L140 184" fill="#344961"/>
+    <path d="M51 136 Q53 104 100 108 Q146 109 150 145 L142 191 Q102 207 59 190Z" fill="#63c5b7"/>
+    <path d="M47 59 L36 15 L78 39 M126 40 L165 16 L158 76" fill="#ed9164"/>
+    <path d="M48 36 L50 58 L64 47 M142 47 L154 34 L149 62" fill="#d86d66" stroke="none"/>
+    <path d="M43 64 Q60 33 102 39 Q141 36 163 68 L150 99 Q112 135 72 110 L41 86Z" fill="#ed9164"/>
+    <path d="M46 80 L78 78 L101 94 L123 78 L158 79 Q145 118 101 118 Q59 117 46 80" fill="#fff0ce" stroke="none"/>
+    <path d="M74 68 L83 66 M120 65 L128 68" fill="none"/>
+    <ellipse cx="79" cy="77" rx="4" ry="6" fill="#27364d" stroke="none"/>
+    <ellipse cx="124" cy="77" rx="4" ry="6" fill="#27364d" stroke="none"/>
+    <path d="M93 89 Q101 83 110 89 L102 97Z" fill="#27364d" stroke-width="2"/>
+    <path d="M93 104 Q101 111 110 104" fill="none" stroke-width="3"/>
+    <path d="M67 41 Q99 24 133 40 L130 53 L65 54Z" fill="#344961"/>
+    <path d="M75 50 L139 50 Q133 62 93 59" fill="#63c5b7"/>
+    <path d="M100 32 L108 42 L101 47 L92 42Z" fill="#f7d58a" stroke-width="2"/>
+    <path d="M64 119 L128 184" fill="none" stroke="#fff0ce" stroke-width="11"/>
+    <path d="M44 137 Q21 130 24 153 L55 170 M150 136 Q173 129 175 150 L150 168" fill="#ed9164"/>
+    <path d="M30 132 L68 156 M173 129 L137 157" stroke="#f7d58a" stroke-width="7"/>
+    <path d="M62 151 L142 151 L147 195 Q101 221 59 195Z" fill="#f08379"/>
+    <ellipse cx="102" cy="151" rx="41" ry="13" fill="#fff0ce"/>
+    <path d="M65 164 L84 197 L102 166 L121 200 L140 164" fill="none" stroke="#fff0ce" stroke-width="4"/>
+    <path d="M59 191 Q101 211 147 191" fill="none"/>
+    </g></svg>

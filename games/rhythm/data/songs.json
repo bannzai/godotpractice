@@ -1,0 +1,23 @@
+[
+  {
+    "id": "starlight",
+    "title": "星あかりパレード",
+    "bpm": 112,
+    "duration": 72,
+    "description": "軽やかな星のステップ"
+  },
+  {
+    "id": "moonride",
+    "title": "月夜のドライブ",
+    "bpm": 128,
+    "duration": 75,
+    "description": "夜空をめぐるシンセポップ"
+  },
+  {
+    "id": "comet",
+    "title": "彗星ダンスフロア",
+    "bpm": 144,
+    "duration": 70,
+    "description": "きらめく高速ディスコ"
+  }
+]
