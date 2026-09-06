@@ -19,12 +19,16 @@
 
 ## 検証
 
-ルートの `make test GAMES=rollball` は lint、起動、純粋ロジック、実シーンの入力・巻き込み・脱落・勝敗を検査します。
+ルートの `make test GAMES=rollball` は lint、起動、純粋ロジック、実シーンの入力・巻き込み・脱落・勝敗、通常終了とフレーム指定終了を検査します。音声再生中の終了は movie と movie-play のログでも検査します。
 
-- `make screenshot GAMES=rollball`: 代表画面の PNG。
+- `make screenshot GAMES=rollball`: タイトル・プレイ・結果・演出途中・5種類のモデルの6状態×3時点の PNG。
 - `make movie GAMES=rollball`: 起動〜タイトルの5秒動画。
-- `make -C games/rollball movie-growth`: 通常移動による巻き込みと成長の20秒動画。`tmp/growth.mp4`。
+- `make -C games/rollball movie-play`: 実キー・スティックイベントによるタイトル→成長→クリアの25秒動画。`tmp/play.mp4` と2秒間隔の一覧 `tmp/play-frames.png`、末尾 `tmp/play-last.png`。
+- `make -C games/rollball movie-growth`: 同じ入力シナリオを使う既存の録画入口。`tmp/growth.mp4`。
+- `make -C games/rollball run RUN_ARGS="--script res://scripts/dev/run_smoke.gd"`: 通常起動・実キー移動・全画面と復帰・閉じる操作を撮影して検証。
 - `make -C games/rollball performance`: 描画付きの実時間 FPS・p95 フレーム時間測定。`tmp/performance.json`。
 - `make build-all GAMES=rollball` / `make build-web GAMES=rollball`: デスクトップ3種 / Web のエクスポート。
 
 素材の由来は `assets/CREDITS.md`、実装中の知見は `documents/knowledge/rollball.md` を参照してください。
+
+音声付きで `--quit-after N` を直接使う場合は、末尾に `-- --audio-stop-at-frame N` も付けてください。Godot が消費した終了フレームはスクリプトから取得できず、強制終了通知では音声の解放待ちもできないため、12フレーム前に再生を停止します。`make movie` 系の入口は両方を渡します。通常のウィンドウ終了は停止後に8フレーム待ってから終了します。

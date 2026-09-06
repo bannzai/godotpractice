@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+    <radialGradient id="back"><stop stop-color="#3e3140"/><stop offset="1" stop-color="#081722"/></radialGradient>
+    <radialGradient id="aura"><stop stop-color="#d79a55" stop-opacity=".45"/><stop offset="1" stop-color="#d79a55" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2=".8"><stop stop-color="#fff1ae"/><stop offset=".4" stop-color="#d79a55"/><stop offset=".68" stop-color="#6f3342"/><stop offset="1" stop-color="#d79a55"/></linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#b35e60"/><stop offset=".55" stop-color="#592c42"/><stop offset="1" stop-color="#0c202f"/></linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#eef8e4"/><stop offset=".45" stop-color="#c5dfd5"/><stop offset=".48" stop-color="#557589"/><stop offset="1" stop-color="#a0c4bf"/></linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3d9ad"/><stop offset=".55" stop-color="#d7ad84"/><stop offset="1" stop-color="#8e6965"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#ffffe1"/><stop offset=".3" stop-color="#fff1ae"/><stop offset=".7" stop-color="#d79a55"/><stop offset="1" stop-color="#6f3342"/></radialGradient>
+    </defs><circle cx="128" cy="128" r="78" fill="none" stroke="#edc88a" stroke-width="2" /><circle cx="128" cy="128" r="86" fill="none" stroke="#a8eeeb" stroke-width="0.8" /><path d="M128 19L146 89 206 50 167 110 237 128 167 146 206 206 146 167 128 237 110 167 50 206 89 146 19 128 89 110 50 50 110 89Z" fill="#14323f" stroke="#edc88a" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /><circle cx="128" cy="128" r="54" fill="none" stroke="#edc88a" stroke-width="1.2" /><path d="M128 72L168 128 128 184 88 128Z" fill="url(#metal)" stroke="#edc88a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" /><path d="M128 90L153 128 128 166 103 128Z" fill="#1c4354" stroke="#a8eeeb" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" /><path d="M128 105l5.75 17.25 17.25 5.75 -17.25 5.75 -5.75 17.25 -5.75 -17.25 -17.25 -5.75 17.25 -5.75Z" fill="#f4eac0" stroke="none" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+</svg>

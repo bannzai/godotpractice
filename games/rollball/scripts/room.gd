@@ -5,6 +5,12 @@ const DARK_WOOD: Color = Color("78523f")
 const TEAL: Color = Color("76b5b0")
 const CREAM: Color = Color("fff0ca")
 const CORAL: Color = Color("e98f79")
+const ITEM_SCENES: Array[PackedScene] = [
+	preload("res://assets/models/duck.tscn"),
+	preload("res://assets/models/robot.tscn"),
+	preload("res://assets/models/train.tscn"),
+	preload("res://assets/models/plant.tscn"),
+]
 const ITEM_COLORS: Array[Color] = [
 	Color("ed987c"), Color("79bbb4"), Color("ebc25f"),
 	Color("a3b784"), Color("a7a6cd"), Color("dfad80"),
@@ -25,6 +31,7 @@ func _ready() -> void:
 	_build_walls()
 	for furniture: Dictionary in FURNITURE:
 		_build_furniture(furniture)
+	_build_atelier_details()
 	_build_lighting()
 
 
@@ -56,33 +63,9 @@ static func item_layout() -> Array[Dictionary]:
 
 
 # 呼び出し側がシーンに追加するため、毎回独立した表示ノードを返す。
-static func make_item_visual(item_size: float, kind: int, color: Color) -> Node3D:
-	var visual: Node3D = Node3D.new()
-	match kind % 4:
-		0:
-			_box(visual, Vector3.ONE * item_size * 0.82,
-				Vector3(0, item_size * 0.41, 0), color)
-			_box(visual, Vector3(item_size * 0.42, item_size * 0.18, item_size * 0.42),
-				Vector3(0, item_size * 0.91, 0), CREAM)
-		1:
-			_box(visual, Vector3(item_size * 0.65, item_size, item_size * 0.28),
-				Vector3(0, item_size * 0.5, 0), color)
-			_box(visual, Vector3(item_size * 0.52, item_size * 0.88, item_size * 0.29),
-				Vector3(item_size * 0.035, item_size * 0.5, 0), CREAM)
-		2:
-			_cylinder(visual, item_size * 0.34, item_size * 0.34, item_size * 0.92,
-				Vector3(0, item_size * 0.46, 0), color)
-			_cylinder(visual, item_size * 0.36, item_size * 0.36, item_size * 0.08,
-				Vector3(0, item_size * 0.96, 0), CREAM)
-		3:
-			_cylinder(visual, item_size * 0.31, item_size * 0.23, item_size * 0.4,
-				Vector3(0, item_size * 0.2, 0), color)
-			var foliage: SphereMesh = SphereMesh.new()
-			foliage.radius = item_size * 0.34
-			foliage.height = item_size * 0.6
-			foliage.radial_segments = 8
-			foliage.rings = 4
-			_mesh(visual, foliage, Vector3(0, item_size * 0.7, 0), Color("749970"))
+static func make_item_visual(item_size: float, kind: int, _color: Color) -> Node3D:
+	var visual: Node3D = ITEM_SCENES[posmod(kind, ITEM_SCENES.size())].instantiate()
+	visual.scale = Vector3.ONE * item_size
 	return visual
 
 
@@ -127,14 +110,94 @@ func _build_walls() -> void:
 	_box(self, Vector3(29.5, 0.22, 0.1), Vector3(0, 0.11, -14.75), CREAM)
 	for side: float in [-1.0, 1.0]:
 		_box(self, Vector3(0.1, 0.22, 29.5), Vector3(side * 14.75, 0.11, 0), CREAM)
-	_box(self, Vector3(5.2, 3.0, 0.15), Vector3(1, 3.0, -14.7), CREAM)
-	_box(self, Vector3(4.7, 2.55, 0.17), Vector3(1, 3.0, -14.59), Color("cce4d6"))
-	_box(self, Vector3(0.12, 2.6, 0.2), Vector3(1, 3.0, -14.47), CREAM)
-	_box(self, Vector3(4.8, 0.12, 0.2), Vector3(1, 3.0, -14.47), CREAM)
+	for side: float in [-1.0, 1.0]:
+		_box(self, Vector3(0.12, 1.5, 29.5),
+			Vector3(side * 14.72, 0.98, 0), Color("b3cec1"))
+		_box(self, Vector3(0.18, 0.11, 29.5), Vector3(side * 14.69, 1.76, 0), CREAM)
+	_box(self, Vector3(29.5, 1.5, 0.12), Vector3(0, 0.98, -14.72), Color("b3cec1"))
+	_box(self, Vector3(29.5, 0.11, 0.18), Vector3(0, 1.76, -14.69), CREAM)
+	for board: int in range(29):
+		_box(self, Vector3(0.035, 1.48, 0.025),
+			Vector3(-14 + board, 0.98, -14.64), Color("93b3a7"))
+	_build_window()
 	for index: int in range(3):
-		_box(self, Vector3(1.6, 1.6, 0.15), Vector3(7 + index * 2.1, 3.55, -14.7), CREAM)
-		_box(self, Vector3(1.3, 1.3, 0.17), Vector3(7 + index * 2.1, 3.55, -14.59),
-			ITEM_COLORS[index])
+		var center: Vector3 = Vector3(7 + index * 2.1, 3.55, -14.68)
+		_box(self, Vector3(1.7, 1.7, 0.18), center, DARK_WOOD)
+		_box(self, Vector3(1.53, 1.53, 0.19), center + Vector3(0, 0, 0.03), CREAM)
+		_box(self, Vector3(1.3, 1.3, 0.2), center + Vector3(0, 0, 0.05),
+			ITEM_COLORS[index].lightened(0.25))
+		var art: Node3D = make_item_visual(0.92, index, CREAM)
+		art.position = center + Vector3(0, -0.45, 0.25)
+		art.rotation_degrees.y = -15
+		add_child(art)
+
+
+# 窓の各層に距離をつけ、追従カメラの移動で遠景と窓枠に視差を出す。
+func _build_window() -> void:
+	_box(self, Vector3(6.5, 3.15, 0.18), Vector3(0.8, 3.2, -14.67), DARK_WOOD)
+	_box(self, Vector3(6.24, 2.9, 0.2), Vector3(0.8, 3.2, -14.53), CREAM)
+	_box(self, Vector3(5.9, 2.6, 0.2), Vector3(0.8, 3.2, -14.38), Color("b8dcd9"))
+	for index: int in range(4):
+		var hill: PrismMesh = PrismMesh.new()
+		hill.size = Vector3(1.7, 0.65 + (index % 2) * 0.23, 0.04)
+		_mesh(self, hill, Vector3(-1.18 + index * 1.3, 1.91 + hill.size.y * 0.5, -14.17),
+			Color("94bab0") if index % 2 == 0 else Color("83aca0"))
+	_sphere(self, Vector3(2.45, 3.85, -14.2), Vector3(0.3, 0.3, 0.035), Color("ffe3a0"))
+	for cloud_index: int in range(3):
+		var cloud: Node3D = Node3D.new()
+		cloud.name = "Cloud%d" % cloud_index
+		cloud.position = Vector3(-1.25 + cloud_index * 1.7,
+			3.8 - (cloud_index % 2) * 0.42, -14.08)
+		add_child(cloud)
+		for puff: int in range(3):
+			_sphere(cloud, Vector3((puff - 1) * 0.2, 0.06 if puff == 1 else 0.0, 0),
+				Vector3(0.25, 0.17, 0.045), Color("fff6df"))
+	_box(self, Vector3(0.14, 2.75, 0.16), Vector3(0.8, 3.2, -13.97), CREAM)
+	_box(self, Vector3(6.1, 0.14, 0.16), Vector3(0.8, 3.2, -13.97), CREAM)
+	_box(self, Vector3(6.75, 0.14, 0.7), Vector3(0.8, 1.67, -14.15), WOOD)
+	_box(self, Vector3(7.3, 0.09, 0.09), Vector3(0.8, 4.9, -13.93), DARK_WOOD)
+	for side: float in [-1.0, 1.0]:
+		for fold: int in range(4):
+			_cylinder(self, 0.16, 0.11, 2.9,
+				Vector3(0.8 + side * (3.0 + fold * 0.16), 3.3, -13.97),
+				CORAL.lightened(0.12 + fold * 0.03))
+
+
+# 装飾だけを追加し、既存の床・家具の衝突と小物配置を保つ。
+func _build_atelier_details() -> void:
+	for stitch: int in range(28):
+		for side: float in [-1.0, 1.0]:
+			_box(self, Vector3(0.23, 0.005, 0.025),
+				Vector3(-5.8 + stitch * 0.43, 0.036, 3.1 + side * 5.98), CREAM)
+	for stitch: int in range(28):
+		for side: float in [-1.0, 1.0]:
+			_box(self, Vector3(0.025, 0.005, 0.23),
+				Vector3(side * 6.08, 0.036, -2.65 + stitch * 0.43), CREAM)
+	for index: int in range(13):
+		var flag: PrismMesh = PrismMesh.new()
+		flag.size = Vector3(0.48, 0.55, 0.04)
+		var bunting: MeshInstance3D = _mesh(self, flag,
+			Vector3(-12.8 + index * 2.1, 4.62 - sin(index * 0.4) * 0.12, -14.51),
+			ITEM_COLORS[index % ITEM_COLORS.size()])
+		bunting.rotation.z = PI
+	_box(self, Vector3(27, 0.025, 0.025), Vector3(0, 4.82, -14.53), CREAM)
+	for index: int in range(4):
+		var display: Node3D = make_item_visual(0.65, index, CREAM)
+		display.position = Vector3(-11.8 + index * 1.5, 3.58, -11.6)
+		add_child(display)
+	for index: int in range(5):
+		var brush: MeshInstance3D = _cylinder(self, 0.035, 0.035, 0.85,
+			Vector3(9.3 + index * 0.1, 3.19, -10), DARK_WOOD)
+		brush.rotation.z = -0.2 + index * 0.11
+		_sphere(self, Vector3(9.24 + index * 0.13, 3.59, -10),
+			Vector3(0.065, 0.12, 0.065), ITEM_COLORS[index])
+	var spool: MeshInstance3D = _cylinder(self, 0.23, 0.23, 0.8,
+		Vector3(8.4, 2.55, -10.5), TEAL)
+	spool.rotation.z = PI / 2.0
+	for side: float in [-1.0, 1.0]:
+		var cap: MeshInstance3D = _cylinder(self, 0.29, 0.29, 0.055,
+			Vector3(8.4 + side * 0.42, 2.55, -10.5), CREAM)
+		cap.rotation.z = PI / 2.0
 
 
 # 家具の各部品をまとめて生成するため、部屋初期化時に一度呼ぶ。
@@ -261,3 +324,16 @@ static func _collision(body: StaticBody3D, size: Vector3, point: Vector3) -> voi
 	shape.shape = box
 	shape.position = point
 	body.add_child(shape)
+
+
+# 球の頂点数を抑え、背景の丸い装飾に共有材質を使う。
+static func _sphere(parent: Node3D, point: Vector3, size: Vector3,
+		color: Color) -> MeshInstance3D:
+	var sphere: SphereMesh = SphereMesh.new()
+	sphere.radius = 1.0
+	sphere.height = 2.0
+	sphere.radial_segments = 12
+	sphere.rings = 6
+	var visual: MeshInstance3D = _mesh(parent, sphere, point, color)
+	visual.scale = size
+	return visual

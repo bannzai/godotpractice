@@ -9,6 +9,7 @@
 #   make screenshot GAMES=shooter  # 描画付きの撮影 (games/shooter/tmp/screenshot-*.png)
 #   make run                       # ゲームを起動する。GAME 未指定ならブランチ名 game/<slug> から決める (worktree で使う)
 #   make run GAME=shooter          # ゲームを指定して起動する
+#   make shooter-run               # 同上 (<slug>-run。全ゲームぶん定義される。make list の slug が使える)
 GODOT ?= /Applications/Godot.app/Contents/MacOS/Godot
 GAMES ?= $(sort $(notdir $(patsubst %/,%,$(dir $(wildcard games/*/project.godot)))))
 # run の対象 1 本。作業者の worktree はブランチ game/<slug> で 1 ゲームを担当するため、ブランチ名から slug を取る
@@ -17,7 +18,10 @@ GAME ?= $(patsubst game/%,%,$(filter game/%,$(shell git branch --show-current 2>
 # ゲーム側の Makefile へそのまま委譲する target。1 ゲームでも失敗したら exit 非 0 で止まる
 DELEGATED_TARGETS := import check selfcheck lint test screenshot movie build-macos build-windows build-linux build-web build-all clean
 
-.PHONY: list run $(DELEGATED_TARGETS)
+# ゲームごとの起動 target (<slug>-run)。games/*/project.godot があるゲームぶん定義される
+RUN_TARGETS := $(addsuffix -run,$(GAMES))
+
+.PHONY: list run $(RUN_TARGETS) $(DELEGATED_TARGETS)
 
 list:
 	@printf '%s\n' $(GAMES)
@@ -27,6 +31,10 @@ run:
 	@test -n "$(GAME)" || { echo "GAME を指定してください (例: make run GAME=shooter)。ブランチ game/<slug> 上なら省略できます" >&2; exit 1; }
 	@test -f games/$(GAME)/project.godot || { echo "games/$(GAME)/project.godot が無い" >&2; exit 1; }
 	$(MAKE) -C games/$(GAME) run GODOT="$(GODOT)"
+
+# make <slug>-run: ブランチに関係なくそのゲームを起動する (例: make shooter-run)
+$(RUN_TARGETS):
+	$(MAKE) -C games/$(patsubst %-run,%,$@) run GODOT="$(GODOT)"
 
 $(DELEGATED_TARGETS):
 	@for game in $(GAMES); do \

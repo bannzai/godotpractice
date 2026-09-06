@@ -3,6 +3,7 @@ extends SceneTree
 ## release ビルドで assert が消えるため、明示的な判定と exit code で結果を返す。
 
 const Catalog = preload("res://scripts/card_catalog.gd")
+const Actor = preload("res://scripts/card_actor.gd")
 const Duel = preload("res://scripts/duel_state.gd")
 
 var failed: bool = false
@@ -14,6 +15,7 @@ func _initialize() -> void:
 	_check_assets_credited()
 	_check_input_actions()
 	_check_catalog()
+	_check_card_art()
 	_check_setup_and_phases()
 	_check_summoning_and_positions()
 	_check_battles()
@@ -41,8 +43,16 @@ func _check(cond: bool, label: String) -> void:
 
 func _check_input_actions() -> void:
 	for action: String in [
-		"duel_confirm", "duel_cancel", "duel_next", "duel_previous_hand", "duel_next_hand",
-		"duel_fullscreen", "duel_up", "duel_down", "duel_left", "duel_right",
+		"duel_confirm",
+		"duel_cancel",
+		"duel_next",
+		"duel_previous_hand",
+		"duel_next_hand",
+		"duel_fullscreen",
+		"duel_up",
+		"duel_down",
+		"duel_left",
+		"duel_right",
 	]:
 		_check(InputMap.has_action(action), "入力: %s が定義されている" % action)
 		if not InputMap.has_action(action):
@@ -394,3 +404,19 @@ func _check_cpu_matches() -> void:
 		max_steps = maxi(max_steps, steps)
 		_check(state.winner in [0, 1], "CPU対CPU: 有限手で終局 seed=%d" % seed_value)
 	print("CPU対CPU: 固定seed40局、最大%d操作で終局" % max_steps)
+
+
+func _check_card_art() -> void:
+	var hashes: Array[String] = []
+	for card: Dictionary in Catalog.cards():
+		var path: String = "res://assets/art/cards/%s.svg" % card.id
+		_check(ResourceLoader.exists(path), "個別画像が存在する: " + card.id)
+		var hash: String = FileAccess.get_sha256(path)
+		_check(not hash.is_empty() and not hashes.has(hash), "カード固有の画像: " + card.id)
+		hashes.append(hash)
+		var actor := Actor.new()
+		actor.setup(card.id, Vector2(320, 240))
+		_check(actor.body.texture != null, "本体画像を読み込める: " + card.id)
+		for action: String in Actor.ACTIONS:
+			_check(actor.animation_length(action) > 0.0, "アニメーションを読み込める: " + card.id + action)
+		actor.free()

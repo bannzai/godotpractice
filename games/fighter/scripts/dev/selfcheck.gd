@@ -7,6 +7,7 @@ const MATCH_SCRIPT: Script = preload("res://scripts/match_state.gd")
 
 var failed: bool = false
 var checked: int = 0
+var _main_scene: PackedScene
 var _first: FighterBody
 var _second: FighterBody
 var _contacts: int = 0
@@ -18,6 +19,8 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# SceneTreeスクリプトのpreload時点ではautoloadがまだ登録されていない。
+	_main_scene = load("res://scenes/main.tscn")
 	_check_scenes("res://scenes")
 	_check_assets_credited()
 	_check_audio()
@@ -28,6 +31,7 @@ func _run() -> void:
 	await _check_combat()
 	await _check_main_inputs(false)
 	await _check_main_inputs(true)
+	await _check_presentation()
 	print("検証条件数: %d" % checked)
 	if failed:
 		quit(1)
@@ -387,7 +391,7 @@ func _check_air_and_pause() -> void:
 
 func _check_main_inputs(gamepad: bool) -> void:
 	var label: String = "ゲームパッド" if gamepad else "キーボード"
-	var main: Control = load("res://scenes/main.tscn").instantiate()
+	var main: Control = _main_scene.instantiate()
 	var state: Node = root.get_node("Match")
 	var was_muted: bool = AudioServer.is_bus_mute(0)
 	AudioServer.set_bus_mute(0, true)
@@ -579,4 +583,109 @@ func _check_audio() -> void:
 	var music: AudioStreamWAV = load("res://assets/audio/arena.wav")
 	_check(music.loop_mode == AudioStreamWAV.LOOP_FORWARD, "BGMは前方ループ")
 	_check(music.loop_end > music.loop_begin, "BGMのループ区間が有効")
-	_check(music.get_length() >= 15.0, "BGMは16秒のフレーズ")
+	_check(music.get_length() >= 15.0, "競技場曲は15秒以上のフレーズ")
+	for name: String in ["title", "final", "result"]:
+		var track: AudioStreamWAV = load("res://assets/audio/%s.wav" % name)
+		_check(track.loop_mode == AudioStreamWAV.LOOP_FORWARD and track.loop_end > 0,
+			"場面別の曲がループする: " + name)
+		_check(track.get_length() >= 10.0, "場面別の曲に十分な長さがある: " + name)
+
+
+func _check_animation_assets() -> void:
+	for frames: SpriteFrames in [FighterVisual.TEAL, FighterVisual.AMBER]:
+		for stance: String in ["standing", "crouching", "air"]:
+			for kind: String in ["lp", "hp", "lk", "hk"]:
+				_check(frames.get_frame_count(stance + "_" + kind) == 8, "通常技8フレーム: " + stance + kind)
+		for action: String in ["idle", "walk", "jump", "hurt", "ko", "guard", "special"]:
+			_check(frames.get_frame_count(action) == 8, "状態8フレーム: " + action)
+	var teal: AtlasTexture = FighterVisual.TEAL.get_frame_texture("idle", 0)
+	var amber: AtlasTexture = FighterVisual.AMBER.get_frame_texture("idle", 0)
+	_check(teal.atlas != amber.atlas, "両キャラは独立した画像ファイルを使う")
+	for frames: SpriteFrames in [FighterVisual.TEAL, FighterVisual.AMBER]:
+		var first: AtlasTexture = frames.get_frame_texture("idle", 0)
+		var sheet: Image = first.atlas.get_image()
+		for action: StringName in frames.get_animation_names():
+			for index: int in range(frames.get_frame_count(action)):
+				var frame: AtlasTexture = frames.get_frame_texture(action, index)
+				var bounds: Rect2i = sheet.get_region(Rect2i(frame.region)).get_used_rect()
+				_check(bounds.position.x >= 2 and bounds.position.y >= 2 and
+					bounds.end.x <= int(frame.region.size.x) - 2 and
+					bounds.end.y <= int(frame.region.size.y) - 2,
+					"隣のセルの画像が混入しない透明余白: %s/%d" % [action, index])
+
+
+func _check_visual_timing(body: FighterBody) -> void:
+	body.enabled = true
+	body.start_attack("hp")
+	await _frames(3)
+	_check(body.visual.animation == &"standing_hp", "攻撃状態が対応するアニメーションへ反映")
+	body.hitstop = 0.15
+	var attack_time: float = body.attack_time
+	var frame: int = body.visual.frame
+	await _frames(4)
+	_check(body.attack_time == attack_time and body.visual.frame == frame, "ヒットストップで判定と画像が共に停止")
+	body.hitstop = 0.0
+	await _frames(45)
+	_check(body.action.is_empty() and body.visual.animation == &"idle", "攻撃硬直の終了で待機へ復帰")
+	body.control(Vector2.RIGHT)
+	await _frames(4)
+	_check(body.visual.animation == &"walk", "移動速度に歩行アニメーションが追随")
+	body.enabled = false
+	frame = body.visual.frame
+	await _frames(8)
+	_check(body.visual.frame == frame, "入力停止中は歩行フレームが進まない")
+	body.health = 0
+	await _frames(15)
+	_check(body.visual.animation == &"ko" and body.visual.frame > 0, "KOは入力停止後も倒れる動作が進む")
+	body.visible = false
+	frame = body.visual.frame
+	await _frames(8)
+	_check(body.visual.frame == frame, "一時停止の非表示中はKO動作も停止")
+	body.visible = true
+	await _frames(50)
+	_check(body.visual.frame == 7, "KOの末尾ポーズを保持")
+
+
+func _check_presentation() -> void:
+	_check_animation_assets()
+	var main: Control = _main_scene.instantiate()
+	root.add_child(main)
+	await _frames(35)
+	_check(main.music_name == "title" and main.bgm.playing, "タイトル曲を再生")
+	_check(main.screen_cover.modulate.a < 0.01, "タイトルのフェードが終了")
+	main.start_match()
+	main.previewing = true
+	main.intro = 0.0
+	await _frames(2)
+	_check(main.music_name == "arena", "対戦で競技場曲へ切替")
+	main.player.health = 875
+	await _frames(1)
+	_check(main.health_display[0] > 875.0 and main.health_display[0] < 1000.0,
+		"体力表示は実体力を変えず補間する")
+	_check(main.player.health == 875, "表示補間は戦闘の実体力を書き換えない")
+	await _frames(50)
+	_check(main.health_display[0] == 875.0 and main.health_trail[0] == 875.0,
+		"体力表示と遅れて減るゲージが実体力へ収束")
+	main.player.reset_fighter(Vector2(390, 570))
+	await _check_visual_timing(main.player)
+	_check(main.health_display[0] == 0.0, "KO時は表示数値も即座に0になる")
+	var state: Node = root.get_node("Match")
+	state.wins.assign([1, 0])
+	await _frames(2)
+	_check(main.music_name == "final", "どちらかがあと1本になると最終ラウンド曲")
+	main._spawn_effect(Vector2(600, 400), false, Color.WHITE)
+	await _frames(3)
+	_check(not get_nodes_in_group("combat_effects").is_empty(), "粒子とダメージ演出を生成")
+	await _frames(50)
+	_check(get_nodes_in_group("combat_effects").is_empty(), "粒子とダメージ演出は終了後に解放")
+	main._clear_arena()
+	state.wins.assign([2, 0])
+	state.screen = state.Screen.RESULT
+	await _frames(30)
+	_check(main.music_name == "result" and main.bgm.playing, "結果画面の曲を再生")
+	_check(main.screen_cover.modulate.a < 0.01, "結果画面へのフェードが終了")
+	main.stop_audio()
+	main.stop_audio()
+	_check(not main.bgm.playing and main.bgm.stream == null, "音声停止は繰返し可能でリソース参照を解放")
+	main.queue_free()
+	await create_timer(0.3).timeout

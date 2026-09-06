@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
+<defs>
+    <radialGradient id="back"><stop stop-color="#3e3140"/><stop offset="1" stop-color="#081722"/></radialGradient>
+    <radialGradient id="aura"><stop stop-color="#d79a55" stop-opacity=".45"/><stop offset="1" stop-color="#d79a55" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2=".8"><stop stop-color="#fff1ae"/><stop offset=".4" stop-color="#d79a55"/><stop offset=".68" stop-color="#6f3342"/><stop offset="1" stop-color="#d79a55"/></linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#b35e60"/><stop offset=".55" stop-color="#592c42"/><stop offset="1" stop-color="#0c202f"/></linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#eef8e4"/><stop offset=".45" stop-color="#c5dfd5"/><stop offset=".48" stop-color="#557589"/><stop offset="1" stop-color="#a0c4bf"/></linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3d9ad"/><stop offset=".55" stop-color="#d7ad84"/><stop offset="1" stop-color="#8e6965"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#ffffe1"/><stop offset=".3" stop-color="#fff1ae"/><stop offset=".7" stop-color="#d79a55"/><stop offset="1" stop-color="#6f3342"/></radialGradient>
+    </defs><path d="M87 84L87 214" fill="none" stroke="#edc88a" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" /><circle cx="87" cy="79" r="18" fill="none" stroke="#edc88a" stroke-width="3" /><path d="M87 66l9.1 13 -9.1 13 -9.1 -13Z" fill="#ffe2a0" stroke="#edc88a" stroke-width="0.8" stroke-linejoin="round" stroke-linecap="round" /><path d="M87 66v26m-9.1 -13h18.2" fill="none" stroke="#fff9dc" stroke-width="0.7" stroke-linejoin="round" stroke-linecap="round" /><path d="M229 212L231 82 238 62 244 83 240 211Z" fill="url(#blade)" stroke="#101b2a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M220 140h34" fill="none" stroke="#edc88a" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" />
+</svg>

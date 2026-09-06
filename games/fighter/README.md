@@ -1,6 +1,6 @@
 # 燈環闘技
 
-夕暮れの工業都市で、二人の装甲闘士が競う1人用の2D格闘ゲーム。
+夕暮れの工業都市で、軽装の蒼と重装の燈が競う1人用の2D格闘ゲーム。
 
 リポジトリルートで `make -C games/fighter run` を実行して起動する。タイトルから闘士を選び、CPUとの試合に進む。1ラウンド99秒、2本先取。体力が0になるか時間切れでラウンドが終了する。残り体力が同じ場合は本数を加算せず再ラウンドになる。
 
@@ -36,4 +36,19 @@
 
 `make screenshot GAMES=fighter` はタイトル・選択・対戦・全12通常技の途中・命中・ガード・必殺技・KO・勝敗結果・タイトル復帰・全画面を撮影する。`make movie GAMES=fighter` は起動から5秒の映像を生成する。
 
+`make -C games/fighter movie-play` は `scripts/dev/demo.gd` から `Input.parse_input_event()` で実際のキー入力を時刻ごとに投入し、29秒・30fpsの映像を生成する。タイトル → 闘士選択 → 移動 → ジャンプ攻撃 → しゃがみガード → 通常技 → 下・斜め下前・前＋拳による必殺技 → 被弾 → 結果 → タイトル復帰を通る。入力したことに加え、ゲーム上で移動・ジャンプ・通常技・ガード・被弾・必殺技の発射が発生したことも検査する。
+
+この短い録画で結果画面まで撮るため、録画専用スクリプトは15秒以降の第1戦、22.5秒以降の第2戦で、CPUよりプレイヤーの体力が少ない場合に残り時間だけを0.05秒へ短縮する。HP・ダメージ・2本先取の処理は変更せず、短縮した時刻と実際の体力をログに残す。通常プレイとエクスポートにはこの短縮処理は入らない。99秒を実時間で待った録画ではなく、通常ルールの検証は `selfcheck` が担う。
+
+成果物は `games/fighter/tmp/movie-play.mp4`、2秒間隔の `movie-play-frame-*.png`、一覧の `movie-play-frames.png`、末尾の `movie-play-last.png`。ジャンプと必殺技は0.1秒間隔でも抽出し、`movie-play-jump-frames.png` と `movie-play-special-frames.png` にまとめる。映像の長さと30fps、音声の最大音量が−55dBを超えること、末尾画像が黒一色でないこと、ログ全文のWARNING・ERROR・終了時リークをコマンドで検査する。PNG一覧と末尾画像を目視し、キャラの動き・演出・画面遷移が終わっていることを確認する。
+
+`make -C games/fighter shutdown-check` は通常起動からの自動終了と `--quit-after 90` の終了を描画付きで実行し、両方のログ全文にエラー・警告・終了時リークがないことを検査する。音声停止後はミキサーの解放を待つ。録画シナリオでは停止後15フレーム（0.5秒）待ってから終了する。
+
 素材の出典・生成条件とフォントの利用条件は `assets/CREDITS.md` に記録している。音声は `python3 games/fighter/scripts/dev/generate_audio.py` で同じ内容に再生成できる。
+
+
+## 素材の再生成
+
+キャラクターは `python3 games/fighter/scripts/dev/generate_characters.py`、舞台・ロゴ・飛び道具・HUD部品は `python3 games/fighter/scripts/dev/generate_stage.py` で再生成する。後者のロゴの輪郭化にはPythonのfontToolsを使用する。生成後は `make import GAMES=fighter` を実行する。
+
+`make screenshot GAMES=fighter` は、各キャラ22動作の開始・中間・終了、打撃とガードの時間経過、KO、2種類の燈波、ボタンのホバー・押下、フェードの途中と完了を撮影する。ゲーム内の動きは `FighterVisual` が戦闘の時間に同期するため、攻撃の発生・硬直・ヒットストップを変えずに素材を差し替えられる。

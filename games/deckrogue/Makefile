@@ -21,6 +21,7 @@ MOVIE_FRAMES ?= 150
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
 	@mkdir -p $(LOG_DIR)
+	@touch $(LOG_DIR)/.gdignore
 	"$(GODOT)" --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
@@ -73,7 +74,7 @@ movie: import
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	"$(GODOT)" --path .
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
@@ -108,3 +109,16 @@ build-all: build-macos build-windows build-linux
 
 clean:
 	rm -rf build $(LOG_DIR)
+
+# 実入力による30秒のプレイ録画。通常の起動録画とは独立して検証する。
+.PHONY: movie-play
+movie-play: import
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
+	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
+	grep -q 'demo OK' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/movie-play-frame-%02d.png
+	ffmpeg -loglevel error -y -sseof -0.1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png

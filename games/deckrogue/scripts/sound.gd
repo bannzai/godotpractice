@@ -1,27 +1,36 @@
 extends Node
 ## BGM の切替は同じ曲なら再開しない。SE は操作ごとの発音なので非冪等。
 
+signal shutdown_finished
+
 var music: AudioStreamPlayer
 var effects: Array[AudioStreamPlayer] = []
 var current_track: String = ""
 var muted: bool = false
 var voice: int = 0
+var shutting_down: bool = false
+var shutdown_started: bool = false
+var shutdown_complete: bool = false
+var has_played: bool = false
+var drain_seconds: float = 0.12
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	drain_seconds = maxf(0.12, AudioServer.get_output_latency() * 2.0)
 	music = AudioStreamPlayer.new()
-	music.volume_db = -16
+	music.volume_db = -12
 	add_child(music)
 	for index: int in range(4):
 		var player := AudioStreamPlayer.new()
-		player.volume_db = -12
+		player.volume_db = -8
 		add_child(player)
 		effects.append(player)
 
 
 func track(name: String) -> void:
 	# headless は音声出力がなく、即終了時の WAV 再生保持も避ける。
-	if DisplayServer.get_name() == "headless":
+	if shutting_down or DisplayServer.get_name() == "headless":
 		return
 	if current_track == name:
 		return
@@ -32,14 +41,16 @@ func track(name: String) -> void:
 	music.stream = stream
 	if not muted:
 		music.play()
+		has_played = true
 
 
 # 入力イベントに対して一度発音するため、反復呼び出しでは別の音を重ねる。
 func play(name: String) -> void:
-	if muted or DisplayServer.get_name() == "headless":
+	if muted or shutting_down or DisplayServer.get_name() == "headless":
 		return
 	effects[voice].stream = load("res://assets/audio/" + name + ".wav")
 	effects[voice].play()
+	has_played = true
 	voice = (voice + 1) % effects.size()
 
 
@@ -54,12 +65,14 @@ func set_muted(value: bool) -> void:
 		current_track = ""
 		if not previous.is_empty():
 			track(previous)
-	music.volume_db = -80 if muted else -16
+	music.volume_db = -80 if muted else -12
 	for player: AudioStreamPlayer in effects:
-		player.volume_db = -80 if muted else -12
+		player.volume_db = -80 if muted else -8
 
 
 func stop_all() -> void:
+	if not is_instance_valid(music):
+		return
 	music.stop()
 	music.stream = null
 	for player: AudioStreamPlayer in effects:
@@ -67,5 +80,28 @@ func stop_all() -> void:
 		player.stream = null
 
 
+func shutdown() -> void:
+	if shutdown_complete:
+		return
+	if shutdown_started:
+		await shutdown_finished
+		return
+	shutdown_started = true
+	shutting_down = true
+	stop_all()
+	# stop() は音声スレッドへ停止を予約する。ツリー解放より前に実時間と
+	# フレームの両方を進め、AudioStreamPlaybackWAV の参照解放を待つ。
+	await get_tree().create_timer(drain_seconds, true, false, true).timeout
+	for frame: int in range(3):
+		await get_tree().process_frame
+	shutdown_complete = true
+	shutdown_finished.emit()
+
+
 func _exit_tree() -> void:
 	stop_all()
+	# --quit-after はエンジンが消費し、GDScript から終了期限を取得できない。
+	# 終了通知後は await でツリーを延命できないため、この経路だけ同期して
+	# 音声スレッドの停止を待つ。通常のウィンドウ終了は shutdown() を使う。
+	if has_played and not shutdown_complete:
+		OS.delay_msec(int(ceil(drain_seconds * 1000.0)))

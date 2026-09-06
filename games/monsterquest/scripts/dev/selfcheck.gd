@@ -15,6 +15,7 @@ func _run() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
 	await preload("res://scripts/dev/input_checks.gd").run(_check, self)
+	await preload("res://scripts/dev/polish_checks.gd").run(_check, self)
 
 	if failed:
 		quit(1)

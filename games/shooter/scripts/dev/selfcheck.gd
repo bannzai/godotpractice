@@ -4,6 +4,7 @@ extends SceneTree
 
 const StateScript: GDScript = preload("res://scripts/game_state.gd")
 const Stage: GDScript = preload("res://scripts/stage_data.gd")
+const Ship: GDScript = preload("res://scripts/ship_sprite.gd")
 const TEST_SAVE: String = "res://tmp/selfcheck-save.json"
 
 var failed: bool = false
@@ -12,6 +13,7 @@ var failed: bool = false
 func _initialize() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_ship_animations()
 	_check_game_state()
 	_check_save_data()
 	_check_waves()
@@ -75,6 +77,69 @@ func _check_asset_directory(path: String, credits: String) -> void:
 		)
 	for subdirectory: String in directory.get_directories():
 		_check_asset_directory(path.path_join(subdirectory), credits)
+
+
+func _check_ship_animations() -> void:
+	var sheets: Array[Texture2D] = []
+	for kind: String in ["player", "scout", "aim", "fan", "boss"]:
+		var sprite: AnimatedSprite2D = Ship.new()
+		sprite.setup(kind)
+		_check(sprite.animation == &"idle" and sprite.is_playing(), kind + ": 初回は待機を再生")
+		var frames: SpriteFrames = sprite.sprite_frames
+		_check(frames != null, kind + ": フレーム資源が存在")
+		if frames == null:
+			sprite.free()
+			continue
+		var sheet: Texture2D = _check_ship_frames(frames, kind)
+		_check(sheet != null and sheet not in sheets, kind + ": 他の機種と独立した画像")
+		if sheet != null:
+			sheets.append(sheet)
+		sprite.set_pose("move")
+		sprite.frame = 2
+		sprite.setup(kind)
+		_check(sprite.sprite_frames == frames, kind + ": 再初期化で同じフレーム資源を保持")
+		_check(
+			sprite.animation == &"move" and sprite.frame == 2 and sprite.is_playing(),
+			kind + ": 再初期化で再生中の状態とフレームを巻き戻さない"
+		)
+		var second: AnimatedSprite2D = Ship.new()
+		second.setup(kind)
+		_check(second.sprite_frames == frames, kind + ": 同種の別個体もフレーム資源を共有")
+		# tree 外の Node は即時解放する。共有 SpriteFrames の所有は機体スクリプトに残す。
+		second.free()
+		sprite.free()
+
+
+func _check_ship_frames(frames: SpriteFrames, kind: String) -> Texture2D:
+	var sheet: Texture2D = null
+	var regions: Array[Rect2] = []
+	var cell: Vector2 = Vector2(256, 160) if kind == "boss" else Vector2(128, 128)
+	_check(frames.get_animation_names().size() == 5, kind + ": アニメーションは5状態")
+	for pose: String in ["idle", "move", "attack", "hit", "death"]:
+		var label: String = kind + "/" + pose
+		_check(frames.has_animation(pose), label + ": 状態が存在")
+		if not frames.has_animation(pose):
+			continue
+		_check(frames.get_frame_count(pose) == 4, label + ": 連続4フレームが存在")
+		_check(frames.get_animation_speed(pose) > 0, label + ": 再生速度は正")
+		if pose == "death":
+			_check(not frames.get_animation_loop(pose), label + ": 死亡は繰り返さない")
+		for index: int in range(frames.get_frame_count(pose)):
+			var atlas: AtlasTexture = frames.get_frame_texture(pose, index) as AtlasTexture
+			_check(atlas != null and atlas.atlas != null, label + ": シートから画像を切り出す")
+			if atlas == null or atlas.atlas == null:
+				continue
+			if sheet == null:
+				sheet = atlas.atlas
+			_check(atlas.atlas == sheet, label + ": 同一機種の全状態は1枚のシートに収まる")
+			var bounds: Rect2 = Rect2(Vector2.ZERO, atlas.atlas.get_size())
+			_check(atlas.region.size == cell, label + ": 切り出しサイズを保持")
+			_check(bounds.encloses(atlas.region), label + ": 切り出しがシート内に収まる")
+			for existing: Rect2 in regions:
+				_check(not existing.intersects(atlas.region), label + ": 各フレームは別領域")
+			regions.append(atlas.region)
+	_check(regions.size() == 20, kind + ": 全状態の20フレームを検証")
+	return sheet
 
 
 func _check_game_state() -> void:

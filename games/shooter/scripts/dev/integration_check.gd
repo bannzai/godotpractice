@@ -26,6 +26,7 @@ func _run() -> void:
 	_check_direction_inputs()
 	_check_collisions_and_items()
 	_check_bomb_and_damage()
+	_check_repeated_hit_animation()
 	await _check_full_stage()
 	_release_inputs()
 	game.music.stop()
@@ -261,3 +262,34 @@ func _release_inputs() -> void:
 		_key(code, false)
 	_button(JOY_BUTTON_A, false)
 	_axis(JOY_AXIS_LEFT_X, 0.0)
+
+
+func _check_repeated_hit_animation() -> void:
+	game.start_run()
+	state.elapsed = Stage.BOSS_TIME
+	game.wave_index = game.waves.size()
+	game.boss_active = true
+	game.boss_hp = Stage.BOSS_HP
+	game.invulnerable = 10.0
+	var saw_hit: bool = false
+	var saw_attack: bool = false
+	var saw_movement: bool = false
+	for tick: int in range(150):
+		if tick % 8 == 0:
+			game.damage_boss(1)
+		game.advance(1.0 / 60.0)
+		saw_hit = saw_hit or game.boss_pose == "hit"
+		saw_attack = saw_attack or game.boss_pose == "attack"
+		saw_movement = saw_movement or game.boss_pose in ["idle", "move"]
+	_check(saw_hit and saw_attack and saw_movement, "連射命中が続いてもボスの被弾・攻撃・通常姿勢が切り替わる")
+	game.damage_boss(Stage.BOSS_HP)
+	_check(game.boss_pose == "death", "撃破時は被弾より死亡姿勢を優先")
+	var has_death: bool = false
+	for effect: Dictionary in game.effects:
+		has_death = (
+			has_death or (effect.get("kind", "") == "death" and effect.get("actor", "") == "boss")
+		)
+	_check(has_death, "結果へ移っても死亡アニメーション用データを残す")
+	_check(game.music.stream.resource_path.ends_with("result.ogg"), "撃破後に結果BGMへ切替")
+	game.return_title()
+	_check(game.music.stream.resource_path.ends_with("title.ogg"), "タイトルへ戻ると専用BGMへ切替")

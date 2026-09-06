@@ -112,7 +112,7 @@ exitcheck: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/exit-normal.log $(LOG_DIR)/exit-quit-after.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	@mkdir -p $(LOG_DIR)
 	"$(GODOT)" $(ENGINE_LOG) --path . $(RUN_ARGS)
 
