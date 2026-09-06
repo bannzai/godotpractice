@@ -84,3 +84,20 @@
 - godot-developmentへ、キャラ別シートの足元基準、フレーム重複検査、実キー入力とフォーカス喪失、エンジン消費後の引数と音声終了の注意を追加すると再利用できる。
 - `compose_evidence.py` のように、撮影PNGから演出の開始・途中・終端を並べ、PR添付を更新する処理をskill化したい。今回はゲーム内のスクリプトとして用意し、共有skill自体は変更していない。
 - 音声を実際に聴いて比較する評価経路が必要。生成方法ごとの向き不向きは今回実測したSVG/PCM合成に限って記録し、未使用の画像生成サービスや外部素材サイトとの比較はしない。
+
+### 第2ラウンドの検証結果
+
+- ローカルの `make test GAMES=platformer`、`make screenshot GAMES=platformer`、`make movie GAMES=platformer`、`make build-all GAMES=platformer`、`make build-web GAMES=platformer` はすべてexit 0。保存したログ全文にWARNING/ERRORはなかった。
+- `movie-play` と `exitcheck` はゲーム固有targetとして追加したため、`make -C games/platformer movie-play` / `make -C games/platformer exitcheck` で実行する。共有Makefileは作業範囲外なので変更していない。PR #25は検証時点で未マージのため、起動は指定の代替targetで確認した。
+- 最終画面で再生成したプレイ録画は29.93秒、最終結果への到達は26.82秒。2秒間隔の15枚と末尾フレームを目視し、草原から洞窟、最終結果まで確認した。
+- CIのartifactでも各画面、主人公・敵2種の連続フレーム、物体一覧、8演出、起動動画の0.5秒間隔のフレームを目視した。Linuxでは既知のllvmpipeによるV-Sync未対応警告が各描画ログに1件あり、ゲーム由来のWARNING/ERRORとリーク警告はなかった。CIのrun URLと添付画像はPR本文を正とする。
+
+### Webの実操作で見つかったこと
+
+- Webtunnelは `--software-webgl --ref polish/platformer` で起動し、callerが指定するポート8000のWeb版を開いた。スキルの一般例の8080では接続できないため、callerの `port` を確認する。1280×656のブラウザには16:9のゲームを左右余白付きで表示する。
+- `agent-browser press ArrowRight` はGodotへ `physical_keycode=4194321`、右移動の強度1として届いた。一方、この環境の `keydown ArrowRight` は `keycode=4194321` でも `physical_keycode=65`（A）となり、左移動の強度1になった。長押し操作ではDキーを使い、矢印の確認はpressで行った。InputMapを逆に変更して合わせてはいけない。
+- 調査では配信PCKの `project.binary`、エンジンJS/WASMのハッシュをローカルと比較し、同じ値とバイナリであることを確認した。その後、ブラウザ内だけで観測用ノードを追加したPCKを一時起動し、受信イベントと入力強度を記録して操作ツール側の不一致を特定した。診断ファイルはtmpに置き、配信ソースやPRには含めていない。
+- Web版のreleaseテンプレートでは今回 `--script` による診断起動は機能しなかった。Engineの `preloadFile` と `start` で診断PCKを使う場合、`start` の前に `init("index")` が必要だった。公式API: https://docs.godotengine.org/en/stable/tutorials/platform/web/html5_shell_classref.html
+- 上記のキー長押しと公開APIによる一時観測を、agent-browser / godot-development skillの調査例に追記すると再利用できる。共有skillへの変更は今回行っていない。
+- 通常起動のWeb版で、決定・移動・ジャンプ・再挑戦・マウスによるタイトル復帰を実操作した。タイトル、プレイ、残機切れの結果、タイトル復帰を撮影し、最新通常起動からのコンソールにWARNING/ERRORがないことを確認した。検証後に `down platformer` を実行し、workflowの終了を確認した。
+- PUTSの保存済み設定を読む際、macOSのアプリデータアクセス同意待ち／SQLiteエラー23が発生した。許可が通った実行ではアップロードできた。未添付の物体・演出・録画・Webの確認済み画像を1枚の比較用PNGへまとめ、追加1回のアップロードで添付を完了した。公開URLから取り直した画像と元PNGのSHA-256一致を確認した。OSのアクセス設定やアプリ保存データは変更していない。
