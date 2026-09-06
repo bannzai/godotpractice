@@ -3,12 +3,14 @@ extends Node3D
 
 const Room = preload("res://scripts/room.gd")
 const Hud = preload("res://scripts/hud.gd")
+const Effects = preload("res://scripts/effects.gd")
+const BallScene = preload("res://assets/models/ball.tscn")
 
 var room: Node3D
 var items: Node3D
 var ball: CharacterBody3D
 var rolling: Node3D
-var core: MeshInstance3D
+var core: Node3D
 var ball_shape: SphereShape3D
 var camera: Camera3D
 var hud: Control
@@ -22,13 +24,32 @@ var previous_phase: String = "title"
 var demo_mode: bool = false
 var demo_elapsed: float = 0.0
 var demo_target: StaticBody3D
+var effects: Node3D
+var hit_pause: float = 0.0
+var shake: float = 0.0
+var growth_stage: int = 0
+var music_kind: String = ""
+var music_tween: Tween
+var audio_stopped: bool = false
+var quitting: bool = false
+var quit_frame: int = 0
+var title_elapsed: float = 0.0
 
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
+	var arguments: PackedStringArray = OS.get_cmdline_args()
+	var quit_index: int = arguments.find("--quit-after")
+	if quit_index >= 0 and quit_index + 1 < arguments.size():
+		quit_frame = int(arguments[quit_index + 1])
+		# 解放を待てないほど短い終了指定では、再生バッファを作らない。
+		audio_stopped = quit_frame > 0 and quit_frame <= 12
 	room = Room.new()
 	add_child(room)
 	items = Node3D.new()
 	add_child(items)
+	effects = Effects.new()
+	add_child(effects)
 	_create_ball()
 	camera = Camera3D.new()
 	camera.fov = 55.0
@@ -41,13 +62,8 @@ func _ready() -> void:
 	hud.start_requested.connect(start_run)
 	hud.title_requested.connect(show_title)
 	music = AudioStreamPlayer.new()
-	music.stream = load("res://assets/audio/music.wav")
 	music.volume_db = -12.0
 	add_child(music)
-	music.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	# 描画なし検証の Dummy 音声ドライバでは再生バッファを作らない。
-	if AudioServer.get_driver_name() != "Dummy" or OS.has_feature("movie"):
-		music.play()
 	sound = AudioStreamPlayer.new()
 	sound.volume_db = -9.0
 	add_child(sound)
@@ -81,6 +97,7 @@ func start_run() -> void:
 	_update_camera(1.0, true)
 	hud.show_mode("playing")
 	previous_phase = "playing"
+	_set_music("play")
 
 
 func show_title() -> void:
@@ -90,9 +107,11 @@ func show_title() -> void:
 	camera.look_at(Vector3(0.0, 0.0, -1.5))
 	hud.show_mode("title")
 	previous_phase = "title"
+	_set_music("title")
 
 
 func _reset_world() -> void:
+	effects.clear()
 	for child: Node in items.get_children():
 		child.free()
 	for child: Node3D in attached:
@@ -104,6 +123,14 @@ func _reset_world() -> void:
 	ball.position = Vector3(0.0, RunState.diameter * 0.5 + 0.02, 8.0)
 	ball.velocity = Vector3.ZERO
 	bump_cooldown = 0.0
+	effect_time = 0.0
+	hit_pause = 0.0
+	shake = 0.0
+	if is_instance_valid(camera):
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
+	growth_stage = 0
+	core.play_state("idle")
 	demo_target = null
 	_sync_size()
 
@@ -140,31 +167,8 @@ func _create_ball() -> void:
 	ball.add_child(collider)
 	rolling = Node3D.new()
 	ball.add_child(rolling)
-	core = MeshInstance3D.new()
-	var sphere: SphereMesh = SphereMesh.new()
-	sphere.radius = 0.5
-	sphere.height = 1.0
-	sphere.radial_segments = 24
-	sphere.rings = 12
-	core.mesh = sphere
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = Color("ed795c")
-	material.roughness = 0.72
-	core.material_override = material
+	core = BallScene.instantiate()
 	rolling.add_child(core)
-	for axis: int in range(3):
-		var band: MeshInstance3D = MeshInstance3D.new()
-		var ring: TorusMesh = TorusMesh.new()
-		ring.inner_radius = 0.48
-		ring.outer_radius = 0.505
-		ring.rings = 24
-		ring.ring_segments = 8
-		band.mesh = ring
-		var stripe: StandardMaterial3D = StandardMaterial3D.new()
-		stripe.albedo_color = Color("fff0c9")
-		band.material_override = stripe
-		band.rotation = Vector3(PI / 2.0 if axis == 1 else 0.0, 0.0, PI / 2.0 if axis == 2 else 0.0)
-		core.add_child(band)
 
 
 func _physics_process(delta: float) -> void:
@@ -175,6 +179,14 @@ func _physics_process(delta: float) -> void:
 	if RunState.phase != "playing":
 		return
 	RunState.tick(delta)
+	if RunState.phase != "playing":
+		_finish_run()
+		return
+	if RunState.remaining <= 30.0:
+		_set_music("urgent")
+	if hit_pause > 0.0:
+		hit_pause = maxf(0.0, hit_pause - delta)
+		return
 	bump_cooldown = maxf(0.0, bump_cooldown - delta)
 	effect_time = maxf(0.0, effect_time - delta)
 	yaw += Input.get_axis("camera_left", "camera_right") * delta * 1.8
@@ -203,15 +215,39 @@ func _physics_process(delta: float) -> void:
 			Vector3.UP.cross(travel).normalized(), travel.length() / (RunState.diameter * 0.5)
 		)
 	ball.position.y = RunState.diameter * 0.5 + 0.02
+	if core.visual_state not in ["collect", "bump"]:
+		core.play_state("move" if travel.length() > 0.001 else "idle")
 	_sync_size()
 	_update_camera(delta)
 	if RunState.phase != previous_phase:
-		hud.show_mode(RunState.phase)
-		_play_sound("win" if RunState.phase == "won" else "lose")
-		previous_phase = RunState.phase
+		_finish_run()
 
 
-func _process(_delta: float) -> void:
+func _finish_run() -> void:
+	if RunState.phase == previous_phase:
+		return
+	camera.h_offset = 0.0
+	camera.v_offset = 0.0
+	hud.show_mode(RunState.phase)
+	var won: bool = RunState.phase == "won"
+	core.play_state("celebrate" if won else "lost")
+	for visual: Node3D in attached:
+		visual.play_state("celebrate" if won else "lost")
+	_play_sound("win" if won else "lose")
+	_set_music("finish" if won else "timeout")
+	if won:
+		effects.burst(ball.position, RunState.diameter, "win")
+	previous_phase = RunState.phase
+
+
+func _process(delta: float) -> void:
+	if quit_frame > 0 and Engine.get_process_frames() >= maxi(0, quit_frame - 12):
+		stop_audio()
+	shake = maxf(0.0, shake - delta)
+	if RunState.phase == "title":
+		title_elapsed += delta
+		camera.position = Vector3(17.0 + sin(title_elapsed * 0.18) * 0.7, 17.0, 23.0)
+		camera.look_at(Vector3(0.0, 0.0, -1.5))
 	hud.update_values(effect_time, bump_cooldown)
 
 
@@ -243,11 +279,22 @@ func _attach_item(item: StaticBody3D) -> void:
 	attached.append(visual)
 	items.remove_child(item)
 	item.queue_free()
+	var before_diameter: float = RunState.diameter
 	RunState.collect(pow(float(entry.size), 3.0) * 0.8)
+	visual.play_state("collect")
+	core.play_state("collect")
 	effect_time = 0.65
 	_sync_size()
 	_play_sound("pickup")
-	_spawn_sparkles()
+	effects.burst(ball.position, RunState.diameter, "pickup")
+	hud.show_pickup(RunState.diameter - before_diameter)
+	var stage: int = floori((RunState.diameter - RunState.INITIAL_DIAMETER) / 0.6)
+	if stage > growth_stage:
+		growth_stage = stage
+		effects.burst(ball.position, RunState.diameter, "growth")
+		hud.show_growth()
+		_play_sound("growth")
+		shake = 0.16
 
 
 func _sync_size() -> void:
@@ -264,6 +311,11 @@ func _bump(normal: Vector3) -> void:
 	bump_cooldown = 0.85
 	ball.velocity = normal * 6.0
 	_play_sound("bump")
+	hit_pause = 0.055
+	shake = 0.28
+	core.play_state("bump")
+	hud.show_bump(not attached.is_empty())
+	effects.burst(ball.position, RunState.diameter, "bump")
 	if attached.is_empty():
 		return
 	var visual: Node3D = attached.pop_back()
@@ -275,6 +327,7 @@ func _bump(normal: Vector3) -> void:
 	entry.position.z = clampf(entry.position.z, -13.0, 13.0)
 	visual.queue_free()
 	var dropped: StaticBody3D = _spawn_item(entry)
+	dropped.get_node("Visual").play_state("bump")
 	dropped.set_meta("available_at", Time.get_ticks_msec() / 1000.0 + 1.0)
 	_sync_size()
 
@@ -293,37 +346,38 @@ func _update_camera(delta: float, snap: bool = false) -> void:
 		target = Vector3(hit.position) + (focus - Vector3(hit.position)).normalized() * 0.3
 	camera.position = target
 	camera.look_at(focus)
+	if shake > 0.0 and not snap:
+		var time: float = Time.get_ticks_msec() * 0.001
+		camera.h_offset = sin(time * 67.0) * shake * 0.18
+		camera.v_offset = cos(time * 53.0) * shake * 0.12
+	else:
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
 
 
 func _play_sound(kind: String) -> void:
-	if AudioServer.get_driver_name() == "Dummy" and not OS.has_feature("movie"):
+	if audio_stopped or (AudioServer.get_driver_name() == "Dummy" and not OS.has_feature("movie")):
 		return
 	sound.stream = load("res://assets/audio/%s.wav" % kind)
 	sound.play()
 
 
-## 短命な演出ノードを生成し、Tween 完了時に解放する。
-func _spawn_sparkles() -> void:
-	for index: int in range(6):
-		var sparkle: MeshInstance3D = MeshInstance3D.new()
-		var mesh: SphereMesh = SphereMesh.new()
-		mesh.radius = 0.055
-		mesh.height = 0.11
-		mesh.radial_segments = 6
-		mesh.rings = 3
-		sparkle.mesh = mesh
-		var material: StandardMaterial3D = StandardMaterial3D.new()
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.albedo_color = Color("ffe7a1")
-		sparkle.material_override = material
-		add_child(sparkle)
-		sparkle.position = ball.position
-		var angle: float = float(index) * TAU / 6.0
-		var end: Vector3 = ball.position + Vector3(cos(angle), 1.3, sin(angle)) * RunState.diameter
-		var tween: Tween = create_tween().set_parallel()
-		tween.tween_property(sparkle, "position", end, 0.45)
-		tween.tween_property(sparkle, "scale", Vector3.ONE * 0.05, 0.45)
-		tween.chain().tween_callback(sparkle.queue_free)
+func _set_music(kind: String) -> void:
+	if music_kind == kind or audio_stopped:
+		return
+	music_kind = kind
+	if AudioServer.get_driver_name() == "Dummy" and not OS.has_feature("movie"):
+		return
+	if music_tween:
+		music_tween.kill()
+	music.stop()
+	music.stream = load("res://assets/audio/%s.wav" % kind)
+	music.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	music.stream.loop_end = music.stream.data.size() / 2 / (2 if music.stream.stereo else 1)
+	music.volume_db = -28.0
+	music.play()
+	music_tween = create_tween()
+	music_tween.tween_property(music, "volume_db", -12.0, 0.6)
 
 
 ## 開発用録画も通常と同じ移動・衝突・回収処理を通す。
@@ -346,8 +400,38 @@ func _demo_direction() -> Vector3:
 	return direction.normalized()
 
 
-func _exit_tree() -> void:
+func stop_audio() -> void:
+	audio_stopped = true
+	if music_tween:
+		music_tween.kill()
 	if is_instance_valid(music):
 		music.stop()
+		music.stream = null
 	if is_instance_valid(sound):
 		sound.stop()
+		sound.stream = null
+
+
+## 音声スレッドが停止通知を消費してから終了するため、複数フレームを待つ。
+func prepare_shutdown() -> void:
+	stop_audio()
+	for _frame: int in range(8):
+		await get_tree().process_frame
+
+
+func request_quit() -> void:
+	if quitting:
+		return
+	quitting = true
+	set_physics_process(false)
+	await prepare_shutdown()
+	get_tree().quit(0)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		request_quit()
+
+
+func _exit_tree() -> void:
+	stop_audio()
