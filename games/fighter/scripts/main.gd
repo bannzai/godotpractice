@@ -450,7 +450,7 @@ func _rebuild_buttons() -> void:
 				_button("対戦を続ける", Rect2(470, 353, 340, 60), _resume)
 				_button("タイトルへ戻る", Rect2(470, 434, 340, 60), show_title)
 		Match.Screen.RESULT:
-			_button("もう一度対戦   ↵", Rect2(265, 538, 360, 62), start_match)
+			_button("もう一度対戦", Rect2(265, 538, 360, 62), start_match)
 			_button("タイトルへ戻る", Rect2(655, 538, 360, 62), show_title)
 
 

@@ -70,6 +70,8 @@
 - `--quit-after` は通常のウィンドウ終了通知を通らず、`OS.get_cmdline_args()` にも残らない。通常終了は音声停止後のTimerを待ち、共通の `_exit_tree` ではstream参照を外してミキサースレッドへ250msを与える。固定fpsのフレーム待ちは実時間の解放待ちにならない点に注意する。Webでは終了時のブロッキング待機を行わない。
 - 撮影した一時PNGがGodotに再インポートされていた。import targetで `tmp/.gdignore` を用意し、開発用の撮影成果物をリソース探索・エクスポートから除外した。
 - `make test GAMES=fighter` は714条件でexit 0。`make screenshot GAMES=fighter` は56枚でexit 0。全22動作×2人の開始・途中・終了、全通常技、打撃・ガード・KOの途中、キャラ別の燈波、ホバー・押下・画面遷移を目視し、セルの混入・欠け・文字の重なりがないことを確認した。
+- webtunnelのSwiftShaderでもタイトル→選択→CPUとの2ラウンド→結果まで実入力で進められた。caller workflowの配信ポートは8000。macOSとLinuxでは代替フォントで表示できた再戦ボタンの「↵」がWebでは欠字になり、文言から外した。デスクトップの撮影だけでは見つからない差だった。
+- PUTSの既定Keychain読み取りはこの環境ではOSStatus -25291となった。新しいキーは発行せず、既存のGitHub画像用R2認証をPUTSの環境変数へ渡すことで `puts upload` を実行できた。キーの値はログ・ファイルへ残さない。
 
 ### 本番に向けた道具の改善候補
 
