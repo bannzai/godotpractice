@@ -1,129 +1,264 @@
-"""外部音源を使わず、固定シードで同じ BGM・効果音を再生成する。
+"""固定譜面から、このプロジェクト独自の BGM と効果音を再生成する。
 
 実行: python3 scripts/dev/generate_audio.py （ffmpeg が必要）
-生成した波形はこのプロジェクトで新規作成した素材。CC0 とは扱わない。
+検証: python3 scripts/dev/generate_audio.py --check
+外部音源や既存曲は使わない。この生成物を CC0 とは扱わない。
 """
 
 from array import array
-from math import exp, pi, sin
+from functools import lru_cache
+from math import cos, exp, pi, sin, sqrt, tanh
 from pathlib import Path
 import random
 import subprocess
+import sys
 import tempfile
 import wave
 
 
 RATE = 44100
 OUT = Path(__file__).resolve().parents[2] / "assets" / "audio"
+SCORES = {
+    "title": (84, ((40, 3), (36, 4), (43, 4), (38, 4)),
+              (12, 7, 14, 10, 7, 3, 7, 10)),
+    "stage": (132, ((45, 3), (41, 4), (48, 4), (43, 4)),
+              (0, 7, 12, 15, 14, 7, 3, 10, 12, 7, 10, 14, 15, 12, 7, 3)),
+    "boss": (156, ((38, 3), (38, 3), (41, 4), (37, 3)),
+             (0, 12, 7, 3, 0, 10, 7, 3, 12, 15, 14, 7, 6, 3, 7, 12)),
+    "result": (100, ((48, 4), (53, 4), (45, 3), (43, 4)),
+               (0, 4, 7, 12, 11, 7, 4, 2)),
+}
+EFFECTS = {"shot": 0.11, "explosion": 0.55, "item": 0.48, "bomb": 1.2}
 
 
-def write_wave(path, samples):
-    """ピークを制限した 16 bit PCM を同じ入力から同じ内容で書く。"""
-    peak = max(abs(value) for value in samples) or 1.0
-    scale = min(0.82 / peak, 1.0)
-    pcm = array("h", (int(value * scale * 32767) for value in samples))
+@lru_cache(maxsize=256)
+def voice(midi, duration, kind):
+    """同じ音高・長さ・音色から同じ単音を返す。"""
+    frequency = 440 * 2 ** ((midi - 69) / 12)
+    samples = array("f")
+    for index in range(round(duration * RATE)):
+        t = index / RATE
+        phase = 2 * pi * frequency * t
+        attack = 0.12 if kind == "pad" else 0.006
+        release = 0.20 if kind == "pad" else min(0.045, duration * 0.25)
+        envelope = min(t / attack, 1.0) * min((duration - t) / release, 1.0)
+        if kind == "pad":
+            tone = (sin(phase) + 0.35 * sin(phase * 1.003)
+                    + 0.18 * sin(phase * 0.997) + 0.12 * sin(phase * 2)) / 1.65
+        elif kind == "bell":
+            tone = sin(phase + 2.5 * sin(phase * 2) * exp(-t * 8))
+            envelope *= exp(-t * 3.4)
+        elif kind == "bass":
+            tone = tanh(1.6 * (sin(phase) + 0.30 * sin(phase * 2)
+                              + 0.17 * sin(phase * 3))) * 0.75
+            envelope *= 0.35 + 0.65 * exp(-t * 9)
+        elif kind == "pulse":
+            tone = (sin(phase) + sin(phase * 3) / 3 + sin(phase * 5) / 5
+                    + sin(phase * 7) / 7) * 0.7
+            envelope *= exp(-t * 2.3)
+        else:
+            tone = (sin(phase) + 0.38 * sin(phase * 2) + 0.22 * sin(phase * 3)
+                    + 0.12 * sin(phase * 4)) * 0.65
+            envelope *= exp(-t * 4)
+        samples.append(tone * envelope)
+    return samples
+
+
+@lru_cache(maxsize=8)
+def percussion(kind):
+    """固定ノイズにより再実行時にも打楽器の波形を一致させる。"""
+    duration = {"kick": 0.28, "snare": 0.20, "hat": 0.075, "open_hat": 0.26}[kind]
+    rng = random.Random(510)
+    samples = array("f")
+    previous = 0.0
+    for index in range(round(duration * RATE)):
+        t = index / RATE
+        noise = rng.uniform(-1, 1)
+        high = noise - previous
+        previous = noise
+        if kind == "kick":
+            tone = sin(2 * pi * (47 * t + 6 * (1 - exp(-t * 42)))) * exp(-t * 18)
+            tone += 0.09 * high * exp(-t * 160)
+        elif kind == "snare":
+            tone = (high * 0.32 + sin(2 * pi * 185 * t) * 0.3) * exp(-t * 23)
+        else:
+            tone = high * exp(-t * (65 if kind == "hat" else 18)) * 0.42
+        samples.append(tone * min(t / 0.001, 1) * min((duration - t) / 0.01, 1))
+    return samples
+
+
+def mix(channels, sound, start, gain, pan=0.0):
+    """重ね合わせのため加算する。末尾の余韻はループ先頭へ持ち越す。"""
+    offset = round(start * RATE)
+    length = len(channels[0])
+    gains = (gain * cos((pan + 1) * pi / 4), gain * sin((pan + 1) * pi / 4))
+    for channel, level in zip(channels, gains):
+        for index, value in enumerate(sound):
+            channel[(offset + index) % length] += value * level
+
+
+def note(channels, start, duration, midi, gain, kind="pluck", pan=0.0, echo=0.0):
+    """音とディレイを重ね合わせるため、出力バッファを加算更新する。"""
+    sound = voice(midi, duration, kind)
+    mix(channels, sound, start, gain, pan)
+    if echo:
+        mix(channels, sound, start + echo, gain * 0.24, -pan)
+        mix(channels, sound, start + echo * 2, gain * 0.09, pan)
+
+
+def write_wave(path, channels):
+    """ピーク制限と継ぎ目の短いフェードでクリップ・クリックを抑える。"""
+    peak = max(max(abs(value) for value in channel) for channel in channels) or 1.0
+    scale = 0.76 / peak if len(channels) == 2 else min(0.76 / peak, 1.0)
+    count = len(channels[0])
+    pcm = array("h")
+    for index in range(count):
+        edge = min(index / 220, (count - 1 - index) / 220, 1.0)
+        for channel in channels:
+            pcm.append(round(channel[index] * scale * edge * 32767))
+    if sys.byteorder != "little":
+        pcm.byteswap()
     with wave.open(str(path), "wb") as output:
-        output.setnchannels(1)
+        output.setnchannels(len(channels))
         output.setsampwidth(2)
         output.setframerate(RATE)
         output.writeframes(pcm.tobytes())
 
 
-def note(buffer, start, duration, midi, gain, kind="lead"):
-    """指定区間の音を合成する。重ね合わせのため buffer を加算更新する。"""
-    frequency = 440 * 2 ** ((midi - 69) / 12)
-    count = int(duration * RATE)
-    offset = int(start * RATE)
-    for index in range(count):
-        t = index / RATE
-        envelope = min(t / 0.008, 1.0) * min((duration - t) / 0.05, 1.0)
-        phase = 2 * pi * frequency * t
-        if kind == "bass":
-            tone = sin(phase) + 0.2 * sin(2 * phase)
-            envelope *= exp(-t * 5)
-        elif kind == "pad":
-            tone = sin(phase) + 0.18 * sin(phase * 1.003)
-            envelope *= min(t / 0.2, 1)
-        else:
-            tone = sin(phase) + 0.3 * sin(2 * phase) + 0.1 * sin(3 * phase)
-            envelope *= exp(-t * 3)
-        buffer[(offset + index) % len(buffer)] += gain * envelope * tone
+def phrase_interval(interval, third):
+    """三度と七度を和音に合わせ、不意の半音衝突を避ける。"""
+    if interval % 12 in (3, 4):
+        return interval - interval % 12 + third
+    if interval % 12 in (10, 11):
+        return interval - interval % 12 + (10 if third == 3 else 11)
+    return interval
 
 
-def drum(buffer, start, gain, kind, rng):
-    """音の重ね合わせのため buffer を加算更新する。"""
-    length = 0.22 if kind == "kick" else 0.10
-    for index in range(int(length * RATE)):
-        t = index / RATE
-        if kind == "kick":
-            sound = sin(2 * pi * (48 * t + 8 * (1 - exp(-t * 30)))) * exp(-t * 23)
-        else:
-            sound = rng.uniform(-1, 1) * exp(-t * (45 if kind == "hat" else 28))
-        buffer[(int(start * RATE) + index) % len(buffer)] += sound * gain
-
-
-def music(name, bpm, roots, melody):
-    """固定シード・譜面からループを生成する。"""
+def music(name):
+    """場面別の固定譜面から、同じステレオループを生成する。"""
+    bpm, chords, melody = SCORES[name]
     beat = 60 / bpm
-    samples = [0.0] * round(32 * beat * RATE)
-    rng = random.Random(5)
+    channels = [array("f", [0]) * round(32 * beat * RATE) for _ in range(2)]
     for bar in range(8):
-        root = roots[bar % len(roots)]
+        root, third = chords[bar % len(chords)]
         start = bar * 4 * beat
-        for interval in (0, 7, 12):
-            note(samples, start, 4 * beat, root + 12 + interval, 0.026, "pad")
-        for step in range(8):
-            current = start + step * beat / 2
-            note(samples, current, beat * 0.43, root + (12 if step % 4 == 3 else 0), 0.14, "bass")
-            note(samples, current, beat * 0.46, root + 24 + melody[(bar * 8 + step) % len(melody)], 0.075)
-            drum(samples, current, 0.028, "hat", rng)
-        for step in range(4):
-            drum(samples, start + step * beat, 0.21 if step % 2 == 0 else 0.095,
-                 "kick" if step % 2 == 0 else "snare", rng)
-    # 波形の継ぎ目だけを平滑化し、ループ時のクリックを抑える。
-    for index in range(220):
-        samples[index] *= index / 220
-        samples[-1 - index] *= index / 220
+        for interval, pan in ((0, -0.6), (third, 0.1), (7, 0.6), (14, -0.2)):
+            note(channels, start, 4.25 * beat, root + 12 + interval,
+                 0.055 if name in ("title", "result") else 0.026, "pad", pan)
+        if name == "title":
+            for step in range(4):
+                interval = phrase_interval(melody[(bar * 4 + step) % len(melody)], third)
+                note(channels, start + step * beat, beat * 1.2,
+                     root + 24 + interval,
+                     0.10, "bell", -0.45 + step * 0.3, beat * 0.75)
+            note(channels, start, beat * 3.7, root - 12, 0.12, "bass")
+            mix(channels, percussion("hat"), start + beat * 2, 0.07, 0.3)
+        elif name == "result":
+            for step in range(4):
+                interval = phrase_interval(melody[(bar * 4 + step) % len(melody)], third)
+                note(channels, start + step * beat, beat * 0.85, root + 12 + interval,
+                     0.13, "bell", 0.15, beat * 0.75)
+                note(channels, start + (step + 0.5) * beat, beat * 0.38,
+                     root + 24 + (0, third, 7, 12)[step], 0.055, "pluck", -0.4)
+            for step in (0, 2):
+                note(channels, start + step * beat, beat * 1.7, root - 12, 0.17, "bass")
+                mix(channels, percussion("kick"), start + step * beat, 0.14)
+            mix(channels, percussion("snare"), start + beat * 3, 0.10, -0.1)
+        else:
+            is_boss = name == "boss"
+            for step in range(8):
+                current = start + step * beat / 2
+                note(channels, current, beat * 0.41, root + (12 if step % 4 == 3 else 0),
+                     0.21 if is_boss else 0.19, "bass")
+                interval = phrase_interval(melody[(bar * 8 + step) % len(melody)], third)
+                note(channels, current, beat * 0.39, root + 24 + interval,
+                     0.11, "pulse" if is_boss else "pluck", 0.2, beat * 0.75)
+                mix(channels, percussion("open_hat" if step == 7 else "hat"),
+                    current, 0.10, -0.55 if step % 2 else 0.55)
+                if is_boss:
+                    note(channels, current + beat / 4, beat * 0.18,
+                         root + 12 + (0, 7, 12, third)[step % 4], 0.055, "pulse", -0.45)
+            for step in range(4):
+                if is_boss or step % 2 == 0:
+                    mix(channels, percussion("kick"), start + step * beat, 0.34)
+                if step % 2:
+                    mix(channels, percussion("snare"), start + step * beat, 0.22)
+            if bar % 4 == 3:
+                for step in (6, 7):
+                    mix(channels, percussion("snare"), start + (3 + step / 8) * beat, 0.13)
     with tempfile.TemporaryDirectory(prefix="audio-", dir=OUT) as directory:
         source = Path(directory) / "source.wav"
-        write_wave(source, samples)
+        write_wave(source, channels)
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source),
-                        "-c:a", "libvorbis", "-q:a", "5", "-map_metadata", "-1",
-                        "-fflags", "+bitexact", "-flags:a", "+bitexact",
+                        "-c:a", "libvorbis", "-q:a", "5", "-threads", "1",
+                        "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact",
                         str(OUT / f"{name}.ogg")], check=True)
+    voice.cache_clear()
 
 
 def effect(name, duration):
-    """固定シードから効果音を生成する。"""
+    """同じ固定シードと包絡から効果音を再生成する。"""
     rng = random.Random(51)
-    samples = []
+    samples = array("f")
     filtered = 0.0
-    for index in range(int(duration * RATE)):
+    for index in range(round(duration * RATE)):
         t = index / RATE
         progress = t / duration
-        attack = min(t / 0.002, 1.0)
         if name == "shot":
-            sound = sin(2 * pi * (1250 * t - 3400 * t * t)) * exp(-t * 30) * 0.34
+            phase = 2 * pi * (1500 * t - 4200 * t * t)
+            sound = (sin(phase) + 0.25 * sin(phase * 2)) * exp(-t * 36) * 0.44
+            sound += rng.uniform(-1, 1) * exp(-t * 130) * 0.08
         elif name == "item":
+            segment = duration / 4
             frequency = (659.25, 830.61, 987.77, 1318.51)[min(int(progress * 4), 3)]
-            local = t % (duration / 4)
-            sound = sin(2 * pi * frequency * local) * sin(pi * local / (duration / 4)) * 0.34
+            local = t % segment
+            phase = 2 * pi * frequency * local
+            sound = sin(phase + sin(phase * 2) * exp(-local * 18))
+            sound *= sin(pi * local / segment) * 0.39
         else:
-            filtered = filtered * 0.8 + rng.uniform(-1, 1) * 0.2
-            bass = sin(2 * pi * ((70 if name == "bomb" else 105) * t - 15 * t * t))
-            sound = (filtered * 0.7 + bass * 0.25) * exp(-progress * 5) * 0.9
-        samples.append(sound * attack * min((duration - t) / 0.01, 1.0))
-    write_wave(OUT / f"{name}.wav", samples)
+            filtered = filtered * 0.82 + rng.uniform(-1, 1) * 0.18
+            bass = sin(2 * pi * ((62 if name == "bomb" else 115) * t - 17 * t * t))
+            debris = rng.uniform(-1, 1) * exp(-progress * 14)
+            sound = (filtered * 1.8 + bass * 0.4) * exp(-progress * 5) + debris * 0.23
+        samples.append(sound * min(t / 0.002, 1) * min((duration - t) / 0.01, 1))
+    write_wave(OUT / f"{name}.wav", [samples])
+
+
+def check():
+    """圧縮後の実ファイルを検査し、破損・無音・飽和・継ぎ目を検出する。"""
+    for name in (*SCORES, *EFFECTS):
+        path = OUT / f"{name}.{'ogg' if name in SCORES else 'wav'}"
+        result = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path),
+                                 "-f", "f32le", "-acodec", "pcm_f32le", "-"],
+                                check=True, capture_output=True)
+        samples = array("f")
+        samples.frombytes(result.stdout)
+        if sys.byteorder != "little":
+            samples.byteswap()
+        peak = max(abs(value) for value in samples)
+        rms = sqrt(sum(value * value for value in samples) / len(samples))
+        channels = 2 if name in SCORES else 1
+        seam = max(abs(samples[channel] - samples[-channels + channel])
+                   for channel in range(channels))
+        duration = len(samples) / channels / RATE
+        expected = 32 * 60 / SCORES[name][0] if name in SCORES else EFFECTS[name]
+        if not (0.05 < peak < 0.98 and 0.015 < rms < 0.3 and seam < 0.012
+                and abs(duration - expected) < 0.01):
+            raise ValueError(f"音声検証失敗: {name}, peak={peak}, rms={rms}, seam={seam}")
+        print(f"{path.name}: {duration:.3f} 秒、ピーク {peak:.4f}、RMS {rms:.4f}、境界差 {seam:.6f}")
+    print("音声検証 OK: BGM 4 曲、効果音 4 種（試聴の代替にはならない）")
 
 
 def main():
-    """生成済みファイルへ同じ内容を再出力する。"""
+    """同じ条件で実行すると生成済みの全ファイルを同じ内容にする。"""
     OUT.mkdir(parents=True, exist_ok=True)
-    music("stage", 120, (45, 41, 48, 43), (0, 7, 12, 15, 12, 7, 3, 7, 0, 7, 10, 14, 10, 7, 2, 7))
-    music("boss", 144, (38, 38, 41, 37), (0, 12, 7, 3, 0, 10, 7, 3, 0, 12, 15, 7, 6, 3, 7, 12))
-    for name, duration in (("shot", 0.11), ("explosion", 0.55), ("item", 0.4), ("bomb", 1.2)):
-        effect(name, duration)
-    print("音声生成 OK: BGM 2 曲、効果音 4 種")
+    if sys.argv[1:] != ["--check"]:
+        for name in SCORES:
+            music(name)
+            print(f"生成: {name}.ogg", flush=True)
+        for name, duration in EFFECTS.items():
+            effect(name, duration)
+    check()
 
 
 if __name__ == "__main__":
