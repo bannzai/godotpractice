@@ -129,7 +129,7 @@ func _process(delta: float) -> void:
 	var daylight: float = (sin(float(_state.get("month", 0)) * 0.7 + _clock * 0.025) + 1) / 2
 	if daylight_override >= 0:
 		daylight = clampf(daylight_override, 0.0, 1.0)
-	_light.color = Color("7284b3").lerp(Color("fff5dc"), daylight)
+	_light.color = Color("c1cbe1").lerp(Color("fff5dc"), daylight)
 	_animate_travelers()
 	if _redraw_clock >= 0.08:
 		_redraw_clock = 0.0

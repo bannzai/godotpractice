@@ -107,6 +107,7 @@ func _check_simulation() -> void:
 	_check(evolved.month == 1, "月の進行")
 	_check(evolved.money == city.money + evolved.income - evolved.expenses, "月次収支")
 	_check_growth_and_problems(city)
+	_check_disconnected_power(city)
 	_check_problem_regression(city)
 	_check_endings(city)
 	_check_save(city)
@@ -252,3 +253,39 @@ func _check_problem_regression(city: Dictionary) -> void:
 	var excess_housing: Dictionary = grown.duplicate(true)
 	excess_housing.jobs = 0
 	_check(Sim.analyze(excess_housing).demand.r < Sim.analyze(grown).demand.r, "雇用不足で住宅需要減少")
+
+
+func _check_disconnected_power(city: Dictionary) -> void:
+	var overloaded: Dictionary = city.duplicate(true)
+	for x: int in range(8, 23):
+		overloaded.tiles[14 * 32 + x] = {
+			"terrain": "flat", "kind": "residential", "level": 3, "age": 0
+		}
+		overloaded.tiles[16 * 32 + x] = {
+			"terrain": "flat", "kind": "residential", "level": 3, "age": 0
+		}
+	var before: Dictionary = Sim.analyze(overloaded)
+	var remote: Dictionary = Sim.place(overloaded, Vector2i(2, 2), "power")
+	var after: Dictionary = Sim.analyze(remote)
+	var unchanged: bool = true
+	for index: int in 1024:
+		if index != 2 * 32 + 2 and before.powered[index] != after.powered[index]:
+			unchanged = false
+	_check(unchanged, "遠隔の発電所は未接続の街へ給電しない")
+	_check(after.power_used == before.power_used, "孤立発電所は既存網の容量不足を解消しない")
+	for x: int in range(3, 8):
+		remote = Sim.place(remote, Vector2i(x, 2), "road")
+	for y: int in range(3, 15):
+		remote = Sim.place(remote, Vector2i(7, y), "road")
+	_check(Sim.analyze(remote).power_used > after.power_used, "道路をつなぐと追加電源が給電できる")
+	var inconsistent: Dictionary = city.duplicate(true)
+	inconsistent.money = -1
+	_check(Sim.decode_save(inconsistent).is_empty(), "負債があるのに赤字0月の保存拒否")
+	var winning: Dictionary = city.duplicate(true)
+	for x: int in range(8, 11):
+		winning = Sim.place(winning, Vector2i(x, 16), "residential")
+	for month: int in 9:
+		winning = Sim.advance_month(winning)
+	winning.money = -100
+	winning.negative_months = 3
+	_check(Sim.decode_save(winning).is_empty(), "3月連続赤字なのにクリアの保存拒否")

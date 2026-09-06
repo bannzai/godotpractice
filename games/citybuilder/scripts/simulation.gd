@@ -223,7 +223,12 @@ static func decode_save(data: Variant) -> Dictionary:
 		and (result.negative_months >= 3 or result.population >= GOAL_POPULATION)
 	):
 		return {}
-	if (result.money >= 0 and result.negative_months != 0) or result.negative_months > result.month:
+	if (
+		(result.money >= 0 and result.negative_months != 0)
+		or (result.money < 0 and result.negative_months == 0)
+		or (result.outcome == "clear" and result.negative_months >= 3)
+		or result.negative_months > result.month
+	):
 		return {}
 	result.demand = _demand(result)
 	return result
@@ -316,12 +321,40 @@ static func _power(state: Dictionary) -> Dictionary:
 	var powered: Array[bool] = []
 	powered.resize(SIZE * SIZE)
 	powered.fill(false)
-	var queue: Array[int] = []
+	var visited: Array[bool] = []
+	visited.resize(SIZE * SIZE)
+	visited.fill(false)
+	var total_capacity: int = 0
+	var used: int = 0
 	for index: int in SIZE * SIZE:
-		if state.tiles[index].kind == "power":
-			powered[index] = true
-			queue.append(index)
-	var capacity: int = queue.size() * 90
+		if visited[index] or state.tiles[index].kind == "empty":
+			continue
+		var component: Array[int] = [index]
+		var sources: Array[int] = []
+		visited[index] = true
+		var cursor: int = 0
+		while cursor < component.size():
+			var current: int = component[cursor]
+			if state.tiles[current].kind == "power":
+				sources.append(current)
+			for neighbor: int in _neighbors(current):
+				if state.tiles[neighbor].kind != "empty" and not visited[neighbor]:
+					visited[neighbor] = true
+					component.append(neighbor)
+			cursor += 1
+		var capacity: int = sources.size() * 90
+		total_capacity += capacity
+		used += _supply_component(state, sources, capacity, powered)
+	return {"powered": powered, "capacity": total_capacity, "used": used}
+
+
+## この解析で生成した配列だけへ給電結果を記録する。保存状態の入力は変更しない。
+static func _supply_component(
+	state: Dictionary, sources: Array[int], capacity: int, powered: Array[bool]
+) -> int:
+	var queue: Array[int] = sources.duplicate()
+	for source: int in sources:
+		powered[source] = true
 	var used: int = 0
 	var cursor: int = 0
 	while cursor < queue.size():
@@ -336,7 +369,7 @@ static func _power(state: Dictionary) -> Dictionary:
 			powered[neighbor] = true
 			queue.append(neighbor)
 		cursor += 1
-	return {"powered": powered, "capacity": capacity, "used": used}
+	return used
 
 
 static func _influence(

@@ -56,9 +56,10 @@ func _capture_scenes() -> void:
 	_city.start_city()
 	_city.speed = 0
 	await _shot("initial-city", 0.5)
-	_city.next_month()
+	for month: int in range(3):
+		_city.next_month()
 	await _shot("growth", 0.25)
-	for month: int in range(4):
+	for month: int in range(2):
 		_city.next_month()
 	await _shot("developed-city", 1.0)
 	await _capture_effects()
@@ -109,6 +110,8 @@ func _capture_overlays() -> void:
 
 func _capture_results() -> void:
 	var active: Dictionary = _city.state.duplicate(true)
+	for x: int in range(8, 11):
+		_city.build(Vector2i(x, 16), "residential")
 	for month: int in range(30):
 		if _city.phase == "result":
 			break

@@ -56,10 +56,9 @@ func next_month() -> void:
 	analysis = Sim.analyze(state)
 	changed.emit()
 	notice.emit("%d月の収支  %+d" % [state.month, state.income - state.expenses])
+	save_city()
 	if state.outcome != "playing":
 		set_phase("result")
-	else:
-		save_city()
 
 
 func build(cell: Vector2i, kind: String) -> bool:

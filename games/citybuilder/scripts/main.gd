@@ -2,6 +2,7 @@ extends Control
 ## 画面と入力を接続する。都市の状態は City が保持する。
 
 const UI = preload("res://scripts/ui.gd")
+const Backdrop = preload("res://scripts/backdrop.gd")
 const View = preload("res://scripts/city_view.gd")
 const Sim = preload("res://scripts/simulation.gd")
 const TOOLS: Array[String] = [
@@ -22,6 +23,7 @@ var tool_description: Label
 var time_label: Label
 var toast: Label
 var tax_label: Label
+var tax_slider: HSlider
 var demand_bars: Array[ProgressBar] = []
 var tool_buttons: Array[Button] = []
 var toast_tween: Tween
@@ -31,6 +33,8 @@ var dragging: bool = false
 var last_cell: Vector2i = Vector2i(-1, -1)
 var closing: bool = false
 var keyboard_cursor: bool = false
+var tax_held: Dictionary = {"tax_down": false, "tax_up": false}
+var notice_panel: Panel
 
 
 func _ready() -> void:
@@ -68,7 +72,7 @@ func _render() -> void:
 
 
 func _title() -> void:
-	UI.picture(screen, "branding/keyart.svg", Rect2(0, 0, 1280, 720))
+	screen.add_child(Backdrop.new())
 	UI.panel(screen, Rect2(48, 52, 540, 612), Color("203c42ed"))
 	UI.label(screen, "小さな区画から、暮らしのある街へ。", Rect2(80, 82, 480, 36), 19, UI.MINT)
 	UI.label(screen, "こもれび\n市計画", Rect2(78, 133, 480, 180), 68)
@@ -97,6 +101,7 @@ func _play() -> void:
 	stats = UI.label(screen, "", Rect2(220, 26, 800, 54), 23)
 	UI.button(screen, "保存・戻る", Rect2(1103, 32, 141, 46), _save_and_title)
 	view = View.new()
+	view.overlay = OVERLAYS[overlay_index]
 	view.position = Vector2(16, 106)
 	view.size = Vector2(932, 494)
 	screen.add_child(view)
@@ -118,6 +123,7 @@ func _play() -> void:
 	needs = UI.label(screen, "", Rect2(980, 357, 265, 54), 16)
 	tax_label = UI.label(screen, "", Rect2(980, 421, 266, 26), 16)
 	var tax := HSlider.new()
+	tax_slider = tax
 	tax.position = Vector2(980, 459)
 	tax.size = Vector2(262, 22)
 	tax.min_value = 0
@@ -130,6 +136,7 @@ func _play() -> void:
 	warnings.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_time_controls()
 	_toolbar()
+	notice_panel = UI.panel(screen, Rect2(28, 541, 908, 48), Color("f4f0dfee"))
 	toast = UI.label(screen, "道路に接する区画へ、電力と仕事を。", Rect2(36, 551, 886, 32), 18, UI.INK)
 	_refresh()
 	Sound.track("city" if City.state.population >= 300 else "town")
@@ -164,7 +171,10 @@ func _toolbar() -> void:
 	UI.button(screen, "街の中央", Rect2(1096, 616, 168, 56), _center_map)
 	UI.label(
 		screen,
-		"ドラッグ 建設  /  右ドラッグ 移動  /  ホイール 拡大　　矢印 カーソル・Enter/A 建設　Q/E・LB/RB 道具　Space/Start 時間　O/Y 問題",
+		(
+			"ドラッグ 建設 / 右ドラッグ 移動 / ホイール 拡大　矢印・十字 移動 / Enter・A 建設"
+			+ "　Q/E・LB/RB 道具　Space・Start 停止　T・Back 速度　O・Y 問題"
+		),
 		Rect2(18, 690, 1240, 22),
 		12,
 		UI.INK
@@ -172,7 +182,7 @@ func _toolbar() -> void:
 
 
 func _result() -> void:
-	UI.picture(screen, "branding/keyart.svg", Rect2(0, 0, 1280, 720))
+	screen.add_child(Backdrop.new())
 	UI.panel(screen, Rect2(240, 93, 800, 534), Color("203c42f5"))
 	var won: bool = City.state.outcome == "clear"
 	UI.label(screen, "こもれび市  /  最終報告", Rect2(294, 128, 690, 36), 22, UI.MINT)
@@ -227,7 +237,8 @@ func _refresh() -> void:
 			City.state.expenses
 		]
 	)
-	tax_label.text = "税率  %d%%  /  高税率で成長鈍化" % City.state.tax
+	tax_slider.set_value_no_signal(City.state.tax)
+	tax_label.text = "税率 %d%%   Z/C・LT/RTで調整" % City.state.tax
 	warnings.text = "\n".join(City.analysis.get("warnings", []))
 	if warnings.text.is_empty():
 		warnings.text = "街は順調です。住宅と雇用を増やしましょう。"
@@ -246,6 +257,7 @@ func _process(delta: float) -> void:
 	displayed_population = move_toward(
 		displayed_population, float(City.state.population), delta * 160
 	)
+	notice_panel.modulate.a = toast.modulate.a
 	stats.text = (
 		"資金  %s    人口  %d / 600    雇用  %d    %d月"
 		% [City.state.money, int(displayed_population), City.state.jobs, City.state.month]
@@ -290,6 +302,9 @@ func _place(cell: Vector2i) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	for action: String in tax_held:
+		if event.is_action_released(action):
+			tax_held[action] = false
 	if event.is_action_pressed("fullscreen"):
 		var full: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 		DisplayServer.window_set_mode(
@@ -305,6 +320,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_select_tool(posmod(selected_tool - 1, TOOLS.size()))
 	if event.is_action_pressed("pause_time"):
 		_set_speed(1 if City.speed == 0 else 0)
+	if event.is_action_pressed("tax_down"):
+		_adjust_tax("tax_down", -1)
+	if event.is_action_pressed("tax_up"):
+		_adjust_tax("tax_up", 1)
+	if event.is_action_pressed("speed_cycle"):
+		_set_speed({0: 1, 1: 3, 3: 0}[City.speed])
 	if event.is_action_pressed("next_month"):
 		City.next_month()
 	if event.is_action_pressed("overlay"):
@@ -329,6 +350,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("build"):
 		_place(view.cursor)
 		get_viewport().set_input_as_handled()
+
+
+func _adjust_tax(action: String, amount: int) -> void:
+	if tax_held[action]:
+		return
+	tax_held[action] = true
+	City.set_tax(clampi(int(City.state.tax) + amount, 0, 20))
 
 
 func _follow_cursor() -> void:
@@ -393,7 +421,8 @@ func _start() -> void:
 
 func _resume() -> void:
 	City.resume_city()
-	get_viewport().gui_release_focus()
+	if City.phase == "playing":
+		get_viewport().gui_release_focus()
 
 
 func _save_and_title() -> void:
