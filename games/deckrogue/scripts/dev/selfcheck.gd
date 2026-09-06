@@ -11,6 +11,7 @@ var failed: bool = false
 func _initialize() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_animation_images()
 	_check_catalog()
 	_check_input_actions()
 	_check_seed_and_map()
@@ -80,6 +81,25 @@ func _check_asset_directory(path: String, credits: String) -> void:
 		)
 	for subdirectory: String in directory.get_directories():
 		_check_asset_directory(path.path_join(subdirectory), credits)
+
+
+# 外部のSVG描画器では正常でもGodotでコマが空白になった不具合を検出する。
+func _check_animation_images() -> void:
+	var directory: DirAccess = DirAccess.open("res://assets/art")
+	for filename: String in directory.get_files():
+		if not filename.ends_with("_sheet.svg"):
+			continue
+		var texture: Texture2D = load("res://assets/art/" + filename)
+		var picture: Image = texture.get_image()
+		_check(picture.get_size() == Vector2i(1536, 1600), filename + " のシート寸法")
+		for row: int in range(5):
+			var distinct_frames: Dictionary = {}
+			for column: int in range(6):
+				var frame: Image = picture.get_region(Rect2i(column * 256, row * 320, 256, 320))
+				_check(frame.get_used_rect().has_area(),
+					"%s の動作%d コマ%dに絵がある" % [filename, row, column])
+				distinct_frames[hash(frame.get_data())] = true
+			_check(distinct_frames.size() >= 3, filename + " の各動作に異なるポーズがある")
 
 
 func _check_catalog() -> void:

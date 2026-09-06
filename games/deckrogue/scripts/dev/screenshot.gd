@@ -2,6 +2,9 @@ extends SceneTree
 ## 描画と入力経路を同じシーンで検証する。撮影用の状態投入は製品の操作には公開しない。
 
 const Catalog := preload("res://scripts/card_catalog.gd")
+const Actor := preload("res://scripts/actor.gd")
+const Backdrop := preload("res://scripts/backdrop.gd")
+const UI := preload("res://scripts/ui.gd")
 
 var main: Control
 var run: Node
@@ -32,6 +35,7 @@ func _capture_scenes() -> bool:
 	await _key(KEY_ENTER)
 	_check(run.phase == "map", "Enter でタイトルから開始")
 	run.start_run(609)
+	await create_timer(0.4).timeout
 	await _capture("map")
 	await _joy(JOY_BUTTON_A)
 	_check(run.phase == "battle", "ゲームパッド A でノード選択")
@@ -46,12 +50,14 @@ func _capture_scenes() -> bool:
 		await _capture("play")
 		await create_timer(0.11).timeout
 		await _capture("damage")
-		await create_timer(0.4).timeout
+		await create_timer(0.5).timeout
+		await _wait_animation()
 	var turn_before: int = run.turn
 	await _key(KEY_E)
 	await create_timer(0.07).timeout
 	await _capture("discard")
-	await create_timer(0.8).timeout
+	await create_timer(1.0).timeout
+	await _wait_animation()
 	_check(run.turn == turn_before + 1, "E でターン終了")
 	await _joy(JOY_BUTTON_Y)
 	_check(main.modal == "deck", "ゲームパッド Y でデッキ表示")
@@ -64,7 +70,9 @@ func _capture_scenes() -> bool:
 	await _key(KEY_ESCAPE)
 	await _capture_large_hand()
 	await _capture_statuses()
+	await _capture_effects()
 	await _complete_run()
+	await create_timer(0.5).timeout
 	await _capture("victory")
 	_check(run.phase == "result" and run.won, "通常操作でクリア結果に到達")
 	main._return_title()
@@ -78,14 +86,24 @@ func _capture_scenes() -> bool:
 		run.end_turn()
 	main.busy = false
 	main._render(false)
+	await create_timer(0.5).timeout
 	await _capture("defeat")
 	_check(run.phase == "result" and not run.won, "敗北結果に到達")
 	main._return_title()
 	_check(run.phase == "title", "敗北からタイトルへ戻る")
-	root.get_node("Sound").stop_all()
+	await _capture_characters()
+	await root.get_node("Sound").shutdown()
 	main.queue_free()
 	await create_timer(0.3).timeout
 	return not failed
+
+
+func _wait_animation() -> void:
+	for frame: int in range(180):
+		if not main.busy:
+			return
+		await process_frame
+	_check(false, "操作の演出が終了する")
 
 
 func _capture_large_hand() -> void:
@@ -124,6 +142,69 @@ func _capture_statuses() -> void:
 	run.enemy.weak = previous[2]
 	run.enemy.vulnerable = previous[3]
 	main._render(false)
+
+
+func _capture_effects() -> void:
+	# 数値は撮影用で、Run の体力・敵・手札には変更を加えない。
+	for kind: String in ["attack", "hurt", "block", "heal", "power", "death"]:
+		main._render(false)
+		await create_timer(0.12).timeout
+		main.busy = true
+		if kind == "death":
+			main.enemy_art.play_action("death")
+			main.effects_layer.burst("death", Vector2(947, 298))
+		else:
+			main._effect(kind, 12 if kind == "attack" else 7)
+		await create_timer(0.22).timeout
+		await _capture("effect-" + kind)
+		await create_timer(0.95).timeout
+		_check(main.effects_layer.get_child_count() == 0, "演出の一時ノードを解放: " + kind)
+		main.busy = false
+	main._render(false)
+
+
+func _capture_characters() -> void:
+	main.hide()
+	main.process_mode = Node.PROCESS_MODE_DISABLED
+	var stage := Control.new()
+	stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage.theme = main.theme
+	root.add_child(stage)
+	var backdrop := Backdrop.new()
+	stage.add_child(backdrop)
+	backdrop.setup("title")
+	for side: String in ["left", "right"]:
+		var motion := InputEventMouseMotion.new()
+		motion.position = Vector2(70 if side == "left" else 1210, 360)
+		Input.parse_input_event(motion)
+		await create_timer(0.7).timeout
+		await _capture("background-" + side)
+	var heading: Label = UI.label(stage, "", Rect2(44, 45, 1190, 60), 34, UI.GOLD)
+	UI.label(stage, "七つの固有デザインと、五つの動作", Rect2(46, 116, 1190, 34), 20, UI.MUTED)
+	var ids: Array[String] = ["hero", "enemy_moth", "enemy_sentinel", "enemy_brute",
+		"enemy_wisp", "boss", "npc_keeper"]
+	var names: Array[String] = ["灯守", "灰羽の蛾", "苔の番人", "岩角の獣", "祠の燐火", "夜を抱く巨像", "祠の司祭"]
+	var actors: Array[Node2D] = []
+	for index: int in range(ids.size()):
+		var x: float = 22 + index * 177
+		UI.panel(stage, Rect2(x, 204, 172, 362), Color("101c2ca8"), Color("657b7355"))
+		var actor := Actor.new()
+		stage.add_child(actor)
+		actor.setup(ids[index], Rect2(x + 2, 203, 168, 320))
+		actors.append(actor)
+		var caption: Label = UI.label(stage, names[index], Rect2(x, 506, 172, 38), 17)
+		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var labels: Dictionary = {"idle": "待機", "move": "移動", "attack": "攻撃", "hurt": "被弾", "death": "死亡"}
+	for action: String in Actor.ACTIONS:
+		for progress: int in range(3):
+			heading.text = "%s　／　%s" % [labels[action], ["開始", "途中", "終了"][progress]]
+			for actor: Node2D in actors:
+				actor.seek_pose(action, float(progress) * 0.5)
+			await _capture("characters-%s-%d" % [action, progress])
+	stage.queue_free()
+	await process_frame
+	main.process_mode = Node.PROCESS_MODE_INHERIT
+	main.show()
 
 
 func _complete_run() -> void:
