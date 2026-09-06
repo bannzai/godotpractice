@@ -1,5 +1,5 @@
 extends SceneTree
-## 撮影は進行を再現するため非冪等。専用保存先を使い、通常プレイの記録を変更しない。
+## 撮影用の編隊と時刻を再現するため非冪等。専用保存先で通常の記録を守る。
 
 var main: Control
 var state: Node
@@ -22,11 +22,14 @@ func _capture_scenes() -> bool:
 	state = root.get_node("GameState")
 	state.save_path = "res://tmp/screenshot-save.json"
 	state.high_score = 0
-	await create_timer(0.2).timeout
+	await _wait(0.45)
 	for label: String in [
 		"title",
 		"play",
 		"explosion",
+		"hit",
+		"power",
+		"supply",
 		"alert",
 		"boss",
 		"boss-phase-two",
@@ -34,15 +37,27 @@ func _capture_scenes() -> bool:
 		"clear",
 		"gameover"
 	]:
+		if label in ["hit", "power", "supply"]:
+			await _wait(0.9)
 		_prepare_capture(label)
+		await _wait(1.5 if label in ["clear", "gameover", "play"] else 0.18)
 		if not await _capture(label):
 			return false
-	main.music.stop()
-	for voice: AudioStreamPlayer in main.sounds.values():
-		voice.stop()
-	# 音声ミキサーが再生参照を解放するまで待つ。固定刻みの進行では実時間が経過しない。
-	await create_timer(0.15).timeout
+	if not await _capture_effect_series():
+		return false
+	main.hide()
+	for kind: String in ["player", "scout", "aim", "fan", "boss"]:
+		var gallery: Node2D = load("res://scripts/dev/animation_gallery.gd").new()
+		gallery.kind = kind
+		root.add_child(gallery)
+		if not await _capture("animation-" + kind):
+			return false
+		gallery.queue_free()
+		await process_frame
+	main.stop_audio()
+	await create_timer(0.2).timeout
 	main.queue_free()
+	await process_frame
 	await process_frame
 	return true
 
@@ -51,25 +66,45 @@ func _prepare_capture(label: String) -> void:
 	match label:
 		"play":
 			main.start_run()
-			Input.action_press("shoot")
-			for frame: int in range(900):
-				main.invulnerable = 1.0
-				main.advance(1.0 / 60.0)
-			Input.action_release("shoot")
+			state.elapsed = 36.0
+			state.add_score(4680)
+			state.power = 2
+			main.wave_index = 32
+			for index: int in range(3):
+				main.spawn_enemy(
+					{"x": 470.0 + index * 155, "kind": ["scout", "aim", "fan"][index], "drop": ""}
+				)
+				main.enemies[index].position = Vector2(470 + index * 155, 170 + index * 63)
+			for index: int in range(8):
+				main.bullets.append(
+					{
+						"position": Vector2(412 + index * 63, 355 + index % 3 * 59),
+						"velocity": Vector2.DOWN * 40,
+						"friendly": false
+					}
+				)
+			main.fire_player()
+			main.items.append({"position": Vector2(760, 490), "kind": "power", "age": 0.0})
 		"explosion":
 			main.trigger_bomb()
-			_step(0.2)
+		"hit":
+			main.invulnerable = 0
+			main.hit_player()
+		"power":
+			main.items.append({"position": main.player, "kind": "power", "age": 0.0})
+		"supply":
+			main.items.append({"position": main.player, "kind": "bomb", "age": 0.0})
 		"alert":
-			_step(1.0)
 			state.elapsed = 148.0
 			main.enemies.clear()
 			main.bullets.clear()
 			main.wave_index = main.waves.size()
 		"boss":
-			_step(2.5)
+			state.elapsed = 150.0
+			main.advance(0.01)
 		"boss-phase-two":
 			main.damage_boss(190)
-			_step(1.3)
+			main.boss_timer = 0
 		"pause":
 			main.paused = true
 			main.call("_sync_menu")
@@ -89,8 +124,7 @@ func _capture(label: String) -> bool:
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var path: String = "tmp/screenshot-%s.png" % label
-	var status: Error = root.get_texture().get_image().save_png(path)
-	if status != OK:
+	if root.get_texture().get_image().save_png(path) != OK:
 		push_error("スクリーンショット保存失敗: %s" % path)
 		quit(1)
 		return false
@@ -98,6 +132,41 @@ func _capture(label: String) -> bool:
 	return true
 
 
-func _step(seconds: float) -> void:
-	for frame: int in range(int(seconds * 60)):
-		main.advance(1.0 / 60.0)
+func _wait(seconds: float) -> void:
+	var elapsed: float = 0.0
+	while elapsed < seconds:
+		await process_frame
+		var delta: float = minf(root.get_process_delta_time(), 0.05)
+		main.advance(delta)
+		elapsed += delta
+
+
+func _capture_effect_series() -> bool:
+	main.start_run()
+	main.wave_index = main.waves.size()
+	await _wait(0.5)
+	for kind: String in ["bomb", "hit", "power", "supply", "boss-death"]:
+		await _wait(0.9)
+		match kind:
+			"bomb":
+				main.trigger_bomb()
+			"hit":
+				main.invulnerable = 0
+				main.hit_player()
+			"power", "supply":
+				main.items.append(
+					{
+						"position": main.player,
+						"kind": "power" if kind == "power" else "bomb",
+						"age": 0.0
+					}
+				)
+			"boss-death":
+				main.boss_active = true
+				main.boss_hp = 1
+				main.damage_boss(1)
+		for frame: int in range(3):
+			await _wait(0.02 if frame == 0 else 0.22)
+			if not await _capture("effect-%s-%d" % [kind, frame]):
+				return false
+	return true
