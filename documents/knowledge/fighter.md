@@ -1,0 +1,51 @@
+# fighter の実装知見
+
+## 実装と判断
+
+- 独自作品「燈環闘技」。夕暮れの工業都市で青緑・橙の装甲闘士が対戦する。立ち・しゃがみ・空中に弱強パンチ・キックを用意した。
+- 画面をまたぐ試合状態を autoload、技性能を純粋関数、実際の接触を Area2D に分けた。99秒・2本先取。同体力の時間切れと相打ちは両者の本数を増やさず再ラウンドとする。
+- ガードは後ろ入力。下段はしゃがみ、空中攻撃は立ちで防ぎ、空中ガードは設けない。被弾硬直とガード硬直を区別し、連続ガードを可能にした。
+- コマンド履歴は向きを基準に下・斜め下前・前を記録し、期限内のパンチ入力で1回消費する。キーボードとパッドは同じInputMapを使う。
+
+## Godot で実測した注意点
+
+- `FontVariation.variation_opentype` の `{"wght": 600}` では同梱可変フォントが細いままだった。`TextServerManager.get_primary_interface().name_to_tag("wght")` の整数タグで指定すると、期待した太さになった。公式の整数タグ例に合わせ、撮影し直して確認した。
+  https://docs.godotengine.org/en/stable/classes/class_fontvariation.html
+- 高負荷時は初回フレームのdeltaが長くなり、0.12秒のTimerでも起動チェックの終了前にBGMが再生された。`Engine.get_process_frames() >= 3` を開始条件にし、初期描画後に再生するよう変更した。
+- `AudioStreamPlayer.stop()` を呼んでも音声ミキサーの解放周期より早く撮影プロセスを終了すると、WAV再生リソースが終了時に残ることがあった。`_exit_tree` で再生を止め、撮影側でシーンを解放して0.2秒待つと警告なしになった。
+- BGMはループ方式だけを実行時に変更しても終端が0のまま残り、即座に停止した。WAVのimport設定でForwardループと全サンプル範囲を指定し、録画の音量検査を追加した。修正後の録画は平均-37.1dB・最大-19.6dB。Movie Makerでは終了直前の4フレームで音声を停止し、ミキサーが解放した後で終了する。
+- 型付き `Array[int]` を、動的なNode参照経由で通常の配列に置換すると実行時エラーになる。撮影の状態作りでは `wins.assign(...)` を使う。
+- `Area2D.get_overlapping_areas()` の領域更新を待つため、実接触検証は物理フレームを進める。発生時間中に領域が反映され、アクティブ中に一度だけ命中することをHPとsignal数で検証した。
+  https://docs.godotengine.org/en/stable/classes/class_area2d.html
+- sandbox内ではGodotのuserログ・エディタキャッシュ作成が拒否され、起動が異常終了することがあった。許可された通常起動で検証し、exit 0だけでなくログ全文のWARNING／ERROR不在を確認する。
+
+## 入力経路を通した検証で見つかった問題
+
+- Startに「停止」と「決定」を割り当てると、1イベント中に停止直後の再開も処理される。停止分岐でイベント処理を終えるよう修正した。
+- パッド南ボタンで一時停止を解除すると、同じ押下が弱キックとして戦闘に流れた。再開の決定ボタンを離すまで攻撃を抑止した。コマンド必殺技の実入力検証で発見できた。
+- 画面遷移を直接呼ぶだけではこれらを発見できない。`Input.parse_input_event` にキーボード・パッドボタン・左スティックを渡し、CPUとの実接触、KO・時間切れ、再戦・タイトル復帰まで検証する方式が有効だった。
+
+## 素材準備
+
+- SVGは既存作品の素材を使わず幾何図形から独自制作。音声も固定乱数・正弦波による独自の合成で、生成スクリプトを同梱した。再生成したWAVのSHA256一致、非無音・クリップなしを確認した。
+- OFLのNoto Sans JPを同梱し、OFL全文とCREDITSを全export presetのinclude_filterに加えた。OSの日本語フォントへの依存を避けた。
+- game-asset-search の `check-credits.sh` が成功。生成物を自動的にCC0とはせず、制作方法と利用規約の帰属を記録した。
+
+## 検証状況
+
+- `make -C games/fighter run` の実プロセスとウィンドウ表示を確認した。macOSの画面収録権限がない環境でも同じ起動経路を撮影できるよう、開発時だけ有効な `FIGHTER_VERIFY_RUN=1` を追加。Godot自身が描画を `tmp/run-title.png` に保存し、音声の終了処理後にexit 0で終了する。タイトルを目視確認済み。run targetは `Godot --path .` のままにした。
+- Godot 4.7 stable / gdlint 4.5.0。selfcheckは268条件。技性能12種、キャラクター差、硬直差、コマンド成立・不成立、試合状態、実Area2D接触・一度のみのダメージ・ガード・飛び道具、両入力経路の一連の対戦を検証した。
+- ローカルの `make test GAMES=fighter` と `make screenshot movie build-all build-web GAMES=fighter` が最終コードでexit 0。23枚の撮影画像、5秒の起動動画の各秒と最終フレームを確認。動画はBGMの最大音量も検査する。CIの最終結果とartifact確認はPRに記録する。
+- パッドはGodotの入力イベント注入で検証。物理コントローラー実機は接続していない。Windows/LinuxはエクスポートとCI検証で、実OS上の手操作は対象外。
+
+## 共有skill・ツールへの改善提案
+
+共有物は変更していない。司令塔がcastleへの反映を判断する。
+
+- godot-developmentに、可変フォントの整数タグ指定、音声終了の解放待ち、型付き配列の撮影状態投入、入力イベントによるメニューと戦闘の一貫した検証を実例として追加すると再利用できる。
+- game-asset-searchに、固定シードの音声合成と非無音・クリップ・再生成一致検査を追加する候補。
+- godot-development skillがローカルになく、raw URLが404でも、既存gh認証でGitHub contents APIからSKILL.mdとreferences/pitfalls.mdを取得できた。
+
+## 残した判断点
+
+なし。上記の同点・ガード仕様を採用し、操作説明とPRに明記した。

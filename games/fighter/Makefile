@@ -63,12 +63,14 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --script res://scripts/dev/movie.gd -- $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
+	ffmpeg -hide_banner -i $(LOG_DIR)/movie.mp4 -af volumedetect -vn -sn -dn -f null - > $(LOG_DIR)/movie-audio.log 2>&1
+	awk '/max_volume:/ { found = 1; exit ($$5 > -55) ? 0 : 1 } END { if (!found) exit 1 }' $(LOG_DIR)/movie-audio.log
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
