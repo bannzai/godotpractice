@@ -26,6 +26,7 @@ var busy: bool = false
 var overlay: String = ""
 var note: String = "手札を選び、自陣の空きマスに潜伏させよう。"
 var speech: String = ""
+var speech_label: Label
 var last_stage: String = ""
 var seed_input: LineEdit
 var hand_page: int = 0
@@ -86,6 +87,7 @@ func _render() -> void:
 	first_focus = null
 	enemy_actor = null
 	hero_actor = null
+	speech_label = null
 	var changed: bool = last_stage != run.stage
 	if changed:
 		backdrop.setup(run.stage)
@@ -438,7 +440,8 @@ func _animate_attack(event: Dictionary, acting: Node2D, center: Vector2) -> void
 		speech = opponent.lines.lost if run.battle.turn == 0 else opponent.lines.attack
 	if run.battle.winner == 0:
 		speech = opponent.lines.defeat
-	UI.paragraph(content, speech, Rect2(980, 339, 255, 94), 18)
+	if is_instance_valid(speech_label):
+		speech_label.text = speech
 	await get_tree().create_timer(0.70).timeout
 
 

@@ -271,7 +271,7 @@ static func _opponent(main: Control) -> void:
 	UI.label(main.content, enemy.name, Rect2(986, 141, 255, 42), 27, UI.GOLD)
 	main.enemy_actor = _actor(main.content, battle.enemy_id, Vector2(1107, 251), 0.61)
 	UI.panel(main.content, Rect2(983, 334, 257, 97), Color("342f25"))
-	UI.paragraph(main.content, main.speech, Rect2(995, 341, 230, 85), 18)
+	main.speech_label = UI.paragraph(main.content, main.speech, Rect2(995, 341, 230, 85), 18)
 	UI.label(
 		main.content,
 		(
