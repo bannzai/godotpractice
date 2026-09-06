@@ -443,7 +443,7 @@ func _sync_menu() -> void:
 		_add_button("飛行を続ける", Vector2(495, 382), resume_run)
 		_add_button("タイトルへ", Vector2(495, 447), return_title)
 	elif GameState.mode == GameState.Mode.TITLE:
-		_add_button("出撃する   ↵ / A", Vector2(104, 463), start_run)
+		_add_button("出撃する   Enter / A", Vector2(104, 463), start_run)
 	elif GameState.mode == GameState.Mode.RESULT:
 		_add_button("もう一度出撃", Vector2(495, 460), start_run)
 		_add_button("タイトルへ", Vector2(495, 525), return_title)
