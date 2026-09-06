@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/visuals/thorn_beetle.gd" id="1"]
+
+[node name="thorn_beetle" type="Node3D"]
+script = ExtResource("1")
