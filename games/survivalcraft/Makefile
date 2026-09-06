@@ -17,7 +17,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -26,6 +26,7 @@ import:
 	"$(GODOT)" $(ENGINE_LOG) --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/import.log
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
@@ -48,7 +49,12 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration
+
+integration: import
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1
+	grep -q '^integration OK$$' $(LOG_DIR)/integration.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -65,14 +71,24 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --script res://scripts/dev/movie.gd -- $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
-	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 28秒の実入力を録画し、2秒ごとの画像と末尾を検査する。
+movie-play: import
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1
+	grep -q '^demo OK$$' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2,scale=640:-1 $(LOG_DIR)/play-frame-%02d.png
+	ffmpeg -loglevel error -y -sseof -0.05 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/play-last.png
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
@@ -83,25 +99,30 @@ run: import
 # (AGENTS.md「検証方法」参照)
 build-macos: import
 	@mkdir -p build/macos
-	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "macOS" build/macos/survivalcraft.zip
+	rm -f build/macos/survivalcraft.zip
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "macOS" build/macos/survivalcraft.zip > $(LOG_DIR)/build-macos.log 2>&1
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-macos.log
 	test -f build/macos/survivalcraft.zip
 
 build-windows: import
 	@mkdir -p build/windows
-	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Windows Desktop" build/windows/survivalcraft.exe
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Windows Desktop" build/windows/survivalcraft.exe > $(LOG_DIR)/build-windows.log 2>&1
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-windows.log
 	test -f build/windows/survivalcraft.exe
 	test -f build/windows/survivalcraft.pck
 
 build-linux: import
 	@mkdir -p build/linux
-	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Linux" build/linux/survivalcraft.x86_64
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Linux" build/linux/survivalcraft.x86_64 > $(LOG_DIR)/build-linux.log 2>&1
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-linux.log
 	test -f build/linux/survivalcraft.x86_64
 	test -f build/linux/survivalcraft.pck
 
 # Web エクスポート (動作確認専用。配布はデスクトップ 3 種)。webtunnel での確認に使う
 build-web: import
 	@mkdir -p build/web
-	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Web" build/web/index.html
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Web" build/web/index.html > $(LOG_DIR)/build-web.log 2>&1
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-web.log
 	test -f build/web/index.html
 	test -f build/web/index.wasm
 	test -f build/web/index.pck
