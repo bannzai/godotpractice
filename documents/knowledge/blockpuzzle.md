@@ -43,4 +43,10 @@ Godotの型付き配列は、動的なNode参照経由で通常の配列を代�
 
 ## 最終検証
 
-最終実行の結果とWeb・CIの証拠は、検証後にこの節へ追記する。
+ローカルの `make test GAMES=blockpuzzle`・`make screenshot GAMES=blockpuzzle`・`make movie GAMES=blockpuzzle`・`make build-all GAMES=blockpuzzle`・`make build-web GAMES=blockpuzzle` はすべてexit 0。ログ全文にWARNING / ERRORと終了時リークはなかった。`make blockpuzzle-run` は実ウィンドウ表示後に通常終了してexit 0。`--quit-after` の1・8・30・120フレームもexit 0でリークなし。
+
+撮影は23枚で、5キャラ×5動作×3時点と各画面、連鎖・おじゃまの途中と終了を目視した。固定秒数だけで連鎖を撮影するとフレーム速度によって目的の段階を外すため、状態のphaseとchainが一致してから撮影する。2連鎖終了後の空盤面も期待値で検査する。
+
+通常起動は5秒、実入力プレイは26.03秒を録画した。後者では24回固定・10回消去し、2秒間隔のフレーム一覧と末尾を目視した。Windows／Linuxはエクスポート、LinuxはCIでも検証する。物理ゲームパッドの機種別互換性と各OSでの手動プレイ、音楽の聴感評価は未検証で、パッドは実InputEvent、音は波形と録画の音声ストリームを確認した。
+
+Web検証では `--software-webgl` で起動し、`#status` が除去されることとcanvasのサイズを確認できた。一方でagent-browserの撮影が数分応答せず、直接CDPの撮影も期限超過した。起動判定の成功だけでは画面確認の代用にならず、転送量や接続遅延も切り分ける必要がある。最終のWeb実操作とCI artifactの確認結果、公開画像の証拠はPR #50に集約する。

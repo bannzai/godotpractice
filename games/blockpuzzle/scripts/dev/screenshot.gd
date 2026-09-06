@@ -97,17 +97,29 @@ func _chain_scene() -> bool:
 	await create_timer(0.04).timeout
 	if not await _capture("landing"):
 		return false
-	await create_timer(0.22).timeout
-	if not await _capture("chain-first"):
-		return false
-	await create_timer(0.4).timeout
-	if not await _capture("chain-fall"):
-		return false
-	await create_timer(0.3).timeout
-	if not await _capture("chain-second"):
-		return false
-	await create_timer(0.6).timeout
-	return _check(state.max_chain >= 2, "演出付きの2連鎖")
+	for phase: Array in [
+		["clear", 1, "chain-first"],
+		["gravity", 1, "chain-fall"],
+		["clear", 2, "chain-second"],
+		["falling", 2, "chain-ended"]
+	]:
+		if not await _wait_phase(phase[0], phase[1]):
+			return false
+		await create_timer(0.12).timeout
+		if not await _capture(phase[2]):
+			return false
+	return _check(
+		state.max_chain >= 2 and state.boards[0].board == Rules.empty_board(), "演出付きの2連鎖が完了し盤面が空になる"
+	)
+
+
+func _wait_phase(phase: String, chain: int) -> bool:
+	var deadline: int = Time.get_ticks_msec() + 8000
+	while Time.get_ticks_msec() < deadline:
+		if state.boards[0].phase == phase and state.boards[0].chain == chain:
+			return true
+		await process_frame
+	return _check(false, "演出の段階に到達: %s / %d" % [phase, chain])
 
 
 func _garbage_scene() -> bool:
