@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="cardbattle"
+config/name="星環の決闘"
 config/version="0.1.0"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
@@ -27,3 +27,50 @@ window/stretch/aspect="keep"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[autoload]
+
+Session="*res://scripts/session.gd"
+
+[input]
+
+duel_confirm={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194309), Object(InputEventKey,"physical_keycode":32), Object(InputEventJoypadButton,"button_index":0)]
+}
+duel_cancel={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194305), Object(InputEventJoypadButton,"button_index":1)]
+}
+duel_next={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":78), Object(InputEventJoypadButton,"button_index":3)]
+}
+duel_previous_hand={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":81), Object(InputEventJoypadButton,"button_index":9)]
+}
+duel_next_hand={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":69), Object(InputEventJoypadButton,"button_index":10)]
+}
+duel_fullscreen={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194342), Object(InputEventJoypadButton,"button_index":6)]
+}
+duel_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194320), Object(InputEventJoypadButton,"button_index":11)]
+}
+duel_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194322), Object(InputEventJoypadButton,"button_index":12)]
+}
+duel_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194319), Object(InputEventJoypadButton,"button_index":13)]
+}
+duel_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194321), Object(InputEventJoypadButton,"button_index":14)]
+}
