@@ -55,4 +55,6 @@ func motion(name: String) -> void:
 # 演出時間を消費して通常色へ戻すため非冪等。
 func _process(delta: float) -> void:
 	hurt_time = maxf(0.0, hurt_time - delta)
-	modulate = Color(2.8, 1.9, 1.4) if hurt_time > 0.15 else Color.WHITE
+	var tint: Color = Color(2.8, 1.9, 1.4) if hurt_time > 0.15 else Color.WHITE
+	tint.a = modulate.a
+	modulate = tint

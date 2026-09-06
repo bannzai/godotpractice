@@ -78,8 +78,22 @@ func _effects() -> void:
 	main.world.use_tool()
 	await _capture("bomb-fuse", 0.55)
 	await _capture("bomb-explosion", 0.63)
-	main.world.enter_room(9, Vector2(520, 384), false)
+	main.world.enter_room(9, Vector2(520, 384))
 	await _capture("room-scroll", 0.12)
+	main.world.enter_room(6, Vector2(280, 384))
+	await _capture("dungeon-fade", 0.12)
+	main.world.enter_room(10, Vector2(780, 270), false)
+	main.world.interact()
+	await _capture("chest-open", 0.15)
+	main.world.invulnerable = 0
+	main.world._damage_hero(Vector2.LEFT)
+	await _capture("hero-hurt", 0.08)
+	main.world.enter_room(11, Vector2(810, 384), false)
+	main.world.enemies[0].hp = 1
+	main.world.facing = Vector2.RIGHT
+	main.world.sword()
+	await _capture("boss-defeat-flash", 0.1)
+	await _capture("boss-defeat-smoke", 0.25)
 
 
 func _animations() -> void:
@@ -113,8 +127,8 @@ func _animations() -> void:
 			actor.sprite.play(motion)
 			actor.sprite.set_frame_and_progress(0, 0)
 		await _capture("actors-%s-start" % motion, 0.01)
-		await _capture("actors-%s-mid" % motion, 0.16)
-		await _capture("actors-%s-end" % motion, 0.17)
+		await _capture("actors-%s-mid" % motion, 0.18)
+		await _capture("actors-%s-end" % motion, 0.22)
 	gallery.queue_free()
 	main.world.set_physics_process(true)
 

@@ -24,7 +24,9 @@ func _run() -> void:
 	await _movement_and_menu()
 	await _field_interactions()
 	await _dungeon_gates()
+	await _enemy_patterns()
 	await _combat_and_results()
+	await _regressions()
 	main.stop_audio()
 	await _pause(0.25)
 	main.queue_free()
@@ -47,6 +49,16 @@ func _movement_and_menu() -> void:
 	before = world.hero.position
 	await _pad(JOY_BUTTON_DPAD_DOWN, 0.15)
 	_check(world.hero.position.y > before.y + 20, "パッド下で移動")
+	for item: Array in [[KEY_LEFT, Vector2.LEFT], [KEY_UP, Vector2.UP],
+		[KEY_RIGHT, Vector2.RIGHT], [KEY_DOWN, Vector2.DOWN]]:
+		before = world.hero.position
+		await _key(item[0], 0.12)
+		_check((world.hero.position - before).dot(item[1]) > 20, "矢印キーの4方向移動: %d" % item[0])
+	for item: Array in [[JOY_BUTTON_DPAD_LEFT, Vector2.LEFT], [JOY_BUTTON_DPAD_UP, Vector2.UP],
+		[JOY_BUTTON_DPAD_RIGHT, Vector2.RIGHT]]:
+		before = world.hero.position
+		await _pad(item[0], 0.12)
+		_check((world.hero.position - before).dot(item[1]) > 20, "パッドの4方向移動: %d" % item[0])
 	await _key(KEY_J)
 	_check(world.attack_time > 0, "J で剣を振る")
 	await _pause(0.4)
@@ -71,6 +83,10 @@ func _field_interactions() -> void:
 	_check(state.mode == "dialogue" and main.dialogue_title == "灯守の長老", "村人との会話")
 	await _pad(JOY_BUTTON_A)
 	_check(state.mode == "play", "パッド A で会話を閉じる")
+	await _room(0, Vector2(740, 500))
+	await _pad(JOY_BUTTON_A)
+	_check(state.mode == "dialogue" and main.dialogue_title == "見習いの灯守", "2人目の村人との会話")
+	await _key(KEY_ENTER)
 	await _room(0, Vector2(330, 240))
 	world.facing = Vector2.RIGHT
 	await _key(KEY_J)
@@ -116,7 +132,11 @@ func _dungeon_gates() -> void:
 	await _key(KEY_K)
 	_check(world.boom_timer > 0, "K で風の輪を投げる")
 	await _pause(0.6)
-	_check(state.has_flag("wind-bridge") and world.barriers().is_empty(), "遠方のスイッチで橋を開通")
+	await _key(KEY_D, 0.65)
+	_check(state.has_flag("wind-bridge") and world.hero.position.x > 750, "遠方のスイッチで橋を開通")
+	world.hero.position = Vector2(600, 250)
+	await _key(KEY_D, 0.2)
+	_check(world.hero.position.x < 622, "橋が開いても橋以外の穴は通り抜けない")
 	await _room(8, Vector2(290, 300))
 	await _pad(JOY_BUTTON_A)
 	_check(state.bombs_owned and state.bombs == 5 and state.tool == "bomb", "爆弾袋を取得して装備")
@@ -128,6 +148,18 @@ func _dungeon_gates() -> void:
 	_check(world.bomb_timer > 0 and state.bombs == 4, "パッド Y で爆弾を消費")
 	await _pause(1.25)
 	_check(state.has_flag("broken-wall") and world.barriers().is_empty(), "爆発で壁を破壊")
+	state.coins = 15
+	await _room(1, Vector2(450, 290))
+	await _key(KEY_E)
+	await _button("爆弾 3 個", true)
+	_check(state.coins == 5 and state.bombs == 7, "店で爆弾を補充")
+	await _key(KEY_ESCAPE)
+	await _key(KEY_TAB)
+	await _button("ブーメラン", true)
+	_check(state.tool == "boomerang", "持ち物から風の輪に装備変更")
+	await _key(KEY_TAB)
+	await _button("爆弾", false)
+	_check(state.tool == "bomb", "持ち物から爆弾に装備変更")
 	await _room(9, Vector2(810, 300))
 	await _key(KEY_E)
 	_check(state.keys == 0 and not state.opened.has("small-key"), "押石を解く前は鍵を取得できない")
@@ -166,6 +198,50 @@ func _dungeon_gates() -> void:
 	_check(state.bombs == saved.bombs and state.flags == saved.flags
 		and state.unlocked == saved.unlocked,
 		"道具・仕掛け・解錠を維持して復帰")
+
+
+func _enemy_patterns() -> void:
+	await _room(2, Vector2(600, 390))
+	var enemy: Node2D = world.enemies[0]
+	var before: Vector2 = enemy.position
+	await _pause(0.2)
+	_check(enemy.position.distance_to(world.hero.position) < before.distance_to(world.hero.position),
+		"徘徊する敵が主人公へ近づく")
+	await _room(4, Vector2(600, 390))
+	enemy = world.enemies[0]
+	# 突進直前の時刻を開始条件にして、実際の物理フレームによる突進を検査する。
+	enemy.timer = 1.35
+	before = enemy.position
+	await _pause(0.2)
+	_check(enemy.position.distance_to(before) > 30, "予兆のあと敵が突進する")
+	await _room(3, Vector2(200, 384))
+	enemy = world.enemies[1]
+	enemy.timer = 1.95
+	await _pause(0.15)
+	_check(world.projectiles.size() == 1, "遠距離の敵が弾を撃つ")
+	await _room(11, Vector2(200, 580))
+	enemy = world.enemies[0]
+	enemy.timer = 3.15
+	await _pause(0.15)
+	_check(world.projectiles.size() == 4, "ボス前半は4方向の弾幕")
+	await _room(11, Vector2(200, 580))
+	enemy = world.enemies[0]
+	# 後半戦の開始条件。弾数と周期の変化はゲームの更新処理で発生させる。
+	enemy.hp = 8
+	enemy.timer = 2.35
+	await _pause(0.15)
+	_check(world.projectiles.size() == 8, "ボス後半は短い周期で8方向の弾幕")
+	await _room(2, Vector2(750, 390))
+	state.hp = state.max_hp
+	world.invulnerable = 0
+	world.hero.position = world.enemies[0].position - Vector2(30, 0)
+	before = world.hero.position
+	await _pause(0.1)
+	_check(state.hp == state.max_hp - 1 and world.hero.position.distance_to(before) > 30,
+		"接触ダメージにノックバックがある")
+	world.hero.position = world.enemies[0].position - Vector2(30, 0)
+	await _pause(0.1)
+	_check(state.hp == state.max_hp - 1 and world.invulnerable > 0, "無敵時間中は連続ダメージを受けない")
 
 
 func _combat_and_results() -> void:
@@ -211,6 +287,49 @@ func _combat_and_results() -> void:
 	await _button("タイトルへ", false)
 	await _pad(JOY_BUTTON_A)
 	_check(state.mode == "play", "パッド A でタイトルから開始")
+
+
+func _regressions() -> void:
+	await _room(2, Vector2(100, 384))
+	state.hp = 1
+	world.invulnerable = 0
+	# 左端への致死弾を開始条件にし、通常の衝突更新で死亡を発生させる。
+	world.projectiles.append({"pos": Vector2(108, 384), "vel": Vector2(-190, 0), "life": 5.0})
+	await _pause(0.08)
+	_check(state.hp == 0 and world.fatal and state.room == 2 and state.checkpoint == 2,
+		"出口際の致死弾で隣室へ移動せず再開地点を維持")
+	var before: Vector2 = world.hero.position
+	await _key(KEY_TAB)
+	_check(state.mode == "play" and world.fatal, "死亡演出中は持ち物を開かない")
+	await _key(KEY_D)
+	_check(world.hero.position == before, "死亡演出中は操作で移動しない")
+	await _pause(0.4)
+	_check(state.mode == "gameover" and state.room == 2, "出口際でも元の部屋で敗北画面へ進む")
+	await _pad(JOY_BUTTON_A)
+	_check(state.mode == "play" and state.room == 2 and state.hp == state.max_hp,
+		"出口際の死亡でも元の部屋から再挑戦")
+	await _room(1, Vector2(450, 290))
+	state.bombs_owned = true
+	state.bombs = 98
+	state.potions = 99
+	state.coins = 25
+	await _key(KEY_E)
+	await _button("爆弾 3 個", false)
+	_check(state.bombs == 98 and state.coins == 25, "上限を超える爆弾購入は代金を消費せず拒否")
+	await _button("回復薬", true)
+	_check(state.potions == 99 and state.coins == 25, "薬の所持上限で購入代金を消費しない")
+	state.bombs = 96
+	state.potions = 98
+	await _button("爆弾 3 個", true)
+	_check(state.bombs == 99 and state.coins == 15, "所持上限ちょうどまで爆弾を購入できる")
+	await _button("回復薬", false)
+	_check(state.potions == 99 and state.coins == 0, "所持上限ちょうどまで薬を購入できる")
+	await _key(KEY_ESCAPE)
+	state.coins = 9998
+	world.pickups.append({"kind": "coin", "pos": world.hero.position})
+	await _pause(0.08)
+	_check(state.coins == 9999 and world.pickups.is_empty(), "拾得した所持金は保存可能な上限で止まる")
+	_check(state.save_game("res://tmp/integration-cap-save.json"), "全所持数が上限でも保存できる")
 
 
 func _room(index: int, at: Vector2) -> void:

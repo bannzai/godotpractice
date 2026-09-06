@@ -217,6 +217,8 @@ def terrain():
 
 
 def backgrounds():
+    keyart=ellipse(48,79,26,7,'#091b29')+human('hero',2,0)
+    save('backgrounds/hero-keyart.svg',svg(group(keyart,'scale(5)'),480,480))
     rng=random.Random(81)
     sky=rect(0,0,1280,720,'url(#sky)','none',0)
     sky+=ellipse(886,167,150,150,'url(#glow)')+ellipse(886,167,58,58,'#e5d9ae')+ellipse(868,151,52,53,'#294059')
@@ -246,6 +248,155 @@ def backgrounds():
     save('backgrounds/middle.svg',svg(mid,1280,720))
     save('backgrounds/foreground.svg',svg(front,1280,720))
     save('backgrounds/title.svg',svg(sky+far+mid+front,1280,720))
+
+
+def scenery():
+    """装飾は透過の独立画像とし、ゲームの当たり判定には干渉しない。"""
+    # 葉冠の輪郭・葉脈・枝を重ね、遠くからも樹木の塊と接地が読めるようにする。
+    tree=ellipse(130,228,103,20,'#102c33')
+    tree+=path('M113 143L149 143Q139 184 155 213L179 231L144 225L133 214L114 232L80 231Z','#6d6351',INK,3)
+    tree+=path('M122 164L119 208M135 172L139 212M114 215L101 224','none','#aa9168',3)
+    tree+=path('M124 177L80 137L78 120L129 152L167 108L180 112L148 171Z','#5b6553',INK,3)
+    for x,y,scale,color in ((76,113,.95,'#285d53'),(176,111,.92,'#285851'),(124,77,1.18,'#347462'),(61,78,.74,'#397967'),(192,79,.68,'#306c60'),(127,37,.72,'#438675')):
+        leaf=path('M-56 17Q-66 -3 -49 -16Q-52 -39 -24 -42Q-8 -63 12 -42Q35 -50 45 -25Q68 -13 52 13Q59 32 33 40Q5 55 -11 43Q-44 48 -56 17Z',color,INK,2.5)
+        leaf+=path('M-40 -14Q-30 -32 -10 -30Q6 -44 20 -28M5 7Q24 -1 39 10M-40 17Q-26 26 -13 20','none','#71ac87',3)
+        leaf+=path('M-25 -7L-16 -12L-6 -8M16 24L26 19L34 22','none','#9fc298',2)
+        tree+=group(leaf,f'translate({x} {y}) scale({scale})')
+    for x,y in ((47,113),(97,62),(158,98),(185,55),(114,127)):
+        tree+=ellipse(x,y,3,4,GOLD)
+    save('scenery/tree.svg',svg(tree,256,256))
+
+    house=ellipse(165,229,140,22,'#102b34')
+    house+=path('M34 205L222 205L288 181L293 215L228 247L33 234Z','#40545c')
+    house+=path('M40 214L228 225L282 204M81 215L79 232M148 221L148 239M229 226L230 242','none','#879383',2)
+    house+=path('M43 110L224 112L224 219L43 211Z','#b4ae8a',INK,3)
+    house+=path('M224 112L276 82L276 194L224 219Z','#777f69',INK,3)
+    house+=path('M44 145L223 152M44 192L223 201M58 113L58 211M208 117L208 216','none','#615f50',5)
+    house+=path('M23 117L84 36L257 37L225 128Z','url(#cloth)',INK,4)
+    house+=path('M225 128L257 37L296 86L278 94L258 68L239 131Z','#386871',INK,3)
+    for y in (57,77,98):
+        x=84-(y-36)*.75
+        end=257-(y-37)*.35
+        house+=path(f'M{x:.1f} {y}L{end:.1f} {y+5}','none','#699796',3)
+        for j in range(6):
+            px=x+13+j*26
+            if px<end-5:
+                house+=path(f'M{px:.1f} {y}l-8 16','none','#203e50',2)
+    house+=path('M24 117L224 129L240 128M83 36L257 37','none','#ccbf8b',5)
+    house+=rect(143,55,28,36,'#637973',INK,3)+path('M139 57L142 44L173 44L176 57Z','#a1b19a')
+    house+=path('M99 211L99 167Q121 138 143 168L143 214Z','#3a4548',INK,3)
+    house+=path('M106 207L106 170Q121 153 136 171L136 210Z','#735e49','#bda476',2)
+    house+=path('M121 163V209M108 188L135 188','none','#b79b6c',2)
+    house+=ellipse(131,191,2.5,3,GOLD)
+    for x,y in ((66,154),(167,158)):
+        house+=rect(x,y,25,28,'url(#gold)',INK,3)
+        house+=path(f'M{x+12} {y}v28M{x} {y+13}h25','none','#5e6354',3)
+        house+=rect(x-4,y+28,33,7,'#526d5d',INK,2)
+        for j in range(4):
+            house+=path(f'M{x+j*7} {y+31}q-5 -11 1 -15q7 5 3 15','#608b63','none')
+    house+=path('M246 137L263 128L263 151L246 160Z','url(#gold)',INK,2)
+    house+=path('M254 133V156','none','#56645a',2)
+    house+=path('M37 197L35 158L24 156','none','#858d72',3)
+    house+=ellipse(25,172,27,31,'url(#glow)')+rect(18,158,14,23,'url(#gold)')
+    house+=path('M49 202Q60 188 74 201M174 211Q181 198 196 208','none','#648164',5)
+    save('scenery/house.svg',svg(house,320,256))
+
+    stall=ellipse(128,169,112,18,'#102c33')
+    stall+=path('M35 53L39 169M214 51L210 167','none','#776a52',8)
+    stall+=path('M34 51L217 51','none','#d4b57b',5)
+    stall+=path('M38 26L201 26L236 87L19 87Z','#c5b287',INK,3)
+    for j in range(6):
+        x=38+j*27
+        low=19+j*36
+        if j%2==0:
+            stall+=path(f'M{x} 27h27L{low+36} 87H{low}Z','#4c8d80','none')
+        stall+=path(f'M{low} 87h36v12q-18 13 -36 0Z','#71a490' if j%2==0 else '#ddc998',INK,2)
+    stall+=path('M38 27L201 27','none',GOLD,4)
+    stall+=path('M42 136L209 136L209 167L42 167Z','#886c50',INK,3)
+    stall+=path('M35 122L214 122L222 140L34 140Z','#c5a16b',INK,3)
+    stall+=path('M47 144L47 162M76 144V164M106 144V164M137 144V164M168 144V164M199 144V164','none','#bea473',2)
+    for x in (60,82,104):
+        stall+=ellipse(x,122,10,5,'#263f48')
+        stall+=path(f'M{x-6} 121L{x-4} 102H{x+4}L{x+7} 121Z','#7eae92',INK,1.5)
+        stall+=rect(x-4,100,8,5,GOLD,INK,1)
+    stall+=rect(135,106,56,20,'#745d4c',INK,2)
+    for j in range(4):
+        stall+=ellipse(143+j*13,108,6,6,['#dba875','#bc7970','#b4bc78','#dba875'][j],INK,1)
+    stall+=path('M216 109L216 133','none','#d3b379',2)+rect(204,115,23,18,'#294c52',GOLD,2)
+    stall+=path('M211 121L219 124L211 128','none',GOLD,2)
+    save('scenery/stall.svg',svg(stall,256,192))
+
+    crystals=ellipse(96,139,85,15,'#102b35')
+    for x,y,w,h,c in ((39,131,28,62,'#63999a'),(134,130,34,72,'#487d8e'),(76,133,43,110,'#85c6bb'),(109,141,29,67,'#b4d5c7')):
+        crystals+=path(f'M{x-w/2} {y-14}L{x-w/2} {y-h+22}L{x} {y-h}L{x+w/2} {y-h+22}L{x+w/2} {y-14}L{x} {y}Z',c,INK,2.5)
+        crystals+=path(f'M{x} {y-h}V{y}M{x-w/2} {y-h+22}L{x} {y-h+32}L{x+w/2} {y-h+22}','none','#d2eed6',2)
+        crystals+=path(f'M{x+2} {y-h+35}L{x+w/2-2} {y-h+25}V{y-16}L{x+2} {y-4}Z','#497c85','none')
+        crystals+=path(f'M{x-w/2+5} {y-h+29}V{y-h+46}','none','#eff8d4',3)
+    for x,y in ((23,141),(158,138),(128,147),(56,148)):
+        crystals+=path(f'M{x-9} {y}L{x-3} {y-12}L{x+7} {y-7}L{x+10} {y+2}Z','#658d86',INK,1.5)
+    crystals+=ellipse(76,48,30,30,'url(#glow)')
+    save('scenery/crystals.svg',svg(crystals,192,160))
+
+    ruins=ellipse(128,167,114,18,'#102c33')
+    ruins+=path('M21 152L199 152L233 168L218 180L31 180L13 170Z','#425b62')
+    ruins+=path('M30 149L30 55L69 41L112 48L112 91L151 84L151 59L191 64L205 152Z','url(#stone)',INK,3)
+    ruins+=path('M31 56L68 64L112 49M68 64V151M112 91L112 153M151 85L153 153','none','#2f4854',3)
+    for y in (82,107,132):
+        ruins+=path(f'M32 {y}L68 {y+6}L110 {y-4}M115 {y+8}L151 {y}L200 {y+5}','none','#334f59',2)
+        ruins+=path(f'M37 {y-3}L62 {y+1}M76 {y}L105 {y-7}','none','#acb9a1',1.5)
+    ruins+=path('M78 43L82 73L94 83L88 101M168 68L173 91L166 104L178 124','none','#233e4b',2)
+    ruins+=path('M145 149L160 127L202 132L217 155L198 168L158 166Z','#718b85')
+    ruins+=path('M160 128L178 149L216 155M178 149L174 165','none','#b6bfa7',2)
+    ruins+=path('M27 65Q41 47 70 49Q94 40 109 52M137 91Q150 71 185 72','none','#638566',8)
+    ruins+=path('M48 49Q37 75 52 94Q62 114 44 139','none','#7c9a6a',4)
+    for x,y in ((43,72),(52,91),(54,111),(45,128),(152,76),(172,73)):
+        ruins+=path(f'M{x} {y}q-18 -12 -17 0q8 11 17 0q12 -17 16 -9q3 11 -16 9','#829a66',INK,1)
+    save('scenery/ruins.svg',svg(ruins,256,192))
+
+    column=ellipse(48,144,41,11,'#102b33')
+    column+=path('M16 127L72 124L83 139L70 149L20 148L10 139Z','#667f7e')
+    column+=path('M26 39L67 37L68 129L53 138L26 130Z','url(#stone)',INK,3)
+    column+=path('M54 39V137M34 51V121M43 53V126M62 49V124','none','#b1bda9',2)
+    column+=path('M20 34L30 18L70 21L78 36L68 49L22 43Z','#8da299',INK,3)
+    column+=path('M25 33L68 38L75 31M68 38V47','none','#d0ceb0',2)
+    column+=path('M32 20L38 8L56 11L68 22Z','#5f7c76')
+    column+=path('M29 77L46 82L46 103L29 97Z','#31545a','#c9c099',1.5)
+    column+=path('M37 85L41 92L37 97L33 90Z',GOLD,'none')
+    column+=path('M16 134Q26 120 35 131M53 137Q64 124 77 133','none','#77926a',5)
+    save('scenery/column.svg',svg(column,96,160))
+
+    lily=''
+    for x,y,rx,ry,c in ((40,63,31,14,'#3e776d'),(87,40,25,12,'#57917c'),(90,74,29,13,'#447e6d')):
+        lily+=ellipse(x,y+3,rx+5,ry+3,'#183e4c')
+        lily+=path(f'M{x} {y}L{x+rx} {y-2}A{rx} {ry} 0 1 0 {x+rx-4} {y+6}Z',c,INK,1.5)
+        lily+=path(f'M{x-rx+6} {y-2}Q{x-8} {y-ry+2} {x+rx-8} {y-3}','none','#8bb399',1.5)
+    for j in range(7):
+        lily+=group(path('M46 46Q24 30 38 26Q51 26 46 46Z','#d4b5b5',INK,1.2),f'rotate({j*51} 46 46)')
+    lily+=ellipse(46,46,7,5,GOLD,INK,1)
+    lily+=path('M82 37L89 23L96 37L89 44Z','#b7c7a5',INK,1)
+    save('scenery/lily.svg',svg(lily,128,96))
+
+    arch=ellipse(162,232,144,20,'#102c33')
+    arch+=path('M24 218L270 209L302 226L287 242L33 246L13 233Z','#4e6b70',INK,3)
+    arch+=path('M32 218L32 84L78 37L142 18L206 32L265 74L279 215L226 222L218 93Q160 45 96 97L95 225Z','url(#stone)',INK,4)
+    arch+=path('M49 212L49 88L90 53L142 35L199 48L248 84L262 211','none','#bcc7a9',4)
+    arch+=path('M97 97L79 84M120 79L112 47M148 68L147 35M176 72L188 46M202 85L228 65M218 98L249 87','none','#314c58',3)
+    for y in (119,151,185):
+        arch+=path(f'M34 {y}L95 {y+7}M225 {y+3}L272 {y-5}','none','#314c58',3)
+        arch+=path(f'M42 {y-3}L88 {y+2}M232 {y}L262 {y-5}','none','#a6baa5',1.5)
+    arch+=path('M33 218L95 224L102 232L26 235Z','#739085')
+    arch+=path('M224 217L277 209L285 221L222 231Z','#739085')
+    arch+=path('M137 37L160 19L181 39L159 59Z','#2e5059',GOLD,2)
+    arch+=path('M158 28L168 38L159 51L151 39Z','#9bd5b7',GOLD,1.5)
+    for x in (62,247):
+        arch+=rect(x-10,146,20,25,'#294b56','#9fba9e',1)
+        arch+=path(f'M{x} 151L{x+5} 158L{x} 166L{x-5} 158Z',GOLD,'none')
+    arch+=path('M44 80Q68 46 116 36M211 41Q238 46 262 76M40 203Q65 194 85 211','none','#678b69',9)
+    arch+=path('M83 48Q68 71 79 103Q89 128 72 151','none','#8caa79',4)
+    for x,y in ((79,58),(77,85),(82,107),(80,126),(73,145),(230,51),(247,63)):
+        arch+=path(f'M{x} {y}q-15 -16 -19 -6q0 11 19 6q16 -14 19 -4q-4 10 -19 4','#84a071',INK,1)
+    arch+=path('M117 226L117 191L133 186L138 221M179 222L191 196L206 203L213 222','#49676a',INK,2)
+    save('scenery/arch.svg',svg(arch,320,256))
 
 
 SR=22050
@@ -372,6 +523,7 @@ if __name__=='__main__':
     props()
     terrain()
     backgrounds()
+    scenery()
     if '--visual-only' not in sys.argv:
         audio()
     print('素材を再生成しました')

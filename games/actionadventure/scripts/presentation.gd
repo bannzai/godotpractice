@@ -190,13 +190,7 @@ func _background() -> void:
 
 func _title() -> void:
 	_background()
-	var hero: TextureRect = _texture(
-		"res://assets/characters/hero.svg", Rect2(812, 302, 360, 360)
-	)
-	var portrait := AtlasTexture.new()
-	portrait.atlas = hero.texture
-	portrait.region = Rect2(0, 0, 96, 96)
-	hero.texture = portrait
+	_texture("res://assets/backgrounds/hero-keyart.svg", Rect2(812, 302, 360, 360))
 	_panel(Rect2(36, 40, 548, 640), Color(0.03, 0.12, 0.16, 0.94))
 	_label("風と海、そして忘れられた灯。", Rect2(76, 72, 470, 36), 19, TEAL)
 	_label("灯守の島", Rect2(70, 110, 486, 96), 68, PAPER)

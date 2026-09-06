@@ -38,6 +38,8 @@ var bomb_pos: Vector2 = Vector2.ZERO
 var bomb_timer: float = 0.0
 var fatal: bool = false
 var background: Array[Sprite2D] = []
+var ambient: CanvasModulate
+var lantern: PointLight2D
 
 
 func setup(main: Node) -> void:
@@ -46,6 +48,8 @@ func setup(main: Node) -> void:
 	for name: String in ["chest", "grass", "rock", "block", "switch", "door", "heart", \
 		"coin", "key", "boomerang", "bomb", "potion", "treasure"]:
 		textures[name] = load("res://assets/props/%s.svg" % name)
+	for name: String in ["tree", "house", "stall", "crystals", "ruins", "column", "lily", "arch"]:
+		textures[name] = load("res://assets/scenery/%s.svg" % name)
 	for name: String in ["distant", "middle", "foreground"]:
 		var layer := Sprite2D.new()
 		layer.texture = load("res://assets/backgrounds/%s.svg" % name)
@@ -74,6 +78,24 @@ func setup(main: Node) -> void:
 	actors.add_child(hero)
 	effects = preload("res://scripts/effects.gd").new()
 	add_child(effects)
+	ambient = CanvasModulate.new()
+	add_child(ambient)
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1, 1, 1, 0.75))
+	gradient.set_color(1, Color.TRANSPARENT)
+	var light_texture := GradientTexture2D.new()
+	light_texture.gradient = gradient
+	light_texture.width = 256
+	light_texture.height = 256
+	light_texture.fill = GradientTexture2D.FILL_RADIAL
+	light_texture.fill_from = Vector2(0.5, 0.5)
+	light_texture.fill_to = Vector2(0.5, 0)
+	lantern = PointLight2D.new()
+	lantern.texture = light_texture
+	lantern.texture_scale = 2.2
+	lantern.color = GOLD
+	lantern.energy = 0.7
+	hero.add_child(lantern)
 	enter_room(0, Vector2(280, 384), false)
 	state.mode = "title"
 
@@ -98,6 +120,8 @@ func enter_room(index: int, spawn: Vector2, animate: bool = true) -> void:
 	transition = 0.38 if animate else 0.0
 	slide_dir = 1.0 if index >= state.room else -1.0
 	state.room = index
+	ambient.color = Color("b1bbc9") if index >= 6 else Color("e0edf0")
+	lantern.visible = index >= 6
 	state.checkpoint = index
 	fatal = false
 	invulnerable = 1.0
@@ -128,8 +152,13 @@ func _build_tiles() -> void:
 			var tile: int = 2 if state.room >= 6 else 0
 			if y in [3, 4] and state.room < 6:
 				tile = 1
+			if state.room == 3 and ((x in range(1, 5) and y < 2)
+				or (x in range(13, 17) and y > 5)):
+				tile = 3
 			tiles.set_cell(Vector2i(x, y), 0, Vector2i(tile, 0))
 	tiles.modulate = Color("c1d3d2") if state.room >= 6 else Color.WHITE
+	if state.room == 4:
+		tiles.modulate = Color("efd3a8")
 
 
 func _prop(kind: String, at: Vector2, id: String = "", reward: String = "") -> void:
@@ -236,15 +265,23 @@ func _physics_process(delta: float) -> void:
 		hero.motion("walk")
 	else:
 		hero.motion("idle")
+	if fatal:
+		return
 	if Input.is_action_just_pressed("attack"):
 		sword()
 	if Input.is_action_just_pressed("tool"):
 		use_tool()
 	if Input.is_action_just_pressed("interact"):
 		interact()
+	if state.mode != "play" or transition > 0:
+		return
 	_update_tools(delta)
 	_update_enemies(delta)
+	if fatal:
+		return
 	_update_projectiles(delta)
+	if fatal:
+		return
 	_collect_pickups()
 	_check_room_exit()
 	hero.visible = invulnerable <= 0 or int(elapsed * 18) % 2 == 0
@@ -252,8 +289,12 @@ func _physics_process(delta: float) -> void:
 
 func barriers() -> Array[Rect2]:
 	var result: Array[Rect2] = []
-	if state.room == 7 and not state.has_flag("wind-bridge"):
-		result.append(Rect2(640, 128, 96, 512))
+	if state.room == 7:
+		if state.has_flag("wind-bridge"):
+			result.append(Rect2(640, 128, 96, 202))
+			result.append(Rect2(640, 440, 96, 200))
+		else:
+			result.append(Rect2(640, 128, 96, 512))
 	if state.room == 8 and not state.has_flag("broken-wall"):
 		result.append(Rect2(960, 128, 64, 512))
 	if state.room == 9 and not state.unlocked.has("iron"):
@@ -323,6 +364,8 @@ func sword() -> void:
 
 func interact() -> void:
 	for prop: Dictionary in props.duplicate():
+		if prop.kind not in ["villager", "merchant", "rock", "chest", "treasure", "door"]:
+			continue
 		if hero.position.distance_to(prop.pos) > 110:
 			continue
 		match prop.kind:
@@ -341,6 +384,10 @@ func interact() -> void:
 			"chest", "treasure":
 				if state.room == 9 and not state.has_flag("weight"):
 					host.notice = "宝箱は沈んでいる。石を床の灯へ押そう。"
+				elif prop.id == "powder" and state.opened.has("powder") and state.bombs < 3:
+					state.bombs = 3
+					effects.popup(prop.pos, "爆弾を3個まで補充")
+					host.audio.cue("chest")
 				else:
 					_open_chest(prop)
 			"door":
@@ -361,7 +408,7 @@ func _open_chest(prop: Dictionary) -> void:
 	effects.burst(prop.pos, GOLD, 30)
 	effects.popup(prop.pos, {"boomerang": "風の輪を手に入れた", "bombs": "爆弾袋を手に入れた",
 		"key": "小さな鍵 +1", "heart": "最大ハート +1", "treasure": "島の灯り"}[prop.reward])
-	host.notice = "道具は Esc / Start のメニューで選択。K / X で使おう。"
+	host.notice = "道具は Esc / Start のメニューで選択。K / Y で使おう。"
 	if prop.reward == "treasure":
 		host.show_result(true)
 
@@ -388,8 +435,6 @@ func use_tool() -> void:
 		bomb_timer = 1.1
 	else:
 		host.notice = "道具はメニューで選べます。爆弾切れは入口の宝箱から補充できます。"
-		if state.room == 8 and state.bombs_owned and state.bombs == 0:
-			state.bombs = 3
 		return
 	tool_time = 0.45
 	hero.sprite.play("action")
@@ -533,6 +578,7 @@ func _damage_hero(direction: Vector2, pit: bool = false) -> void:
 	host.audio.cue("hurt")
 	if state.damage(1):
 		fatal = true
+		state.mode = "play"
 		hero.dead = true
 		hero.sprite.play("death")
 		await get_tree().create_timer(0.55).timeout
@@ -546,7 +592,7 @@ func _collect_pickups() -> void:
 		if pickup.kind == "heart":
 			state.heal(1)
 		else:
-			state.coins += 3
+			state.coins = mini(9999, state.coins + 3)
 		effects.popup(pickup.pos, "+1" if pickup.kind == "heart" else "+3")
 		host.audio.cue("chest")
 		pickups.erase(pickup)
@@ -557,6 +603,7 @@ func _draw() -> void:
 		return
 	draw_rect(Rect2(58, 122, 1164, 524), Color("071d2b"), false, 8)
 	_draw_architecture()
+	_draw_scenery()
 	for prop: Dictionary in props:
 		if prop.kind in ["villager", "merchant"]:
 			continue
@@ -615,13 +662,7 @@ func _draw_architecture() -> void:
 				draw_circle(at, r * 19, Color(0.3, 0.9, 0.75, 0.017))
 			draw_circle(at, 8, MINT)
 			draw_arc(at, 18, 0, TAU, 24, GOLD, 2, true)
-	else:
-		for x: int in range(120, 1200, 100):
-			draw_circle(Vector2(x, 158), 26, Color("24524d"))
-			draw_circle(Vector2(x + 25, 630), 35, Color("193e40"))
-	if state.room == 5:
-		draw_rect(Rect2(535, 133, 210, 70), Color("203947"))
-		draw_arc(Vector2(640, 185), 80, PI, TAU, 24, GOLD, 5, true)
+
 
 
 func _draw_enemy_signals() -> void:
@@ -640,3 +681,48 @@ func _draw_enemy_signals() -> void:
 			draw_rect(Rect2(440, 105, 400, 12), Color("162b3b"))
 			draw_rect(Rect2(440, 105, 400 * maxf(enemy.hp, 0) / 16.0, 12),
 				Color("ea9879") if enemy.hp <= 8 else GOLD)
+
+
+
+func _scenery(name: String, rect: Rect2, color: Color = Color.WHITE) -> void:
+	draw_texture_rect(textures[name], rect, false, color)
+
+
+func _draw_scenery() -> void:
+	if state.room < 6:
+		_scenery("tree", Rect2(70, 128, 145, 145))
+		_scenery("tree", Rect2(1020, 488, 180, 180))
+		match state.room:
+			0:
+				_scenery("house", Rect2(180, 134, 245, 196))
+				_scenery("house", Rect2(880, 445, 240, 192))
+			1:
+				_scenery("stall", Rect2(420, 132, 256, 192))
+				_scenery("house", Rect2(870, 440, 225, 180))
+			2:
+				for x: int in [190, 740, 980]:
+					_scenery("tree", Rect2(x, 130, 185, 185))
+				_scenery("ruins", Rect2(220, 445, 225, 170))
+			3:
+				_scenery("lily", Rect2(165, 170, 110, 83))
+				_scenery("lily", Rect2(965, 525, 110, 83))
+				_scenery("crystals", Rect2(260, 460, 190, 158))
+				_scenery("crystals", Rect2(720, 140, 190, 158))
+			4:
+				_scenery("tree", Rect2(220, 130, 190, 190), Color("efc68b"))
+				_scenery("tree", Rect2(950, 130, 190, 190), Color("efc68b"))
+				_scenery("ruins", Rect2(230, 460, 225, 170))
+			5:
+				_scenery("arch", Rect2(510, 113, 260, 208))
+				_scenery("ruins", Rect2(830, 450, 250, 187))
+				_scenery("column", Rect2(340, 145, 78, 130))
+				_scenery("column", Rect2(895, 145, 78, 130))
+	else:
+		for at: Vector2 in [Vector2(140, 135), Vector2(1090, 470)]:
+			_scenery("column", Rect2(at, Vector2(78, 130)))
+		_scenery("ruins", Rect2(240, 485, 180, 135))
+		if state.room == 11:
+			_scenery("arch", Rect2(820, 130, 270, 216))
+			_scenery("crystals", Rect2(210, 150, 150, 125))
+		elif state.room == 7:
+			_scenery("crystals", Rect2(840, 180, 160, 134))
