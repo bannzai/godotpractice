@@ -112,7 +112,7 @@ func _potion(events: Array[Dictionary]) -> bool:
 		return false
 	potions -= 1
 	active_monster().hp = mini(active_monster().hp + 35, Catalog.stats(active_monster()).hp)
-	events.append(_message("回復薬で HP を回復した！"))
+	events.append({"kind": "heal", "hp_after": active_monster().hp, "text": "回復薬で HP を回復した！"})
 	return true
 
 
@@ -126,7 +126,7 @@ func _switch(argument: String, events: Array[Dictionary]) -> bool:
 		events.append(_message("その仲間は倒れている。"))
 		return false
 	active_index = next_index
-	events.append(_message("いっておいで、%s！" % _name(active_monster())))
+	events.append(_switch_event("いっておいで、%s！" % _name(active_monster())))
 	return true
 
 
@@ -179,20 +179,24 @@ func _attack(player: bool, move_id: String, events: Array[Dictionary]) -> void:
 	events.append({
 		"kind": "attack", "target": "enemy" if player else "player", "text": text,
 		"damage": amount, "effectiveness": multiplier,
+		"element": Catalog.MOVES[move_id].type, "hp_after": defender.hp,
 	})
 	if defender.hp > 0:
 		return
+	events.append({
+		"kind": "faint", "target": "enemy" if player else "player",
+		"text": "%sは力尽きた。" % _name(defender),
+	})
 	if player:
 		_victory(events)
 	else:
-		events.append(_message("%sは力尽きた。" % _name(defender)))
 		var next_index: int = _first_healthy()
 		if next_index < 0:
 			mode = "gameover"
 			events.append(_message("仲間がみんな倒れてしまった…。"))
 		else:
 			active_index = next_index
-			events.append(_message("%sが代わりに戦う！" % _name(active_monster())))
+			events.append(_switch_event("%sが代わりに戦う！" % _name(active_monster())))
 
 
 ## 勝利報酬を一度の戦闘終了時に加算するため非冪等。
@@ -341,3 +345,10 @@ func _name(monster: Dictionary) -> String:
 
 func _message(text: String) -> Dictionary:
 	return {"kind": "message", "text": text}
+
+
+func _switch_event(text: String) -> Dictionary:
+	return {
+		"kind": "switch", "text": text, "species": active_monster().species,
+		"hp_after": active_monster().hp, "maximum": Catalog.stats(active_monster()).hp,
+	}
