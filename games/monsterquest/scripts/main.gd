@@ -18,18 +18,20 @@ var busy: bool = false
 var menu_open: bool = false
 var notice: String = ""
 var step_clock: float = 0.0
-var enemy_picture: TextureRect
-var player_picture: TextureRect
+var enemy_picture: QuestActor
+var player_picture: QuestActor
 var battle_message: Label
 var first_button: Button
+var effects: BattleEffects
+var player_health: QuestHealth
+var enemy_health: QuestHealth
+var drawn_mode: String = ""
+var audio_suspended: bool = false
 
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
-	var skin := Theme.new()
-	skin.default_font = FONT
-	skin.default_font_size = 20
-	theme = skin
+	theme = preload("res://themes/quest.tres")
 	music = AudioStreamPlayer.new()
 	music.volume_db = -6.0
 	add_child(music)
@@ -50,14 +52,19 @@ func _notification(what: int) -> void:
 
 
 func stop_audio() -> void:
+	audio_suspended = true
 	music.stop()
 	sound.stop()
+	music.stream = null
+	sound.stream = null
 
 
 func _exit_tree() -> void:
 	stop_audio()
-	music.stream = null
-	sound.stream = null
+	# --quit-after は終了直前のため await で次フレームを待てない。
+	# stop が要求した音声のフェード・解放をミキサースレッドに処理させる。
+	# https://github.com/godotengine/godot/pull/122742
+	OS.delay_msec(150)
 
 
 ## 時間に応じた移動と入力イベントを処理するため非冪等。
@@ -112,6 +119,9 @@ func refresh() -> void:
 	add_child(page)
 	first_button = null
 	world = null
+	effects = BattleEffects.new()
+	page.add_child(effects)
+	effects.setup(page)
 	_panel(Rect2(0, 0, 1280, 720), PAPER)
 	match Game.mode:
 		"title":
@@ -122,7 +132,17 @@ func refresh() -> void:
 			_show_battle()
 		"clear", "gameover":
 			_show_result()
-	_play_music("battle" if Game.mode == "battle" else "field")
+	var track: String = "field"
+	match Game.mode:
+		"title": track = "title"
+		"battle": track = "boss" if Game.trainer else "battle"
+		"clear", "gameover": track = "result"
+	_play_music(track)
+	if drawn_mode != Game.mode:
+		page.modulate.a = 0.0
+		var entrance: Tween = page.create_tween()
+		entrance.tween_property(page, "modulate:a", 1.0, 0.30)
+		drawn_mode = Game.mode
 	if first_button != null and (Game.mode != "field" or menu_open):
 		first_button.grab_focus()
 
@@ -157,28 +177,45 @@ func _button_at(text: String, rect: Rect2, callback: Callable, primary: bool = f
 	node.text = text
 	node.position = rect.position
 	node.size = rect.size
-	for color_name: String in [
-		"font_color", "font_hover_color", "font_focus_color", "font_pressed_color"
-	]:
-		node.add_theme_color_override(color_name, PAPER if primary else INK)
-	for state: String in ["normal", "hover", "pressed", "focus"]:
-		var style := StyleBoxFlat.new()
-		style.bg_color = GREEN if primary else Color("e8e8d3")
-		style.set_corner_radius_all(12)
-		if state != "normal":
-			style.set_border_width_all(3)
-			style.border_color = GOLD
-		node.add_theme_stylebox_override(state, style)
-	node.pressed.connect(callback)
+	node.theme_type_variation = &"Primary" if primary else &"Button"
+	node.pivot_offset = rect.size / 2.0
+	node.mouse_entered.connect(_button_motion.bind(node, 1.025))
+	node.mouse_exited.connect(_button_motion.bind(node, 1.0))
+	node.button_down.connect(_button_motion.bind(node, 0.97))
+	node.button_up.connect(_button_motion.bind(node, 1.0))
+	node.pressed.connect(func() -> void:
+		if busy or closing:
+			return
+		_play_sound("ui")
+		callback.call()
+	)
 	page.add_child(node)
 	if first_button == null:
 		first_button = node
 	return node
 
 
-func _picture(id: String, rect: Rect2) -> TextureRect:
+## ホバー状態へ滑らかに近づける。重複イベントでは前のTweenを置き換える。
+func _button_motion(button: Button, target: float) -> void:
+	if button.disabled:
+		return
+	if button.has_meta("motion"):
+		(button.get_meta("motion") as Tween).kill()
+	var tween: Tween = button.create_tween()
+	button.set_meta("motion", tween)
+	tween.tween_property(button, "scale", Vector2.ONE * target, 0.12)
+
+
+func _picture(id: String, rect: Rect2) -> QuestActor:
+	var node := QuestActor.new()
+	page.add_child(node)
+	node.setup(id, rect)
+	return node
+
+
+func _image(path: String, rect: Rect2) -> TextureRect:
 	var node := TextureRect.new()
-	node.texture = load(Catalog.SPECIES[id].image)
+	node.texture = load("res://assets/%s.svg" % path)
 	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	node.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	node.position = rect.position
@@ -188,25 +225,33 @@ func _picture(id: String, rect: Rect2) -> TextureRect:
 	return node
 
 
+func _backdrop(height: float = 720.0) -> void:
+	var backdrop := ForestBackdrop.new()
+	page.add_child(backdrop)
+	backdrop.setup(Game.mode == "battle" and Game.trainer, height)
+
+
 func _show_title() -> void:
-	_panel(Rect2(694, 0, 586, 720), Color("dce7cd"))
-	_panel(Rect2(763, 106, 444, 444), Color("c3d7b5"), 220)
-	_panel(Rect2(40, 44, 195, 36), GREEN, 18)
-	_label_at("小さな冒険、大きな出会い", Rect2(54, 46, 180, 32), 14, PAPER)
-	_label_at("こもれびの\n調査隊", Rect2(70, 144, 620, 188), 68)
-	_label_at("草むらの向こうで、きみを待っている。", Rect2(76, 355, 570, 42), 23)
-	_label_at("見つけて、仲間にして、一緒に強くなる。\n６種のいきものと旅する、手のひらの冒険。", Rect2(76, 410, 570, 75), 20, MUTED)
-	_button_at("はじめから冒険する  →", Rect2(76, 524, 440, 58), start_new, true)
-	var resume_button: Button = _button_at("つづきから", Rect2(76, 594, 214, 48), resume_game)
+	_backdrop()
+	_image("backgrounds/title_keyart", Rect2(612, 54, 640, 572))
+	_panel(Rect2(46, 48, 552, 608), PAPER, 28)
+	_image("ui/logo", Rect2(88, 80, 62, 62))
+	_label_at("こもれび野外研究所", Rect2(164, 88, 364, 40), 20, GREEN)
+	_label_at("小さな冒険、大きな出会い", Rect2(90, 150, 438, 32), 16, MUTED)
+	_label_at("こもれびの", Rect2(80, 192, 490, 90), 64)
+	_label_at("調査隊", Rect2(84, 277, 470, 108), 82)
+	_label_at("草むらの向こうで、きみを待っている。", Rect2(90, 407, 454, 34), 19)
+	_label_at("見つけて、仲間にして、一緒に強くなる。", Rect2(90, 447, 454, 34), 18, MUTED)
+	_button_at("はじめから冒険する  →", Rect2(88, 512, 466, 58), start_new, true)
+	var resume_button: Button = _button_at("つづきから", Rect2(88, 588, 190, 44), resume_game)
 	resume_button.disabled = not FileAccess.file_exists(Game.SAVE_PATH)
-	_button_at("遊び方・クレジット", Rect2(302, 594, 214, 48), _show_help)
-	_picture("sprout", Rect2(950, 116, 220, 220))
-	_picture("tide", Rect2(762, 302, 248, 248))
-	_picture("ember", Rect2(1000, 360, 230, 230))
-	_label_at("森と、海と、きみの物語。", Rect2(824, 626, 400, 40), 22, GREEN)
+	_button_at("遊び方・クレジット", Rect2(294, 588, 260, 44), _show_help)
+	_panel(Rect2(804, 626, 360, 34), INK, 23)
+	_label_at("森と、海と、きみの物語。", Rect2(834, 627, 314, 32), 18, PAPER)
+	_panel(Rect2(0, 666, 1280, 54), PAPER)
 	_footer("矢印 / WASD・方向パッドで選択    Enter / A 決定    F11 全画面")
 	if not notice.is_empty():
-		_label_at(notice, Rect2(76, 480, 590, 40), 17, GREEN)
+		_label_at(notice, Rect2(640, 48, 610, 36), 17, PAPER)
 
 
 func _show_help() -> void:
@@ -252,7 +297,7 @@ func resume_game() -> void:
 
 func _show_field() -> void:
 	var names: Dictionary = {"town": "こもれびの町", "route": "ひだまりの小径", "home": "自宅", "clinic": "回復の家"}
-	_label_at(names[Game.zone], Rect2(28, 20, 650, 55), 32)
+	_label_at(names[Game.zone], Rect2(28, 12, 650, 50), 32)
 	_label_at("調査目標：仲間を育てて隊長に挑もう", Rect2(690, 28, 560, 40), 19, GREEN)
 	world = QuestWorld.new()
 	world.position = Vector2(24, 100)
@@ -261,11 +306,11 @@ func _show_field() -> void:
 	world.set_player(Game.cell)
 	_panel(Rect2(1000, 100, 256, 560), Color("e8ead8"), 16)
 	_label_at("調査ノート", Rect2(1020, 112, 220, 44), 24)
-	_label_at(
-		"仲間  %d / 6\nボール  %d\n回復薬  %d" % [Game.party.size(), Game.balls, Game.potions],
-		Rect2(1020, 166, 220, 100),
-		21
-	)
+	_label_at("仲間  %d / 6" % Game.party.size(), Rect2(1020, 166, 220, 32), 21)
+	_image("ui/capture_ball", Rect2(1020, 212, 30, 30))
+	_label_at("ボール  %d" % Game.balls, Rect2(1060, 210, 172, 34), 20)
+	_image("ui/potion", Rect2(1020, 253, 30, 30))
+	_label_at("回復薬  %d" % Game.potions, Rect2(1060, 251, 172, 34), 20)
 	if not Game.party.is_empty():
 		var lead: Dictionary = Game.party[Game.active_index]
 		_picture(lead.species, Rect2(1050, 284, 154, 154))
@@ -274,32 +319,21 @@ func _show_field() -> void:
 			Rect2(1018, 436, 224, 35),
 			20
 		)
-		_health_bar(lead, Rect2(1020, 480, 208, 12))
+		_health_bar(lead, Rect2(1020, 476, 208, 12))
 	_button_at("話す / 調べる", Rect2(1018, 518, 220, 48), interact)
 	_button_at("手持ち・道具", Rect2(1018, 578, 220, 48), open_menu)
 	_footer("移動：矢印 / WASD / 左スティック　 話す：Enter / A　 手持ち・保存：Esc / Start")
 	if not notice.is_empty():
-		_panel(Rect2(44, 590, 916, 52), PAPER, 12)
-		_label_at(notice, Rect2(60, 598, 880, 36), 18)
+		_label_at(notice, Rect2(30, 65, 1218, 30), 17, MUTED)
 	if menu_open:
 		_show_menu()
 
 
-func _health_bar(monster: Dictionary, rect: Rect2) -> void:
-	var maximum: int = Catalog.stats(monster).hp
-	_panel(rect, Color("ccd5be"), 6)
-	var ratio: float = float(monster.hp) / maximum
-	_panel(
-		Rect2(rect.position, Vector2(rect.size.x * ratio, rect.size.y)),
-		GREEN if ratio > 0.3 else Color("c57455"),
-		6
-	)
-	_label_at(
-		"HP %d / %d" % [monster.hp, maximum],
-		Rect2(rect.position + Vector2(0, 14), Vector2(rect.size.x, 30)),
-		15,
-		MUTED
-	)
+func _health_bar(monster: Dictionary, rect: Rect2) -> QuestHealth:
+	var node := QuestHealth.new()
+	page.add_child(node)
+	node.setup(monster, rect)
+	return node
 
 
 ## 一歩ごとに位置・抽選が進むため非冪等。移動中は再入を止める。
@@ -313,11 +347,14 @@ func walk(direction: Vector2i) -> void:
 	Game.cell = next
 	Game.steps += 1
 	busy = true
+	world.visual_player.set_action("walk")
+	world.visual_player.sprite.flip_h = direction.x < 0
 	var tween: Tween = create_tween()
 	tween.tween_property(
 		world.visual_player, "position", Vector2(next) * 40.0 + Vector2(20, 20), 0.12
 	)
 	await tween.finished
+	world.visual_player.set_action("idle")
 	busy = false
 	var destination: Dictionary = QuestWorld.portal(Game.zone, Game.cell)
 	if not destination.is_empty():
@@ -331,6 +368,8 @@ func walk(direction: Vector2i) -> void:
 		elif Game.zone == "home":
 			notice = "おかえり。メニューから調査の記録を保存できるよ。"
 		refresh()
+		if Game.zone == "clinic":
+			effects.burst(world.position + world.visual_player.position, "heal", 36)
 		return
 	if QuestWorld.is_grass(Game.zone, Game.cell) and Game.rng.randf() < 0.20:
 		begin_battle(Catalog.encounter(Game.rng.randf()), Game.rng.randi_range(3, 6), false)
@@ -498,16 +537,21 @@ func begin_battle(id: String, level: int, trainer: bool) -> void:
 
 
 func _show_battle() -> void:
-	_panel(Rect2(0, 0, 1280, 486), Color("dce7cd"))
-	_panel(Rect2(80, 226, 536, 204), Color("c2d4ad"), 100)
-	_panel(Rect2(710, 216, 460, 128), Color("bdd1a5"), 64)
-	_label_at("隊長 ヒナギクとの腕試し" if Game.trainer else "草むらでの出会い", Rect2(36, 20, 1000, 45), 26)
-	_label_at("炎 → 草 → 水 → 炎   有利２倍 / 不利½", Rect2(754, 30, 510, 32), 17, GREEN)
-	_monster_card(Game.enemy, Rect2(60, 98, 394, 128))
+	_backdrop(486)
+	_panel(Rect2(0, 0, 1280, 72), INK)
+	_panel(Rect2(90, 384, 504, 70), Color("8eac79"), 35)
+	_panel(Rect2(754, 292, 416, 54), Color("afc995"), 27)
+	_label_at("隊長 ヒナギクとの腕試し" if Game.trainer else "草むらでの出会い", Rect2(36, 15, 700, 45), 25, PAPER)
+	_label_at("炎 → 草 → 水 → 炎   有利２倍 / 不利½", Rect2(794, 25, 466, 32), 16, GOLD)
+	enemy_health = _monster_card(Game.enemy, Rect2(54, 98, 374, 122))
 	var lead: Dictionary = Game.party[Game.active_index]
-	_monster_card(lead, Rect2(780, 340, 430, 128))
-	enemy_picture = _picture(Game.enemy.species, Rect2(826, 88, 260, 260))
-	player_picture = _picture(lead.species, Rect2(194, 212, 300, 270))
+	player_health = _monster_card(lead, Rect2(816, 350, 396, 120))
+	enemy_picture = _picture(
+		"crab_captain" if Game.trainer else Game.enemy.species, Rect2(836, 92, 270, 254)
+	)
+	if Game.trainer:
+		_picture("captain", Rect2(1160, 164, 98, 154))
+	player_picture = _picture(lead.species, Rect2(186, 204, 324, 278))
 	_panel(Rect2(24, 498, 660, 160), Color("e7ead7"), 18)
 	battle_message = _label_at(
 		"%s はどうする？" % Catalog.SPECIES[lead.species].name, Rect2(48, 514, 608, 116), 25
@@ -517,12 +561,15 @@ func _show_battle() -> void:
 	for index: int in moves.size():
 		var move_id: String = moves[index]
 		var move: Dictionary = Catalog.MOVES[move_id]
-		_button_at(
+		var move_button: Button = _button_at(
 			"%s ・ %s" % [move.name, _type_name(move.type)],
 			Rect2(704 + (index % 2) * 278, 500 + (index / 2) * 57, 260, 48),
 			battle_turn.bind("attack", move_id),
 			true
 		)
+		move_button.icon = load("res://assets/ui/type_%s.svg" % move.type)
+		move_button.expand_icon = true
+		move_button.add_theme_constant_override("icon_max_width", 24)
 	_button_at("ボール %d" % Game.balls, Rect2(704, 618, 126, 42), battle_turn.bind("capture", ""))
 	_button_at("回復 %d" % Game.potions, Rect2(840, 618, 126, 42), battle_turn.bind("potion", ""))
 	_button_at("交代", Rect2(978, 618, 120, 42), _show_switch)
@@ -530,7 +577,7 @@ func _show_battle() -> void:
 	_footer("技を選択：矢印 / 方向パッド　 決定：Enter / A　 相手より速いと先に攻撃できる")
 
 
-func _monster_card(monster: Dictionary, rect: Rect2) -> void:
+func _monster_card(monster: Dictionary, rect: Rect2) -> QuestHealth:
 	_panel(rect, PAPER, 18)
 	_label_at(
 		"%s  Lv.%d" % [Catalog.SPECIES[monster.species].name, monster.level],
@@ -543,7 +590,10 @@ func _monster_card(monster: Dictionary, rect: Rect2) -> void:
 		17,
 		GREEN
 	)
-	_health_bar(monster, Rect2(rect.position + Vector2(92, 60), Vector2(rect.size.x - 114, 12)))
+	_image("ui/type_" + Catalog.SPECIES[monster.species].type,
+		Rect2(rect.position + Vector2(64, 58), Vector2(24, 24)))
+	return _health_bar(monster,
+		Rect2(rect.position + Vector2(102, 60), Vector2(rect.size.x - 124, 12)))
 
 
 func _type_name(type: String) -> String:
@@ -574,19 +624,36 @@ func battle_turn(action: String, move_id: String) -> void:
 		return
 	refresh()
 	busy = true
+	_prepare_modal()
 	var events: Array = Game.resolve_turn(action, move_id)
 	for event: Dictionary in events:
 		battle_message.text = event.get("text", "")
-		if event.kind == "attack":
-			await animate_attack(event)
-		elif event.kind == "capture":
-			_play_sound("capture")
-			var tween: Tween = create_tween()
-			tween.tween_property(enemy_picture, "modulate:a", 0.15, 0.3)
-			tween.tween_property(enemy_picture, "modulate:a", 1.0, 0.3)
-			await tween.finished
-		else:
-			await get_tree().create_timer(0.75).timeout
+		match event.kind:
+			"attack":
+				await animate_attack(event)
+			"capture":
+				_play_sound("capture")
+				await effects.capture(enemy_picture, event.success)
+			"heal":
+				_play_sound("heal")
+				player_health.present(event.hp_after)
+				await effects.celebrate(player_picture, "heal", "+HP")
+			"level":
+				_play_sound("levelup")
+				await effects.celebrate(player_picture, "level", "レベルアップ！")
+			"faint":
+				_play_sound("defeat")
+				var actor: QuestActor = enemy_picture if event.target == "enemy" else player_picture
+				actor.set_action("defeat")
+				await get_tree().create_timer(0.65).timeout
+			"switch":
+				player_picture.setup(event.species, Rect2(player_picture.position, player_picture.size))
+				player_picture.set_action("idle")
+				player_picture.modulate = Color.WHITE
+				player_health.present(event.hp_after, event.maximum)
+				await get_tree().create_timer(0.5).timeout
+			_:
+				await get_tree().create_timer(0.55).timeout
 	busy = false
 	notice = events.back().get("text", "") if not events.is_empty() else ""
 	refresh()
@@ -595,30 +662,21 @@ func battle_turn(action: String, move_id: String) -> void:
 ## アニメーションは時間経過に従って見た目を動かすので非冪等。
 func animate_attack(event: Dictionary) -> void:
 	_play_sound("attack")
-	var target: TextureRect = enemy_picture if event.target == "enemy" else player_picture
-	var attacker: TextureRect = player_picture if event.target == "enemy" else enemy_picture
-	var origin: Vector2 = attacker.position
-	var damage_text: Label = _label_at(
-		"−%d" % event.damage,
-		Rect2(target.position + Vector2(70, 10), Vector2(160, 80)),
-		52,
-		Color("ad4c3b")
-	)
-	var tween: Tween = create_tween()
-	tween.tween_property(
-		attacker, "position:x", origin.x + (28 if event.target == "enemy" else -28), 0.13
-	)
-	tween.tween_property(target, "modulate", Color("ff967f"), 0.12)
-	tween.tween_property(target, "modulate", Color.WHITE, 0.12)
-	tween.tween_property(attacker, "position", origin, 0.13)
-	tween.tween_property(damage_text, "position:y", damage_text.position.y - 35, 0.35)
-	await tween.finished
-	damage_text.queue_free()
+	var target: QuestActor = enemy_picture if event.target == "enemy" else player_picture
+	var attacker: QuestActor = player_picture if event.target == "enemy" else enemy_picture
+	var health: QuestHealth = enemy_health if event.target == "enemy" else player_health
+	# 表示のHPは被弾する時点から減らし、解決済みターンの最終値へ先回りさせない。
+	var countdown: Tween = health.create_tween()
+	countdown.tween_interval(0.42)
+	countdown.tween_callback(health.present.bind(event.hp_after))
+	await effects.attack(attacker, target, event)
 
 
 func _show_result() -> void:
 	var won: bool = Game.mode == "clear"
-	_panel(Rect2(670, 0, 610, 720), Color("dce7cd"))
+	_backdrop()
+	_panel(Rect2(48, 66, 640, 594), PAPER, 28)
+	_image("ui/emblem", Rect2(856, 82, 204, 164))
 	_label_at("調査、大成功！" if won else "今日は、ひと休み。", Rect2(76, 128, 620, 90), 48)
 	_label_at(
 		"仲間と歩いた道が、\nきみを一人前の調査隊員にした。" if won else "仲間たちはよく頑張った。\n町で回復して、もう一度出かけよう。",
@@ -631,10 +689,13 @@ func _show_result() -> void:
 		24,
 		GREEN
 	)
-	_button_at("タイトルへ", Rect2(80, 548, 460, 64), to_title, true)
+	_button_at("タイトルへ", Rect2(80, 540, 460, 56), to_title, true)
 	if not won:
-		_button_at("町で回復して再開", Rect2(80, 622, 460, 52), retry)
-	_picture("sprout" if won else "ember", Rect2(752, 178, 426, 426))
+		_button_at("町で回復して再開", Rect2(80, 608, 460, 44), retry)
+	_picture("sprout" if won else "ember", Rect2(752, 240, 426, 380))
+	if won:
+		effects.burst(Vector2(974, 270), "level", 56)
+	_panel(Rect2(0, 672, 1280, 48), PAPER)
 	_footer("Enter / A で決定")
 
 
@@ -655,7 +716,7 @@ func to_title() -> void:
 
 
 func _play_music(track: String) -> void:
-	if music_name == track:
+	if audio_suspended or music_name == track:
 		return
 	music_name = track
 	music.stop()
@@ -667,12 +728,14 @@ func _play_music(track: String) -> void:
 	# 初期フレームで終了する起動検証では再生を開始せず、音声の終了競合を避ける。
 	await get_tree().process_frame
 	await get_tree().process_frame
-	if is_inside_tree():
+	if is_inside_tree() and not audio_suspended and music_name == track:
 		music.play()
 
 
 ## 効果音を入力や演出ごとに鳴らすため非冪等。
 func _play_sound(track: String) -> void:
+	if audio_suspended:
+		return
 	sound.stream = load("res://assets/audio/%s.wav" % track)
 	sound.play()
 
