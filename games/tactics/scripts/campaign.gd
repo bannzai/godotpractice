@@ -1,6 +1,6 @@
 extends Node
 ## 戦闘・成長・フェーズ進行はプレイヤーの操作を一度適用するため非冪等。
-## 検証では save_path を専用 user:// ファイルへ差し替えて実セーブを保護する。
+## 検証では save_path を作業ディレクトリ内へ差し替えて実セーブを保護する。
 
 var screen: String = "title"
 var stage_index: int = 0
@@ -253,7 +253,24 @@ func valid_save(data: Variant) -> bool:
 		ids.append(value.id)
 		if value.hp > 0:
 			occupied.append(cell)
-	return "hero" in ids
+	return _valid_roster(data)
+
+
+func _valid_roster(data: Dictionary) -> bool:
+	var definitions: Array = BattleData.ALLIES + BattleData.STAGES[int(data.stage)].enemies
+	if data.units.size() != definitions.size():
+		return false
+	for definition: Dictionary in definitions:
+		var matching: bool = false
+		for unit: Dictionary in data.units:
+			if unit.id != definition.id:
+				continue
+			var team: String = "player" if definition in BattleData.ALLIES else "enemy"
+			matching = unit.team == team and unit.job == definition.job
+			matching = matching and unit.boss == definition.get("boss", false)
+		if not matching:
+			return false
+	return not (data.stage == BattleData.STAGES.size() - 1 and data.outcome == "victory")
 
 
 func _valid_header(data: Dictionary) -> bool:

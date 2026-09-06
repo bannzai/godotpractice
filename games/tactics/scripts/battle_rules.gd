@@ -39,6 +39,10 @@ static func strike(attacker: Dictionary, target: Dictionary, map: Array) -> Dict
 
 
 static func forecast(attacker: Dictionary, target: Dictionary, map: Array) -> Dictionary:
+	if attacker.job == "healer":
+		return {"damage": 0, "hit": 100, "critical": 0, "strikes": 1,
+			"counter_damage": 0, "counter_hit": 0, "counter_strikes": 0,
+			"heal": mini(attacker.strength + 8, target.max_hp - target.hp)}
 	var result: Dictionary = strike(attacker, target, map)
 	var counter: Dictionary = strike(target, attacker, map)
 	var can_counter: bool = target.job != "healer" and can_reach(target, attacker)
@@ -46,7 +50,7 @@ static func forecast(attacker: Dictionary, target: Dictionary, map: Array) -> Di
 		"counter_damage": counter.damage if can_counter else 0,
 		"counter_hit": counter.hit if can_counter else 0,
 		"counter_strikes": (2 if target.speed - attacker.speed >= 4 else 1) if can_counter else 0,
-		"heal": attacker.strength + 8 if attacker.job == "healer" else 0})
+		"heal": 0})
 	return result
 
 

@@ -53,13 +53,18 @@ def save(name, samples):
     gain = .78 / max(peak, 1.)
     pcm = array('h', (int(max(-.95, min(.95, value*gain))*32767) for value in samples))
     # Oggのserialとメタデータを固定し、同じ生成器でバイト一致を保つ。
-    wav = ROOT / f'{name}.wav'
+    work = ROOT.parents[1] / 'tmp' / 'audio-generation'
+    work.mkdir(parents=True, exist_ok=True)
+    (work / '.gdignore').touch()
+    wav = work / f'{name}.wav'
+    output = work / f'{name}.ogg'
     with wave.open(str(wav), 'wb') as stream:
         stream.setnchannels(2)
         stream.setsampwidth(2)
         stream.setframerate(RATE)
         stream.writeframes(pcm.tobytes())
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-fflags', '+bitexact', '-i', str(wav), '-map_metadata', '-1', '-c:a', 'libvorbis', '-q:a', '4', '-flags:a', '+bitexact', '-fflags', '+bitexact', str(ROOT / f'{name}.ogg')], check=True)
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-fflags', '+bitexact', '-i', str(wav), '-map_metadata', '-1', '-c:a', 'libvorbis', '-q:a', '4', '-flags:a', '+bitexact', '-fflags', '+bitexact', str(output)], check=True)
+    output.replace(ROOT / f'{name}.ogg')
     wav.unlink()
 
 

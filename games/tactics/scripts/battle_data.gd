@@ -32,7 +32,7 @@ const ALLIES: Array[Dictionary] = [
 ]
 const STAGES: Array[Dictionary] = [
 	{
-		"name": "01  風渡りの草原", "objective": "rout", "objective_text": "敵を全滅させる",
+		"name": "風渡りの草原", "objective": "rout", "objective_text": "敵を全滅させる",
 		"goal": Vector2i(13, 5),
 		"map": ["................", "..FF......MM....", "..F.......M.....",
 			"......F.........", ".....FF.........", ".........T......",
@@ -45,7 +45,7 @@ const STAGES: Array[Dictionary] = [
 		],
 	},
 	{
-		"name": "02  霧の砦", "objective": "boss", "objective_text": "砦の隊長を倒す",
+		"name": "霧の砦", "objective": "boss", "objective_text": "砦の隊長を倒す",
 		"goal": Vector2i(11, 5),
 		"map": ["................", "...FFF....MMM...", "...FF.....M.....",
 			"......W.........", "......W...FFF...", "..........TT....",
@@ -59,7 +59,7 @@ const STAGES: Array[Dictionary] = [
 		],
 	},
 	{
-		"name": "03  夜明けの道", "objective": "reach", "objective_text": "リオが東の光柱へ到達する",
+		"name": "夜明けの道", "objective": "reach", "objective_text": "リオが東の光柱へ到達する",
 		"goal": Vector2i(13, 5),
 		"map": ["................", "..MM.....FF.....", "...M.....FFF....",
 			"......WW........", "......WW........", ".............T..",

@@ -4,14 +4,14 @@
 
 ## 独自素材 (units) (`assets/units/`)
 
-- **素材名**: 暁の境界 キャラクターと武器 (`archer.svg`, `archer_body.svg`, `archer_weapon.svg`, `axe.svg`, `axe_body.svg`, `axe_weapon.svg`, `boss.svg`, `boss_body.svg`, `boss_weapon.svg`, `bow.svg`, `bow_body.svg`, `bow_weapon.svg`, `healer.svg`, `healer_body.svg`, `healer_weapon.svg`, `lance.svg`, `lance_body.svg`, `lance_weapon.svg`, `raider.svg`, `raider_body.svg`, `raider_weapon.svg`, `sword.svg`, `sword_body.svg`, `sword_weapon.svg`)
+- **素材名**: 暁の境界 キャラクターと武器 (`archer.svg`, `archer_body.svg`, `archer_weapon.svg`, `axe.svg`, `axe_body.svg`, `axe_weapon.svg`, `boss.svg`, `boss_body.svg`, `boss_weapon.svg`, `bow.svg`, `bow_body.svg`, `bow_weapon.svg`, `enemy_lance.svg`, `enemy_lance_body.svg`, `enemy_lance_weapon.svg`, `enemy_sword.svg`, `enemy_sword_body.svg`, `enemy_sword_weapon.svg`, `healer.svg`, `healer_body.svg`, `healer_weapon.svg`, `lance.svg`, `lance_body.svg`, `lance_weapon.svg`, `raider.svg`, `raider_body.svg`, `raider_weapon.svg`, `sword.svg`, `sword_body.svg`, `sword_weapon.svg`)
 - **作者**: bannzai（Codexを用いた独自制作）
 - **入手 URL**: https://github.com/bannzai/godotpractice
-- **ライセンス**: 本プロジェクト用の独自制作物（第三者素材・楽譜を使用していない）
+- **ライセンス**: 本プロジェクト用の独自制作物（第三者素材を使用していない）
 - **クレジット表記**: **不要**
 - **改変**: なし
 - **備考**: 再生成: python3 games/tactics/scripts/art/generate_art.py
-- **生成**: Codexによるコード記述、Python標準ライブラリによる決定的生成 / プロンプトの要点: 剣士、盾を持つ槍兵、大柄な斧兵、フード弓兵、白い法衣の回復役、角兜の略奪兵、紫フードの射手、冠甲冑の指揮官。各本体と武器を分離しアニメーションする。
+- **生成**: Codexによるコード記述、Python標準ライブラリによる決定的生成 / プロンプトの要点: 剣士、盾を持つ槍兵、大柄な斧兵、フード弓兵、白い法衣の回復役、角兜の略奪兵、羽兜と覆面の反曲弓射手、冠甲冑の指揮官、尖兜と曲刀の敵剣士、大盾と長槍の敵槍兵。全10種の本体と武器を分離しアニメーションする。
 
 ## 独自素材 (backgrounds) (`assets/backgrounds/`)
 
@@ -66,3 +66,13 @@
 - **クレジット表記**: **必要**
 - **改変**: なし
 - **備考**: 既存deckrogueの未改変フォントをコピー。著作権表示とライセンス全文をfonts/OFL.txtへ同梱。
+
+## 独自シェーダ (`assets/shaders/`)
+
+- **素材名**: 暁の境界 谷の薄霧 (`atmosphere.gdshader`)
+- **作者**: bannzai（Codexを用いた独自制作）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクト用の独自制作物（第三者素材を使用していない）
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **生成**: CodexによるGodotシェーダ記述 / プロンプトの要点: 深紺と翡翠の谷に漂う低速の薄霧と淡い金の光。最大透明度0.075、GL Compatibility対応。

@@ -2,7 +2,8 @@ extends Node2D
 ## 本体と武器を別パーツとして動かす。画像原寸192×224、原点は画像中心。
 
 const KINDS: Array[String] = [
-	"sword", "lance", "axe", "bow", "healer", "raider", "archer", "boss"
+	"sword", "lance", "axe", "bow", "healer", "raider", "archer", "boss",
+	"enemy_sword", "enemy_lance"
 ]
 const POSES: Array[String] = ["idle", "select", "move", "attack", "hurt", "dodge", "defeat"]
 

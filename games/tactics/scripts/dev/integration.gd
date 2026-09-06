@@ -15,7 +15,7 @@ func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	Engine.time_scale = 15.0
 	campaign = root.get_node("Campaign")
-	campaign.save_path = "res://tmp/integration-campaign.json"
+	campaign.save_path = "user://tactics-integration-test.json"
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
@@ -28,6 +28,8 @@ func _run() -> void:
 	await key(KEY_ENTER)
 	await idle()
 	_check(campaign.unit_by_id("hero").x == 3, "実入力で青いマスへ移動")
+	await key(KEY_I)
+	_check(main.selected == "hero", "満HPで薬を使っても移動取消の選択を保つ")
 	await button(JOY_BUTTON_B)
 	_check(campaign.unit_by_id("hero").x == 2, "Bで移動を取り消す")
 	await button(JOY_BUTTON_A)
@@ -52,6 +54,14 @@ func _run() -> void:
 	_check(campaign.screen == "title", "結果からマウスでタイトル復帰")
 	await button(JOY_BUTTON_A)
 	_check(campaign.screen == "play", "パッドAで新規プレイ")
+	for unit: Dictionary in campaign.units:
+		if unit.team == "player":
+			unit.hp = 0
+	campaign.outcome = "defeat"
+	_check(campaign.save_game(), "全味方死亡の敗北を検証専用user://へ保存")
+	main.show_title()
+	await click(Vector2(184, 498))
+	_check(campaign.screen == "result", "全味方死亡の保存から例外なく敗北結果へ再開")
 	main.stop_audio()
 	await create_timer(0.2, true, false, true).timeout
 	Engine.time_scale = 1.0

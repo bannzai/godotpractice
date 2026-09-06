@@ -157,6 +157,10 @@ func _check_campaign() -> void:
 	var healing: Array[Dictionary] = model.attack("healer", "hero")
 	_check(not healing.is_empty() and hero.hp == hero.max_hp - 1, "隣接味方を回復")
 	_check(model.attack("healer", "hero").is_empty(), "行動済みの再回復不可")
+	var heal_preview: Dictionary = BattleRules.forecast(
+		model.unit_by_id("healer"), hero, model.stage().map)
+	_check(heal_preview.heal == 1 and heal_preview.counter_strikes == 0
+		and heal_preview.counter_damage == 0, "回復予測は実回復量を示し反撃なし")
 	_check(not model.use_item("hero").is_empty() and hero.items == 1, "傷薬で回復し消費")
 	for unit: Dictionary in model.living("player"):
 		model.wait_unit(unit.id)
@@ -266,6 +270,15 @@ func _check_save(model: Node) -> void:
 		"成長と永久死亡を復元")
 	_check(not restored.valid_save({"version": 99}), "未対応・欠損データを拒否")
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(model.save_path))
+	var invalid_roster: Dictionary = data.duplicate(true)
+	invalid_roster.units.pop_back()
+	_check(not restored.valid_save(invalid_roster), "配置ユニットの欠損を拒否")
+	invalid_roster = data.duplicate(true)
+	invalid_roster.units[0].team = "enemy"
+	_check(not restored.valid_save(invalid_roster), "主人公の陣営改変を拒否")
+	invalid_roster = data.duplicate(true)
+	invalid_roster.stage = 1
+	_check(not restored.valid_save(invalid_roster), "第 2 章のボス欠損を拒否")
 	data.units[0].x = 99
 	_check(not restored.valid_save(data), "マップ外の保存座標を拒否")
 	data.units[0].x = "invalid"

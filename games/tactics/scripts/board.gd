@@ -40,6 +40,8 @@ static func art_kind(unit: Dictionary) -> String:
 		return unit.job
 	if unit.boss:
 		return "boss"
+	if unit.job in ["sword", "lance"]:
+		return "enemy_" + str(unit.job)
 	return "archer" if unit.job == "bow" else "raider"
 
 

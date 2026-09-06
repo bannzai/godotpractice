@@ -42,7 +42,30 @@ def face(hair, eyes=JADE, beard=False):
 def body(kind):
     s = ellipse(96, 213, 55, 7, '#101e32', 'none')
     # マント、髪、帽子、盾の形を分け、盤面でも職種の輪郭を保つ。
-    if kind == 'sword':
+    if kind == 'enemy_sword':
+        s += path('M71 88 L42 116 30 204 76 183 92 156 121 185 151 205 141 116 117 85Z', '#51445e', GOLD, 2)
+        s += path('M77 151 L66 208 86 213 97 171 116 212 138 212 121 151Z', '#293648')
+        s += path('M72 87 L117 85 126 143 106 170 72 163 62 120Z', '#536172', GOLD, 3)
+        s += path('M76 92 L104 146 M75 146 L121 143', 'none', '#a27d80', 7)
+        s += path('M59 102 L48 122 58 152 73 141 M120 100 L141 115 141 144 126 141', '#536172', GOLD, 2)
+        s += path('M66 52 L81 20 94 8 112 28 123 57 114 86 88 97 69 81Z', '#344256', GOLD, 2)
+        s += path('M71 60 L87 53 111 55 118 64 102 77 77 74Z', '#15283e')
+        s += path('M79 62 L87 62 M102 62 L111 60', 'none', CORAL, 3)
+        s += path('M94 15 L94 51 M93 78 L96 88', 'none', '#aab8bf', 3)
+        s += path('M67 89 L91 106 119 89 111 114 80 113Z', CORAL)
+    elif kind == 'enemy_lance':
+        s += path('M62 82 L43 184 71 174 95 190 131 173 146 182 127 83Z', '#624851', GOLD, 2)
+        s += path('M70 157 L60 211 87 213 97 170 110 213 137 211 125 155Z', '#2a384b')
+        s += path('M62 87 L125 85 136 142 116 173 65 169 51 117Z', '#586271', GOLD, 3)
+        s += path('M74 93 L93 130 116 94 M72 148 L121 148', 'none', '#afbfc1', 5)
+        s += path('M65 43 L79 29 113 29 125 45 122 74 107 93 82 88 67 69Z', '#405066', GOLD, 3)
+        s += path('M77 29 L73 13 83 24 111 24 122 12 119 32', '#a6b5bc', GOLD, 2)
+        s += path('M70 54 L121 52 118 65 73 66Z', '#142338')
+        s += path('M77 59 L88 59 M103 59 L115 58', 'none', CORAL, 3)
+        s += path('M96 65 L96 84', 'none', '#adb9bb', 3)
+        s += path('M36 99 L76 92 89 143 66 179 31 151Z', '#4c4b67', GOLD, 4)
+        s += path('M60 105 L70 143 62 159 43 141Z', '#bd8990', GOLD, 2)
+    elif kind == 'sword':
         s += path('M76 86 Q39 117 39 192 L67 183 87 199 130 184 140 110 106 85Z', 'url(#red)')
         s += path('M54 165 Q45 117 71 101 M65 173 L64 129', 'none', '#efb792', 2)
         s += path('M76 160 L70 204 91 207 96 167 106 204 129 204 117 153Z', NAVY)
@@ -126,6 +149,10 @@ def body(kind):
 
 def weapon(kind):
     # 支点は(48,100)。腕の位置に合わせてNode2Dで回転する。
+    if kind == 'enemy_sword':
+        return path('M43 92 Q68 67 72 9 Q96 59 57 96Z', 'url(#steel)', NAVY, 2) + path('M33 89 L65 99 60 106 31 97Z', GOLD) + path('M43 100 L37 129 47 132 53 105Z', '#6b4554')
+    if kind == 'enemy_lance':
+        return path('M46 33 L46 158 53 158 53 33Z', '#946e69') + path('M49 2 L29 34 43 30 44 48 56 48 58 29 72 35Z', 'url(#steel)', NAVY, 2) + path('M55 45 L82 48 68 64 55 60Z', CORAL, GOLD, 1)
     if kind in ('sword', 'boss'):
         s = path('M43 92 L40 27 49 7 58 27 53 92Z', 'url(#steel)', NAVY, 2)
         s += path('M30 91 L68 91 66 99 31 99Z', GOLD)
@@ -146,7 +173,7 @@ def weapon(kind):
 
 
 def make_units():
-    for kind in ('sword', 'lance', 'axe', 'bow', 'healer', 'raider', 'archer', 'boss'):
+    for kind in ('sword', 'lance', 'axe', 'bow', 'healer', 'raider', 'archer', 'boss', 'enemy_sword', 'enemy_lance'):
         b, w = body(kind), weapon(kind)
         write('units', kind + '_body', b)
         write('units', kind + '_weapon', w, 96, 160)
@@ -190,7 +217,7 @@ def make_backgrounds():
         fore += path(f'M{x} {y} l4 -15 4 15 m-4 -4 10 -9', 'none', '#527d73', 1)
     write('backgrounds', 'foreground', fore, 1280, 720)
     # キーアートは右側に人物、左側をタイトル文言用の静かな空間にする。
-    keyart = sky + mountains + fore
+    keyart = ''
     keyart += '<g transform="translate(975,388) scale(1.08)">' + body('lance') + '<g transform="translate(92,25)">' + weapon('lance') + '</g></g>'
     keyart += '<g transform="translate(740,411) scale(1.28)">' + body('healer') + '<g transform="translate(92,25)">' + weapon('healer') + '</g></g>'
     keyart += '<g transform="translate(876,368) scale(1.48)">' + body('sword') + '<g transform="translate(92,25) rotate(14,48,100)">' + weapon('sword') + '</g></g>'
@@ -230,4 +257,4 @@ if __name__ == '__main__':
     make_units()
     make_backgrounds()
     make_terrain()
-    print('tactics 独自SVG 37点を生成')
+    print('tactics 独自SVG 43点を生成')

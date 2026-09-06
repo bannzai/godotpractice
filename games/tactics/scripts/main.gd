@@ -4,6 +4,7 @@ extends Control
 const UI := preload("res://scripts/ui.gd")
 const Board := preload("res://scripts/board.gd")
 const Backdrop := preload("res://scripts/backdrop.gd")
+const CombatView := preload("res://scripts/combat_view.gd")
 const Effects := preload("res://scripts/effects.gd")
 const JOBS: Dictionary = {
 	"sword": "剣士", "lance": "槍騎士", "axe": "斧戦士", "bow": "弓使い", "healer": "祈り手"
@@ -90,7 +91,7 @@ func show_title() -> void:
 	busy = false
 	_reset_screen()
 	_music("title")
-	UI.art(screen, "backgrounds/keyart.svg", Rect2(510, 20, 730, 660))
+	UI.art(screen, "backgrounds/keyart.svg", Rect2(0, 0, 1280, 720))
 	UI.panel(screen, Rect2(50, 86, 505, 554), Color(0.05, 0.11, 0.17, 0.94))
 	UI.art(screen, "ui/crest.svg", Rect2(84, 112, 56, 56))
 	UI.label(screen, "五人の誓い、三つの戦場", Rect2(154, 124, 360, 36), 22, UI.GOLD)
@@ -128,8 +129,11 @@ func show_help() -> void:
 
 
 func start_game() -> void:
-	campaign.new_game()
+	var saved: bool = campaign.new_game()
 	_begin_stage()
+	if not saved:
+		notice = campaign.save_error
+		_refresh_sidebar()
 
 
 func resume_game() -> void:
@@ -145,7 +149,8 @@ func _begin_stage() -> void:
 	selected = ""
 	target = ""
 	busy = false
-	var hero: Dictionary = campaign.living("player")[0]
+	notice = ""
+	var hero: Dictionary = campaign.unit_by_id("hero")
 	cursor = Vector2i(hero.x, hero.y)
 	show_play()
 	effects.banner("第 %d 章  %s" % [campaign.stage_index + 1, campaign.stage().name])
@@ -170,7 +175,7 @@ func show_play() -> void:
 	board = Board.new()
 	screen.add_child(board)
 	board.set_selection(selected, cursor)
-	UI.label(screen, "青：移動範囲    赤：移動後を含む射程    輪：味方 / 敵", Rect2(62, 652, 745, 28), 18)
+	UI.label(screen, "青：移動範囲    赤：移動後を含む射程    輪：味方 / 敵", Rect2(62, 651, 745, 26), 18)
 	_refresh_sidebar()
 
 
@@ -211,9 +216,22 @@ func _refresh_sidebar() -> void:
 		_forecast()
 	else:
 		_actions(current)
-	UI.label(sidebar, notice, Rect2(825, 651, 410, 40), 17, UI.GOLD)
+	var status: Label = UI.label(sidebar, notice, Rect2(825, 651, 410, 56), 16, UI.GOLD)
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	for button: Node in sidebar.find_children("*", "Button", true, false):
 		button.focus_mode = Control.FOCUS_NONE
+	var ground: Dictionary = BattleData.terrain(cursor, campaign.stage().map)
+	var cost: String = str(ground.cost) if ground.cost < 99 else "通行不可"
+	UI.label(
+		sidebar,
+		(
+			"%s  /  移動 %s  /  守備 +%d  /  回避 +%d%%"
+			% [ground.name, cost, ground.defense, ground.evasion]
+		),
+		Rect2(62, 681, 736, 28),
+		17,
+		UI.GOLD
+	)
 	if is_instance_valid(board):
 		board.set_selection(selected, cursor)
 
@@ -338,9 +356,10 @@ func confirm_attack() -> void:
 	if busy or target.is_empty():
 		return
 	busy = true
+	var initial_hp: Dictionary = _health_snapshot()
 	var events: Array = campaign.attack(selected, target)
 	target = ""
-	await _animate_events(events)
+	await _animate_events(events, initial_hp)
 	selected = ""
 	busy = false
 	_refresh_sidebar()
@@ -362,6 +381,11 @@ func item_selected() -> void:
 		return
 	busy = true
 	var events: Array = campaign.use_item(selected)
+	if events.is_empty():
+		busy = false
+		notice = "HPが満タン、または薬を持っていません"
+		_refresh_sidebar()
+		return
 	await _animate_events(events)
 	selected = ""
 	target = ""
@@ -406,8 +430,9 @@ func _enemy_turn() -> void:
 	effects.banner("敵軍フェーズ", UI.CORAL)
 	await get_tree().create_timer(0.95).timeout
 	while campaign.phase == "enemy" and campaign.outcome.is_empty():
+		var initial_hp: Dictionary = _health_snapshot()
 		var events: Array = campaign.enemy_step()
-		await _animate_events(events)
+		await _animate_events(events, initial_hp)
 		if is_instance_valid(board):
 			board.sync()
 		await get_tree().create_timer(0.16).timeout
@@ -421,11 +446,26 @@ func _enemy_turn() -> void:
 
 
 # イベントごとの表示時間を確保し、判定済みの結果を順番に再生する。
-func _animate_events(events: Array) -> void:
+func _health_snapshot() -> Dictionary:
+	var result: Dictionary = {}
+	for unit: Dictionary in campaign.units:
+		result[unit.id] = unit.hp
+	return result
+
+
+func _animate_events(events: Array, initial_hp: Dictionary = {}) -> void:
 	if events.is_empty():
 		return
 	_music("battle")
+	var cutin: Control
 	for event: Dictionary in events:
+		if event.kind == "attack" and cutin == null:
+			cutin = CombatView.new()
+			add_child(cutin)
+			cutin.setup(campaign, event.actor, event.target, initial_hp)
+			await get_tree().create_timer(0.16).timeout
+		if cutin != null:
+			cutin.present(event)
 		var actor: Node2D = board.actors.get(str(event.get("actor", "")))
 		var victim: Node2D = board.actors.get(str(event.get("target", "")))
 		var point: Vector2 = victim.position if victim != null else Vector2(600, 320)
@@ -445,34 +485,41 @@ func _animate_events(events: Array) -> void:
 			"attack":
 				if actor != null:
 					actor.play_pose("attack")
-					var zoom: Tween = board.create_tween().set_parallel(true)
-					zoom.tween_property(board, "scale", Vector2.ONE * 1.045, 0.12)
-					zoom.tween_property(board, "position", -actor.position * 0.045, 0.12)
+
 				_sfx("attack")
 				await get_tree().create_timer(0.22).timeout
 			"hit":
 				if victim != null:
 					victim.play_pose("hurt")
 				var critical: bool = event.get("critical", false)
-				effects.burst(point, ("必殺！ " if critical else "") + "−%d" % event.amount, UI.CORAL)
+				if cutin == null:
+					effects.burst(
+						point, ("必殺！ " if critical else "") + "−%d" % event.amount, UI.CORAL
+					)
 				if critical:
 					effects.banner("一閃  —  クリティカル", UI.GOLD)
 				await _impact(victim, critical)
 			"miss":
 				if victim != null:
 					victim.play_pose("dodge")
-				effects.burst(point, "回避", UI.JADE)
+				if cutin == null:
+					effects.burst(point, "回避", UI.JADE)
 			"death":
 				if victim != null:
 					victim.play_pose("defeat")
-				effects.burst(point, "撃破", UI.GOLD)
+				if cutin == null:
+					effects.burst(point, "撃破", UI.GOLD)
 			"heal":
 				_sfx("heal")
 				effects.burst(point, "+%d" % event.amount, UI.JADE)
 			"level":
 				_sfx("level")
-				effects.burst(actor.position if actor != null else point, "成長  Lv.UP", UI.GOLD)
+				if cutin == null:
+					effects.burst(actor.position if actor != null else point, "成長  Lv.UP", UI.GOLD)
 		await get_tree().create_timer(0.24).timeout
+	if cutin != null:
+		await get_tree().create_timer(0.25).timeout
+		cutin.queue_free()
 	if is_instance_valid(board):
 		board.scale = Vector2.ONE
 		board.position = Vector2.ZERO
@@ -498,7 +545,7 @@ func show_result() -> void:
 	busy = false
 	_reset_screen()
 	_music("result")
-	UI.art(screen, "backgrounds/keyart.svg", Rect2(650, 10, 620, 700))
+	UI.art(screen, "backgrounds/keyart.svg", Rect2(0, 0, 1280, 720))
 	UI.panel(screen, Rect2(112, 122, 685, 478), Color(0.05, 0.11, 0.17, 0.96))
 	var won: bool = campaign.outcome != "defeat"
 	var title: String = "道は、暁へ続く" if campaign.outcome == "ending" else "戦場を越えて"
@@ -536,8 +583,11 @@ func show_result() -> void:
 
 
 func advance_stage() -> void:
-	campaign.next_stage()
+	var saved: bool = campaign.next_stage()
 	_begin_stage()
+	if not saved:
+		notice = campaign.save_error
+		_refresh_sidebar()
 
 
 func _unhandled_input(event: InputEvent) -> void:

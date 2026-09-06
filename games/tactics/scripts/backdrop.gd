@@ -12,6 +12,14 @@ func _ready() -> void:
 	for layer: String in ["sky", "mountains", "foreground"]:
 		layers.append(UI.art(self, "backgrounds/%s.svg" % layer, Rect2(-24, -16, 1328, 752)))
 
+	var mist := ColorRect.new()
+	mist.size = Vector2(1280, 720)
+	mist.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var atmosphere := ShaderMaterial.new()
+	atmosphere.shader = load("res://assets/shaders/atmosphere.gdshader")
+	mist.material = atmosphere
+	add_child(mist)
+
 
 # 雲と草の連続的な時間変化を表す。
 func _process(delta: float) -> void:
