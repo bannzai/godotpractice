@@ -78,7 +78,7 @@ func _draw_board() -> void:
 		Rect2(grid.position - Vector2(13, 9), grid.size + Vector2(26, 18)),
 		Color(0.09, 0.17, 0.19, 0.95)
 	)
-	UI.label(self, "相手の陣", Rect2(270, 91, 163, 34), 18, UI.MUTED)
+	UI.label(self, "上二段：相手の陣", Rect2(270, 91, 226, 34), 18, UI.MUTED)
 	var enemy_king: Button = UI.button(
 		self,
 		"敵の王   %d / %d" % [board.kings[1], board.max_kings[1]],
@@ -140,7 +140,7 @@ func _draw_board() -> void:
 	)
 	own_king.add_theme_color_override("font_color", UI.JADE)
 	cell_views[-1] = own_king
-	UI.label(self, "あなたの陣", Rect2(270, 336, 153, 32), 18, UI.MUTED)
+	UI.label(self, "下二段：あなたの陣", Rect2(775, 91, 210, 34), 18, UI.MUTED)
 
 
 func _draw_hand() -> void:

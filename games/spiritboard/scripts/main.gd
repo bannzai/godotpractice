@@ -95,6 +95,9 @@ func refresh() -> void:
 				session.board.enemy_id, "battle"
 			)
 		sound.play_scene(scene_music)
+		sound.play_sfx("transition")
+		if session.screen == "battle":
+			sound.play_sfx("voice")
 		if session.screen == "event" and _node_kind() in ["grave", "police"]:
 			effects.entrance(session.event_title())
 		elif session.screen == "battle" and session.board.enemy_id in ["general", "police"]:
@@ -259,6 +262,10 @@ func _event_screen() -> void:
 	UI.art(page, "node_" + kind, Rect2(72, 152, 252, 252))
 	var npc: String = "police" if kind == "police" else "merchant" if kind == "merchant" else "hero"
 	_actor(page, npc, Rect2(75, 300, 262, 315))
+	var prop: String = (
+		"prop_coin" if kind == "merchant" else "prop_grave" if kind == "grave" else "prop_talisman"
+	)
+	UI.art(page, prop, Rect2(270, 532, 72, 72))
 	UI.panel(page, Rect2(379, 115, 861, 514), Color(0.045, 0.10, 0.12, 0.93))
 	UI.label(page, session.event_title(), Rect2(415, 139, 790, 55), 36)
 	UI.label(page, session.event_description(), Rect2(416, 207, 775, 89), 23, UI.MUTED)
@@ -318,6 +325,15 @@ func _result() -> void:
 	UI.label(page, "最終闇堕ち度", Rect2(112, 457, 250, 35), 21, UI.MUTED)
 	_count_label(int(session.run.darkness), Rect2(485, 451, 190, 43), " / 100")
 	UI.button(page, "タイトルへ戻る", Rect2(111, 530, 599, 53), session.to_title, "title")
+	if not session.run.collected.is_empty():
+		UI.panel(page, Rect2(790, 510, 440, 133), Color(0.055, 0.105, 0.12, 0.96))
+		UI.label(page, "この夜に結んだ霊", Rect2(810, 518, 400, 42), 23, UI.GOLD)
+		var names: PackedStringArray = []
+		for id: String in session.run.collected:
+			var spirit_name: String = str(Catalog.card(id).name)
+			if spirit_name not in names:
+				names.append(spirit_name)
+		UI.label(page, "・".join(names), Rect2(810, 565, 400, 72), 18, UI.MUTED)
 
 
 # 結果の値は画面を開くたびに数え上げる。

@@ -18,7 +18,12 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 MOVIE_FRAMES ?= 150
 MOVIE_PLAY_FRAMES := 720
 
-.PHONY: import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
+.PHONY: generate-assets import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
+
+# 独自素材を同じバイト列で再生成する。外部の認証・サービスは不要。
+generate-assets:
+	python3 scripts/dev/generate_art.py --out-dir assets
+	python3 scripts/dev/generate_audio.py --out-dir assets
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:

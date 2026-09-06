@@ -1,6 +1,8 @@
 extends Control
 ## 背景と漂う霧は画面部品の更新から独立して寿命を持つ。
 
+const INK_VEIL = preload("res://scripts/ink_veil.gdshader")
+
 var layers: Array[TextureRect] = []
 var elapsed: float = 0.0
 var travel: float = 0.0
@@ -23,6 +25,13 @@ func _ready() -> void:
 	shade.size = Vector2(1280, 720)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
+	var veil: ColorRect = ColorRect.new()
+	veil.size = Vector2(1280, 720)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ink: ShaderMaterial = ShaderMaterial.new()
+	ink.shader = INK_VEIL
+	veil.material = ink
+	add_child(veil)
 
 
 # 経過時間に従う視差と霧の周期運動なので非冪等。

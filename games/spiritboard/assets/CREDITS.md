@@ -37,3 +37,5 @@
 ## 画面テーマ
 
 `scenes/ui/theme.tres` は本プロジェクト用に作成した独自Theme。青墨・和紙・金・朱の配色と、同梱するZen Old Minchoを使用する。第三者のUI画像やテーマは使用していない。
+
+`scripts/ink_veil.gdshader` は独自の紙目と墨の陰影を描くCanvasItemシェーダ。外部のシェーダコードは使用していない。
