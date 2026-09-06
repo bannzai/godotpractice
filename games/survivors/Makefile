@@ -16,7 +16,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean benchmark inputcheck playthrough
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -24,6 +24,7 @@ import:
 	"$(GODOT)" --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/import.log
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
@@ -46,7 +47,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck inputcheck
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -108,3 +109,26 @@ build-all: build-macos build-windows build-linux
 
 clean:
 	rm -rf build $(LOG_DIR)
+
+# 実際の入力イベントを UI まで通す結合検証。F11 は描画付き実行時に追加確認する。
+inputcheck: import
+	"$(GODOT)" --headless --path . --script res://scripts/dev/input_check.gd > $(LOG_DIR)/inputcheck.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/inputcheck.log; \
+	tail -n 1 $(LOG_DIR)/inputcheck.log | grep -q '^exit=0$$'
+	grep -q '^inputcheck OK$$' $(LOG_DIR)/inputcheck.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/inputcheck.log
+
+# 通常の初期状態から移動と強化選択だけで10分間生き残る自動プレイ。
+playthrough: import
+	"$(GODOT)" --headless --path . --script res://scripts/dev/playthrough.gd > $(LOG_DIR)/playthrough.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/playthrough.log; \
+	tail -n 1 $(LOG_DIR)/playthrough.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/playthrough.log
+
+# 描画付きの負荷試験。fps は実時間で測り、固定fpsの録画とは別に実行する。
+benchmark: import
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --disable-vsync --max-fps 0 --script res://scripts/dev/benchmark.gd > $(LOG_DIR)/benchmark.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/benchmark.log; \
+	tail -n 1 $(LOG_DIR)/benchmark.log | grep -q '^exit=0$$'
+	grep -q '^benchmark OK$$' $(LOG_DIR)/benchmark.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/benchmark.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
