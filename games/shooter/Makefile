@@ -40,6 +40,11 @@ selfcheck: import
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
 	tail -n 1 $(LOG_DIR)/selfcheck.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/selfcheck.log
+	"$(GODOT)" --headless --path . --script res://scripts/dev/integration_check.gd > $(LOG_DIR)/integration.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/integration.log; \
+	grep -q '^integration_check OK$$' $(LOG_DIR)/integration.log
+	tail -n 1 $(LOG_DIR)/integration.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
 
 # GDScript の lint (gdtoolkit の gdlint。設定は ./gdlintrc)
 lint:
