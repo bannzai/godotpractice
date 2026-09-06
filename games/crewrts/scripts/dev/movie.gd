@@ -16,6 +16,5 @@ func _record() -> void:
 		if index == maxi(frames, 10) - 6:
 			main.stop_audio()
 		await process_frame
-	main.queue_free()
-	await process_frame
+	# 終端フレームまで庭を描画し、停止済みの音声とシーンは終了処理で解放する。
 	quit(0)
