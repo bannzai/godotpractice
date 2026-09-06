@@ -6,6 +6,8 @@
 # 環境変数 GODOT で Linux バイナリを渡す。
 GODOT ?= /Applications/Godot.app/Contents/MacOS/Godot
 LOG_DIR := tmp
+# sandbox でも OS のユーザーデータ領域へログを書かない。
+ENGINE_LOG := --log-file $(abspath $(LOG_DIR)/engine.log)
 
 # 描画付きで起動する target (screenshot / movie) の共通オプション。headless では描画されないため付けない。
 # CI の Linux では Xvfb + llvmpipe 上で実行する
@@ -16,26 +18,27 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint playcheck test screenshot movie run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
 	@mkdir -p $(LOG_DIR)
-	"$(GODOT)" --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
+	@touch $(LOG_DIR)/.gdignore
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
-	"$(GODOT)" --headless --path . --quit > $(LOG_DIR)/check.log 2>&1; \
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --quit > $(LOG_DIR)/check.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/check.log; \
 	grep -q '^platformer boot$$' $(LOG_DIR)/check.log
 	tail -n 1 $(LOG_DIR)/check.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import
-	"$(GODOT)" --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
+selfcheck: import playcheck
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
 	tail -n 1 $(LOG_DIR)/selfcheck.log | grep -q '^exit=0$$'
@@ -45,14 +48,22 @@ selfcheck: import
 lint:
 	gdlint scripts/
 
+# 実入力と物理で地形・アイテム・敵・2ステージの走破を検証する。
+playcheck: import
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --fixed-fps 60 --script res://scripts/dev/playcheck.gd > $(LOG_DIR)/playcheck.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/playcheck.log; \
+	grep -q '^playcheck OK$$' $(LOG_DIR)/playcheck.log
+	tail -n 1 $(LOG_DIR)/playcheck.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/playcheck.log
+
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck playcheck
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
 screenshot: import
 	rm -f $(LOG_DIR)/screenshot-*.png
-	"$(GODOT)" --path . $(WINDOWED_FLAGS) --script res://scripts/dev/screenshot.gd > $(LOG_DIR)/screenshot.log 2>&1; \
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --script res://scripts/dev/screenshot.gd > $(LOG_DIR)/screenshot.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/screenshot.log; \
 	tail -n 1 $(LOG_DIR)/screenshot.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/screenshot.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
@@ -63,7 +74,7 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --script res://scripts/dev/movie.gd --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) -- $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
@@ -74,32 +85,33 @@ movie: import
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run:
-	"$(GODOT)" --path .
+	@mkdir -p $(LOG_DIR)
+	"$(GODOT)" $(ENGINE_LOG) --path .
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
 # 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要
 # (AGENTS.md「検証方法」参照)
 build-macos: import
 	@mkdir -p build/macos
-	"$(GODOT)" --headless --path . --export-release "macOS" build/macos/platformer.zip
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "macOS" build/macos/platformer.zip
 	test -f build/macos/platformer.zip
 
 build-windows: import
 	@mkdir -p build/windows
-	"$(GODOT)" --headless --path . --export-release "Windows Desktop" build/windows/platformer.exe
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Windows Desktop" build/windows/platformer.exe
 	test -f build/windows/platformer.exe
 	test -f build/windows/platformer.pck
 
 build-linux: import
 	@mkdir -p build/linux
-	"$(GODOT)" --headless --path . --export-release "Linux" build/linux/platformer.x86_64
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Linux" build/linux/platformer.x86_64
 	test -f build/linux/platformer.x86_64
 	test -f build/linux/platformer.pck
 
 # Web エクスポート (動作確認専用。配布はデスクトップ 3 種)。webtunnel での確認に使う
 build-web: import
 	@mkdir -p build/web
-	"$(GODOT)" --headless --path . --export-release "Web" build/web/index.html
+	"$(GODOT)" $(ENGINE_LOG) --headless --path . --export-release "Web" build/web/index.html
 	test -f build/web/index.html
 	test -f build/web/index.wasm
 	test -f build/web/index.pck
