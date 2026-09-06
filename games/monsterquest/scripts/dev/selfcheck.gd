@@ -6,8 +6,15 @@ var failed := false
 
 
 func _initialize() -> void:
+	_run.call_deferred()
+
+
+func _run() -> void:
+	preload("res://scripts/dev/logic_checks.gd").run(_check)
+	preload("res://scripts/dev/world_checks.gd").run(_check)
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	await preload("res://scripts/dev/input_checks.gd").run(_check, self)
 
 	if failed:
 		quit(1)
