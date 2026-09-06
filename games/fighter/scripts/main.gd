@@ -32,6 +32,7 @@ var previewing: bool = false
 var last_screen: int = -1
 var feedback: String = ""
 var feedback_time: float = 0.0
+var suppress_attacks: bool = false
 
 
 func _ready() -> void:
@@ -47,6 +48,10 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	stop_audio()
+
+
+func stop_audio() -> void:
 	bgm.stop()
 	for sound: AudioStreamPlayer in sounds.values():
 		sound.stop()
@@ -57,8 +62,13 @@ func _build_audio() -> void:
 	bgm.stream = preload("res://assets/audio/arena.wav")
 	bgm.volume_db = -13.0
 	add_child(bgm)
-	(bgm.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
-	bgm.play()
+	# 最初の描画と音声ミキサーの準備が済んでから再生する。
+	var music_start: Timer = Timer.new()
+	music_start.wait_time = 0.12
+	music_start.one_shot = true
+	music_start.timeout.connect(bgm.play)
+	add_child(music_start)
+	music_start.start()
 	for sound: String in ["hit", "guard", "special"]:
 		var audio: AudioStreamPlayer = AudioStreamPlayer.new()
 		audio.stream = load("res://assets/audio/%s.wav" % sound)
@@ -178,8 +188,11 @@ func _update_fight(delta: float) -> void:
 	var active: bool = not paused and not Match.round_over and intro <= 0.0
 	player.enabled = active
 	cpu.enabled = active
+	player.visible = not paused
+	cpu.visible = not paused
 	for projectile: Node in get_tree().get_nodes_in_group("projectiles"):
 		projectile.set_physics_process(active)
+		projectile.visible = not paused
 	if paused:
 		return
 	if intro > 0.0:
@@ -201,11 +214,15 @@ func _update_fight(delta: float) -> void:
 	commands.push(direction, player.facing, delta)
 	var attack: String = ""
 	for kind: String in ["lp", "hp", "lk", "hk"]:
-		if Input.is_action_just_pressed(kind):
+		if not suppress_attacks and Input.is_action_just_pressed(kind):
 			attack = kind
 			break
 	if attack in ["lp", "hp"] and commands.consume():
 		attack = "special"
+	if suppress_attacks:
+		suppress_attacks = ["lp", "hp", "lk", "hk"].any(
+			func(kind: String) -> bool: return Input.is_action_pressed(kind)
+		)
 	player.control(direction, attack)
 	_update_cpu(delta)
 	if player.hitstop <= 0.0 and cpu.hitstop <= 0.0:
@@ -282,6 +299,7 @@ func _choose(index: int) -> void:
 
 func _resume() -> void:
 	paused = false
+	suppress_attacks = true
 	_rebuild_buttons()
 
 

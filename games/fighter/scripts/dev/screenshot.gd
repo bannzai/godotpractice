@@ -36,6 +36,19 @@ func _capture_scenes() -> bool:
 	main.cpu.enabled = false
 	if not await _capture("tmp/screenshot-play.png"):
 		return false
+	for capture_group: Callable in [
+		_capture_moves, _capture_combat, _capture_results, _capture_display
+	]:
+		if not await capture_group.call(main):
+			return false
+	main.queue_free()
+	# 音声ミキサーが停止済みの再生リソースを解放する周期を待つ。
+	await create_timer(0.2).timeout
+	await process_frame
+	return true
+
+
+func _capture_moves(main: Control) -> bool:
 	for stance: String in ["standing", "crouching", "air"]:
 		for kind: String in ["lp", "hp", "lk", "hk"]:
 			main.player.reset_fighter(Vector2(570, 570 if stance != "air" else 450))
@@ -48,6 +61,10 @@ func _capture_scenes() -> bool:
 			main.player.queue_redraw()
 			if not await _capture("tmp/screenshot-%s-%s.png" % [stance, kind]):
 				return false
+	return true
+
+
+func _capture_combat(main: Control) -> bool:
 	main.player.reset_fighter(Vector2(570, 570))
 	main.cpu.reset_fighter(Vector2(710, 570))
 	main.player.enabled = true
@@ -84,6 +101,10 @@ func _capture_scenes() -> bool:
 		projectile.set_physics_process(false)
 	if not await _capture("tmp/screenshot-special.png"):
 		return false
+	return true
+
+
+func _capture_results(main: Control) -> bool:
 	var state: Node = root.get_node("Match")
 	main.effects.clear()
 	main.feedback_time = 0.0
@@ -106,10 +127,30 @@ func _capture_scenes() -> bool:
 	main.show_title()
 	if not await _capture("tmp/screenshot-return.png"):
 		return false
-	main.queue_free()
-	# 音声ミキサーが停止済みの再生リソースを解放する周期を待つ。
-	await create_timer(0.2).timeout
+	return true
+
+
+func _capture_display(main: Control) -> bool:
+	main.previewing = false
+	var key: InputEventKey = InputEventKey.new()
+	key.physical_keycode = KEY_F11
+	key.pressed = true
+	Input.parse_input_event(key)
+	await create_timer(0.5).timeout
+	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+		push_error("F11で全画面にならない")
+		quit(1)
+		return false
+	if not await _capture("tmp/screenshot-fullscreen.png"):
+		return false
+	key.pressed = false
+	Input.parse_input_event(key)
 	await process_frame
+	key.pressed = true
+	Input.parse_input_event(key)
+	await create_timer(0.5).timeout
+	key.pressed = false
+	Input.parse_input_event(key)
 	return true
 
 
