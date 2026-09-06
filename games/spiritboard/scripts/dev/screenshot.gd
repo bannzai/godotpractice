@@ -154,6 +154,8 @@ func _capture_effects() -> void:
 	await create_timer(0.2).timeout
 	await _capture("effect-acquire")
 	for kind: String in ["grave", "police", "boss"]:
+		session.to_title()
+		await _settle()
 		_enter_kind(kind)
 		await create_timer(0.24).timeout
 		await _capture("entrance-" + kind)

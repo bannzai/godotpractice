@@ -7,6 +7,8 @@ const UI = preload("res://scripts/spirit_ui.gd")
 const Catalog = preload("res://scripts/card_catalog.gd")
 const Actor = preload("res://scripts/spirit_actor.gd")
 const CardView = preload("res://scripts/spirit_card.gd")
+const OWN_KING_RECT: Rect2 = Rect2(44, 526, 190, 40)
+const ENEMY_KING_RECT: Rect2 = Rect2(505, 94, 250, 43)
 
 var session: Node
 var effects: Control
@@ -40,6 +42,10 @@ func setup(state: Node, effect_layer: Control, audio: Node) -> void:
 
 
 func redraw() -> void:
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	var focus_tag: String = ""
+	if focused and is_ancestor_of(focused):
+		focus_tag = str(focused.get_meta("tag", ""))
 	for child: Node in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -67,6 +73,17 @@ func redraw() -> void:
 	_draw_board()
 	_draw_hand()
 	_draw_actions()
+	_restore_focus(self, focus_tag)
+
+
+func _restore_focus(parent: Node, tag: String) -> void:
+	if tag.is_empty():
+		return
+	for child: Node in parent.get_children():
+		if child is Button and not child.disabled and str(child.get_meta("tag", "")) == tag:
+			child.grab_focus()
+			return
+		_restore_focus(child, tag)
 
 
 func _draw_board() -> void:
@@ -82,7 +99,7 @@ func _draw_board() -> void:
 	var enemy_king: Button = UI.button(
 		self,
 		"敵の王   %d / %d" % [board.kings[1], board.max_kings[1]],
-		Rect2(505, 94, 250, 43),
+		ENEMY_KING_RECT,
 		_select_cell.bind(-2),
 		"enemy-king"
 	)
@@ -134,7 +151,7 @@ func _draw_board() -> void:
 	var own_king: Button = UI.button(
 		self,
 		"あなたの王   %d / %d" % [board.kings[0], board.max_kings[0]],
-		Rect2(44, 526, 190, 40),
+		OWN_KING_RECT,
 		_inspect.bind(-1),
 		"own-king"
 	)
@@ -384,8 +401,10 @@ func _animate(result: Dictionary) -> void:
 
 
 func _point(pos: int) -> Vector2:
+	if cell_views.has(pos) and is_instance_valid(cell_views[pos]):
+		return (cell_views[pos] as Control).get_rect().get_center()
 	if pos < 0:
-		return Vector2(630, 550 if pos == -1 else 116)
+		return (OWN_KING_RECT if pos == -1 else ENEMY_KING_RECT).get_center()
 	return cell_rect(pos).get_center()
 
 

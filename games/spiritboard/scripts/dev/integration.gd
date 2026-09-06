@@ -105,6 +105,8 @@ func _battle_inputs() -> bool:
 	await _choose_kind("battle")
 	if not _check(session.screen == "battle", "戦闘へ進む"):
 		return false
+	if not await _hidden_mode_input():
+		return false
 	var hand_index: int = _strongest_hand()
 	var chosen: String = str(session.board.hands[0][hand_index])
 	await _click("hand-%d" % hand_index)
@@ -120,6 +122,22 @@ func _battle_inputs() -> bool:
 		return false
 	_check(not bool(session.board.at(10).face), "Rで選択中の霊を潜伏させる")
 	return await _second_turn()
+
+
+func _hidden_mode_input() -> bool:
+	var hidden_button: Control = _find_tag("hidden")
+	if not _check(hidden_button != null, "裏向き配置のボタンがある"):
+		return false
+	hidden_button.grab_focus()
+	await _tap_button(JOY_BUTTON_A)
+	_check(main.battle_view.deploy_hidden and _focused_tag() == "hidden",
+		"パッドAで裏向き配置を有効にした後もフォーカスを保つ")
+	await _tap_button(JOY_BUTTON_A)
+	_check(not main.battle_view.deploy_hidden and _focused_tag() == "hidden",
+		"パッドAでもう一度裏向き配置を切り替えられる")
+	await _tap_button(JOY_BUTTON_DPAD_LEFT)
+	return _check(not _focused_tag().is_empty() and _focused_tag() != "hidden",
+		"裏向き配置を切り替えた後も十字キーで選択を移せる") and not failed
 
 
 func _second_turn() -> bool:
@@ -176,15 +194,24 @@ func _attack_and_save() -> bool:
 
 
 func _result_inputs() -> bool:
-	await _click("abandon")
-	_check(session.screen == "battle" and main.battle_view.confirmed_abandon,
-		"断念は最初の操作では確定しない")
-	await _click("abandon")
+	var abandon_button: Control = _find_tag("abandon")
+	if not _check(abandon_button != null, "断念のボタンがある"):
+		return false
+	abandon_button.grab_focus()
+	await _tap_button(JOY_BUTTON_A)
+	_check(session.screen == "battle" and main.battle_view.confirmed_abandon
+		and _focused_tag() == "abandon", "パッドAで断念を選ぶと確認に留まり、フォーカスを保つ")
+	await _tap_button(JOY_BUTTON_A)
 	if not _check(session.screen == "result" and str(session.run.result) == "defeat",
-			"断念の確認操作で敗北結果へ進む"):
+			"2回目のパッドAで断念を確定し、敗北結果へ進む"):
 		return false
 	await _tap_key(KEY_ENTER)
 	return _check(session.screen == "title", "Enterで結果からタイトルへ戻る")
+
+
+func _focused_tag() -> String:
+	var focused: Control = root.gui_get_focus_owner()
+	return str(focused.get_meta("tag", "")) if focused else ""
 
 
 func _choose_kind(kind: String) -> bool:
