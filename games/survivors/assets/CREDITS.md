@@ -4,25 +4,25 @@
 
 ## 独自画像 (`assets/art/`)
 
-- **素材名**: 宵森の灯守の図案 (`floor.svg`, `player.svg`, `enemy-0.svg`, `enemy-1.svg`, `enemy-2.svg`, `enemy-3.svg`, `gem.svg`, `heal.svg`, `magnet.svg`, `bolt.svg`, `orbit.svg`, `pulse.svg`, `title-emblem.svg`)
+- **素材名**: 宵森の灯守の図案 (`bolt.svg`, `enemy-0-sheet.svg`, `enemy-0.svg`, `enemy-1-sheet.svg`, `enemy-1.svg`, `enemy-2-sheet.svg`, `enemy-2.svg`, `enemy-3-sheet.svg`, `enemy-3.svg`, `floor.svg`, `forest-far.svg`, `forest-near.svg`, `gem.svg`, `heal.svg`, `icon-armor.svg`, `icon-clock.svg`, `icon-health.svg`, `icon-kills.svg`, `icon-pause.svg`, `icon-sound.svg`, `icon-speed.svg`, `key-art.svg`, `logo.svg`, `magnet.svg`, `mist.svg`, `orbit.svg`, `player-sheet.svg`, `player.svg`, `pulse.svg`, `spark.svg`, `title-emblem.svg`)
 - **作者**: bannzai（Codexを利用）
 - **入手 URL**: https://openai.com/policies/terms-of-use/
-- **ライセンス**: 独自生成物。OpenAI規約のOutput帰属に従い利用者が権利を保有。第三者素材なし
+- **ライセンス**: プロジェクト独自生成物。第三者素材なし。第三者へのライセンス付与はしていない
 - **クレジット表記**: **不要**
-- **改変**: なし
-- **備考**: 再生成: python3 scripts/dev/generate_assets.py。第三者へのライセンス付与はしていない。
-- **生成**: CodexでSVGコードを作成・Python標準ライブラリで保存 / プロンプトの要点: 独自の青緑の森、金色のランタンを持つ灯守、紫の精霊・赤い蛾・苔獣・巨大怪物、ミント色の魔法。既存作品は参照しない
+- **改変**: 品質向上ラウンドで再設計
+- **備考**: 再生成: python3 scripts/dev/generate_assets.py。フォントの著作権とOFL全文は fonts/OFL.txt を参照。
+- **生成**: Codexによるコード作成・PythonとfontToolsで決定的に生成 / プロンプトの要点: 青緑の夜森、金色の灯守、葉の精・蛾・石の巨獣・枝角の主。各体に5動作6フレーム、個別アイテムとUI図案、多層背景、キーアート。ロゴは同梱OFLフォントの輪郭から生成
 
 ## 独自音声 (`assets/audio/`)
 
-- **素材名**: 宵森の旋律と効果音 (`bgm.wav`, `attack.wav`, `hurt.wav`, `level.wav`, `pickup.wav`)
+- **素材名**: 宵森の旋律と効果音 (`attack.wav`, `bgm-boss.wav`, `bgm-play.wav`, `bgm-result.wav`, `bgm-title.wav`, `boss.wav`, `heal.wav`, `hurt.wav`, `level.wav`, `magnet.wav`, `pickup.wav`, `result.wav`, `ui.wav`)
 - **作者**: bannzai（Codexを利用）
 - **入手 URL**: https://openai.com/policies/terms-of-use/
-- **ライセンス**: 独自生成物。OpenAI規約のOutput帰属に従い利用者が権利を保有。第三者音源なし
+- **ライセンス**: プロジェクト独自生成物。第三者素材なし。第三者へのライセンス付与はしていない
 - **クレジット表記**: **不要**
-- **改変**: なし
-- **備考**: 再生成: python3 scripts/dev/generate_assets.py。PCM16 22050Hz。第三者へのライセンス付与はしていない。
-- **生成**: CodexでPythonコードを作成・Python標準ライブラリで波形合成 / プロンプトの要点: 独自の短い音列と正弦波で24秒の幻想的なループ、控えめな攻撃・被弾・成長・取得音を合成
+- **改変**: 品質向上ラウンドで再設計
+- **備考**: 再生成: python3 scripts/dev/generate_assets.py。フォントの著作権とOFL全文は fonts/OFL.txt を参照。
+- **生成**: Codexによるコード作成・Python標準ライブラリで決定的に生成 / プロンプトの要点: 4場面の独自譜面。撥弦、木琴、ベル、倍音パッド、ベース、ノイズ打楽器と9種の効果音。外部旋律・録音サンプル不使用
 
 ## フォント (`assets/fonts/`)
 
@@ -33,3 +33,14 @@
 - **クレジット表記**: **必要**
 - **改変**: ファイル名をZenMaruGothic-Medium.ttfからfont.ttfに変更。フォントデータは改変なし
 - **備考**: Copyright 2021 The Zen Maru Gothic Project Authors (https://github.com/googlefonts/zen-marugothic)。取得先: https://raw.githubusercontent.com/google/fonts/main/ofl/zenmarugothic/ZenMaruGothic-Medium.ttf。著作権表示とライセンス全文をOFL.txtに同梱。
+
+## UIテーマ (`assets/theme/`)
+
+- **素材名**: 宵森のUIテーマ (`night.tres`)
+- **作者**: bannzai（Codexを利用）
+- **入手 URL**: https://openai.com/policies/terms-of-use/
+- **ライセンス**: プロジェクト独自生成物。第三者素材なし。第三者へのライセンス付与はしていない
+- **クレジット表記**: **不要**
+- **改変**: 品質向上ラウンドで再設計
+- **備考**: Godot Themeリソースとして記述。フォントの著作権とOFL全文は fonts/OFL.txt を参照。
+- **生成**: CodexによるGodotリソース作成 / プロンプトの要点: night.tresに青緑・金色のボタン状態と同梱日本語フォントを統一
