@@ -1,7 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-      <path d="M0 0h48v48H0z" fill="#304b68"/>
-      <path d="M0 24h48M23 0v24M11 24v24M37 24v24" stroke="#233d58" stroke-width="3"/>
-      <path d="M27 10l7-3 5 6-6 7z" fill="#397693"/>
-      <path d="M15 31l5-3 6 8-7 5z" fill="#477c97"/>
-      <path d="M4 10h7M29 31h5" stroke="#699da7" stroke-width="2"/>
-    </svg>
+<defs>
+  <linearGradient id="coat" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#ffe5a0"/><stop offset=".5" stop-color="#f5bd59"/>
+    <stop offset="1" stop-color="#d68c3a"/>
+  </linearGradient>
+  <linearGradient id="teal" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#98e6cd"/><stop offset=".55" stop-color="#48b8ae"/>
+    <stop offset="1" stop-color="#23898d"/>
+  </linearGradient>
+  <linearGradient id="coral" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#ffd09b"/><stop offset=".55" stop-color="#ef9471"/>
+    <stop offset="1" stop-color="#cf6658"/>
+  </linearGradient>
+  <linearGradient id="skin" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#fff0cb"/><stop offset="1" stop-color="#eab18b"/>
+  </linearGradient>
+  <linearGradient id="brass" x1="0" y1="0" x2=".9" y2="1">
+    <stop stop-color="#fff3b7"/><stop offset=".45" stop-color="#f9ce63"/>
+    <stop offset="1" stop-color="#cf873d"/>
+  </linearGradient>
+  <linearGradient id="rock" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#548895"/><stop offset="1" stop-color="#294956"/>
+  </linearGradient>
+  <linearGradient id="dirt" x1="0" y1="0" x2="0" y2="1">
+    <stop stop-color="#bc8865"/><stop offset="1" stop-color="#916753"/>
+  </linearGradient>
+</defs>
+<rect x="0" y="0" width="48" height="48" rx="0" fill="#345763" stroke="none" stroke-width="1.5" /><path d="M0 4l14-4 14 4 20-3v18l-14 5-19-3L0 25Z" fill="#436775" stroke="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /><path d="M0 27l16-4 18 3 14-5v22l-16 5-20-4-12 3Z" fill="#3c606d" stroke="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /><path d="M0 24l14-3 20 4 14-5m-21-16-3 18M14 26l1 21" fill="none" stroke="#284a58" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M2 5l12-3 7 2m9 25 12-4M19 43l9 2" fill="none" stroke="#679398" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" /><path d="M31 10l6-5 4 7-5 6Z" fill="#77adab" stroke="#2c6675" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" /><path d="M37 5l-1 13-5-8Z" fill="#a2d2bc" stroke="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /><path d="M4 36l4-3 4 6-5 3Z" fill="#619b9e" stroke="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
