@@ -1,0 +1,55 @@
+# survivors の実装・検証知見
+
+## ゲームの設計
+
+独自の作品名は「宵森の灯守」。青緑の森で灯守を移動させ、10分生き延びる。最後の30秒に強敵が現れる。強敵の撃破は必須ではなく、600秒生存が勝利条件。
+
+- 進行状態は autoload の RunState が所有する。画面は入力ベクトルを渡し、座標・武器・経験値・勝敗を読む。ポーズと強化選択では step が進行を止める。
+- 敵は物理ノードにせず状態の配列で保持する。敵の追跡、自動投射、周回攻撃、範囲攻撃を軽量に更新し、画面でまとめて描画する。
+- 出現編成・敵の能力・経験値の閾値は game_rules.gd が正。出現表の全境界を selfcheck で検査する。
+- 経験値を一度に大量取得しても強化を順番に選択できる。全武器最大後も有効な3択を出す。能力値の上限に達した候補は除外する。
+- 回復と磁石は撃破時のドロップに加えて定期供給する。ジェムが増え続ける場合は古いジェムの値を統合し、経験値を失わせずに数を制限する。
+
+## Godot で得た知見
+
+- キーボードの特殊キー番号を手書きで推測すると左右の割り当てが壊れる。実入力イベントで「移動・メニュー選択・決定・休止・再開」を通す検証を加え、誤りを検出した。InputMap の存在だけの確認では不足する。
+- headless の入力検証でも、マウスの座標を検証する際は root.size を1280×720に設定する。既定サイズのままでは見た目と異なる座標をクリックしてしまう。
+- macOS の全画面切替は非同期。F11の往復検証は各切替後にOSのアニメーション完了を待つ。
+- 強化選択後に保留経験値で次の強化が始まる場合、最終的な phase は同じ upgrade のまま。画面名の変化だけでUIを更新すると古い候補を表示するため、選択処理後に候補UIを再構築する。
+- Dummy音声ドライバの検証では、短い起動・終了中に再生したWAVのPlaybackが残り、exit 0でもリソースリークが出た。AudioServer.get_driver_name()でDummyを検出し、その環境では再生を開始しない。通常ドライバは別スクリプトで実再生を検証する。
+- BGMのループは finished で再開する方式から AudioStreamWAV の LOOP_FORWARD に変更し、ループ終端を音源の長さとサンプルレートから設定した。通常ドライバで24秒の終端を越える再生を確認した。
+- 演出の上限数をFIFOで制限する場合、大量撃破の hit/death によって範囲攻撃の輪まで初回描画前に消える。敵へのダメージ処理の後に輪を追加し、60体同時撃破でも残る回帰検証を追加した。輪の最終半径も攻撃判定の半径から求める。
+- importは失敗診断があってもexit 0になった事例がある。Makefileのimportにログ全文のWARNING/ERROR検査を追加した。sandbox内ではGodot標準のアプリデータ・editor設定への書き込み制限に当たり、許可付き実行で検証した。
+
+## 素材の準備
+
+- 独自SVG13点と、独自の音列・波形合成によるBGM/SE5点を用意した。生成スクリプトを残し、2回の生成結果がSHA256で一致することを確認した。
+- WAVのクリッピングなし、BGMの先頭と終端の差が1PCM以内であることを検査した。
+- Zen Maru Gothic Mediumを同梱し、日本語表示をOSのフォールバックに依存させない。OFL全文を全exportのinclude_filterに含めた。
+- game-asset-search の record-credit と check-credits を利用。生成物を勝手にCC0とはせず、由来・生成手段と利用条件をCREDITSに記録した。
+
+## 検証結果（2026-09-06）
+
+- `make test GAMES=survivors`: exit 0。lint・起動・純粋ロジック・実入力の結合検証。selfcheckの依存としてinputcheckも実行するため、既存CIでも実入力検証が走る。
+- 描画付き `scripts/dev/input_check.gd`: exit 0 / inputcheck OK。キーボード、パッドボタン・左スティックの合成イベント、マウス選択、連続強化、勝敗・再開・タイトル、F11の往復を検証。物理ゲームパッド自体は使用していない。
+- `scripts/dev/audio_check.gd`: 通常音声ドライバでexit 0 / audiocheck OK。BGMの実再生・音声バス出力・4種SEの実再生・24秒を越えたループを確認。
+- `scripts/dev/playthrough.gd`: 通常の初期状態とルールのまま、移動と強化選択だけで600秒生存。seed 42、レベル89、撃破5810、HP100/100、武器3種最大、同時敵数最大226。実行15.72秒、exit 0。回避botによる実測であり、人間の初見難度の評価ではない。
+- 描画付き `scripts/dev/benchmark.gd`: Apple M4 Max / GL Compatibility / 1280×720 / VSync無効。2秒暖機後10.003秒、1194フレーム、平均119.36fps、p95 9.392ms。同時敵342〜360、画面内最小310、ジェム最小180、演出最大120。ゲーム時間も10.003秒進行、exit 0 / benchmark OK。敵・プレイヤーHPを増やして負荷数を維持するfixtureであり、全機種での速度保証ではない。
+- `make build-all GAMES=survivors` と `make build-web GAMES=survivors`: exit 0。macOS / Windows / Linux / Web を生成。ビルドログ全文にエンジンのWARNING/ERRORなし。
+- `make screenshot GAMES=survivors` と `make movie GAMES=survivors`: exit 0。タイトル・プレイ・演出途中・強化・敗北・最終強敵・クリアの7枚を目視確認。1280×720 / 30fps / 5秒 / 150フレームの起動mp4を時系列のフレーム画像で確認し、黒画面・崩れなし。最終CI artifactの確認結果はPR本文に記録する。
+
+## 再利用する手順と共有物への提案
+
+- godot-development skillへの改善案: headlessの入力検証ではrootサイズを明示する、OS全画面切替の待ちを考慮する、Dummy音声と通常音声を分けて検証する、importのexit 0だけで成功判定しない、を検証用雛形に反映する。
+- 負荷検証は固定fpsのmovieから判定せず、frame_post_drawの実時間を測定し、敵数・画面内敵数・ゲーム時間の進行も一緒に確認する。
+- knowledge文書の変更でも現在の共有CIは全ゲームを対象にすることを初回CIで確認した。ゲーム個別のknowledgeだけを変更した際に対象ゲームへ絞る案を司令塔へ提案する。共有workflowは変更していない。
+
+ユーザーの判断を要する未解決の仕様分岐はなし。公開・マージ・Steamworks連携は依頼どおり行わない。
+
+## 通常起動の確認
+
+`games/survivors/Makefile` の `run` は `Godot --path .` のまま維持する。`make -C games/survivors run` でエディタを開かずゲーム用ウィンドウが生成され、起動ログに `survivors boot` が出ることを確認した。
+
+OS経由のウィンドウ撮影はこの環境で失敗したため、`SURVIVORS_RUN_CAPTURE=1 make -C games/survivors run` でも同じ起動経路を実行した。ゲーム自身のビューポートを `tmp/run-title.png` に保存し、タイトル画面を目視確認。exit 0 / runcheck OK、WARNING / ERRORなし。
+
+`run_capture.gd` はエディタバイナリで上記環境変数を指定した時だけ有効になり、撮影後に終了する。通常起動とエクスポートでは有効にならない。シーン・autoload変更後にも、個別ゲームのrunからウィンドウとタイトルを確認する。ルートのrunがmainへ入ったら `git fetch origin main` と `git merge origin/main` で取り込み、ルートの起動経路も確認する。
