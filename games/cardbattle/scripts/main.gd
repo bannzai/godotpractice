@@ -1,5 +1,6 @@
 extends Control
 ## 入力と表示を担当。ルールと勝敗は Session.duel が所有する。
+## 入力コールバックは押下ごとに選択・画面・音を進めるため非冪等。
 
 const Catalog = preload("res://scripts/card_catalog.gd")
 const CardView = preload("res://scripts/card_view.gd")
@@ -501,8 +502,15 @@ func _perform(success: bool) -> void:
 		if kind == "draw":
 			origin = Vector2(1190, 95)
 			destination = Vector2(455, 626 if player == 0 else 137)
-		elif kind == "summon":
-			destination = origin
+		elif kind in ["summon", "destroy"]:
+			destination = Vector2(116 + event.get("target", 0) * 170, origin.y)
+		elif kind == "attack":
+			origin.x = 116 + event.get("source", 0) * 170
+			destination.x = 116 + event.get("target", 0) * 170
+			if event.get("target", -1) == -1:
+				destination = Vector2(110 if player == 0 else 665, 80)
+		elif kind == "damage":
+			destination = Vector2(665 if player == 0 else 110, 80)
 		var names: Dictionary = {
 			"draw": "ドロー",
 			"summon": "召喚",

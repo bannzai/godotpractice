@@ -72,7 +72,8 @@ func summon(hand_index: int, defense: bool = false) -> bool:
 	players[turn_player].monsters.append({"id": id, "defense": defense,
 		"attacked": false, "boost": 0, "changed": false})
 	summoned = true
-	events.append({"type": "summon", "player": turn_player, "id": id})
+	events.append({"type": "summon", "player": turn_player, "id": id,
+		"target": players[turn_player].monsters.size() - 1})
 	message = "%s を%s表示で召喚。" % [Catalog.card(id).name, "守備" if defense else "攻撃"]
 	return true
 
@@ -145,7 +146,8 @@ func attack(attacker: int, target: int = -1) -> bool:
 	if not players[enemy].monsters.is_empty() and not _valid_monster(enemy, target):
 		return false
 	monster.attacked = true
-	events.append({"type": "attack", "player": turn_player, "id": monster.id, "target": target})
+	events.append({"type": "attack", "player": turn_player, "id": monster.id, "target": target,
+		"source": attacker})
 	message = "%s の攻撃！" % Catalog.card(monster.id).name
 	if _trigger_trap(enemy, attacker) or winner != -1:
 		return true

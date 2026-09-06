@@ -25,14 +25,14 @@ static func cards() -> Array[Dictionary]:
 			"attack": attacks[stat] if solar else defenses[stat],
 			"defense": defenses[stat] if solar else attacks[stat],
 			"level": 3 + int(stat / 4.0), "attribute": attributes[index],
-			"effect": "", "text": "通常召喚は１ターン１回。召喚したターンから攻撃できる。",
+			"effect": "", "text": "通常召喚は1ターン1回。召喚したターンから攻撃できる。",
 		})
-	result.append(_effect("draw", "巡る星図", "spell", "draw", "自分のデッキから２枚引く。"))
-	result.append(_effect("destroy", "崩落の光", "spell", "destroy", "相手のモンスター１体を破壊する。"))
-	result.append(_effect("boost", "太陽の加護", "spell", "boost", "自分の１体の攻撃力をターン終了まで７００上げる。"))
+	result.append(_effect("draw", "巡る星図", "spell", "draw", "自分のデッキから2枚引く。"))
+	result.append(_effect("destroy", "崩落の光", "spell", "destroy", "相手のモンスター1体を破壊する。"))
+	result.append(_effect("boost", "太陽の加護", "spell", "boost", "自分の1体の攻撃力をターン終了まで700上げる。"))
 	result.append(_effect("snare", "結晶の落とし穴", "trap", "destroy", "相手の攻撃時、攻撃モンスターを破壊する。"))
-	result.append(_effect("mist", "夜霧の結界", "trap", "weaken", "相手の攻撃時、その攻撃力をターン終了まで８００下げる。"))
-	result.append(_effect("spark", "反響する火花", "trap", "damage", "相手の攻撃時、相手に１０００のライフダメージ。"))
+	result.append(_effect("mist", "夜霧の結界", "trap", "weaken", "相手の攻撃時、その攻撃力をターン終了まで800下げる。"))
+	result.append(_effect("spark", "反響する火花", "trap", "damage", "相手の攻撃時、相手に1000のライフダメージ。"))
 	return result
 
 

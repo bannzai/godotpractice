@@ -30,6 +30,8 @@ func _opening() -> bool:
 	await create_timer(0.4).timeout
 	if not await _capture("title"):
 		return false
+	if not await _navigation():
+		return false
 	main.content.get_node("help").pressed.emit()
 	if not await _capture("help"):
 		return false
@@ -42,9 +44,7 @@ func _opening() -> bool:
 		return false
 	await _key(KEY_N)
 	await create_timer(0.6).timeout
-	if not _check(main.state.phase == "main", "Nでドローしてメインへ進める"):
-		return false
-	return true
+	return _check(main.state.phase == "main", "Nでドローしてメインへ進める")
 
 
 func _battle() -> bool:
@@ -190,3 +190,22 @@ func _mouse(point: Vector2) -> void:
 	event.pressed = false
 	Input.parse_input_event(event)
 	await process_frame
+
+
+func _navigation() -> bool:
+	main.content.get_node("deck0").grab_focus()
+	await _key(KEY_RIGHT)
+	if not _check(root.gui_get_focus_owner().name == "deck1", "矢印でデッキを切り替える"):
+		return false
+	await _pad(JOY_BUTTON_DPAD_LEFT)
+	if not _check(root.gui_get_focus_owner().name == "deck0", "十字キーでデッキを切り替える"):
+		return false
+	await _key(KEY_F11)
+	await create_timer(1.0).timeout
+	var fullscreen: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	await _pad(JOY_BUTTON_START)
+	await create_timer(1.0).timeout
+	return _check(
+		fullscreen and DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED,
+		"F11で全画面、STARTでウィンドウ表示へ戻る"
+	)
