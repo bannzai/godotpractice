@@ -14,14 +14,14 @@
 
 ## オリジナル音源 (`assets/audio/`)
 
-- **素材名**: 玩具工房の音楽と効果音 (`music.wav`, `pickup.wav`, `bump.wav`, `win.wav`, `lose.wav`)
+- **素材名**: 玩具工房の音楽と効果音 (`title.wav`, `play.wav`, `urgent.wav`, `finish.wav`, `timeout.wav`, `music.wav`, `pickup.wav`, `bump.wav`, `win.wav`, `lose.wav`, `growth.wav`)
 - **作者**: 本プロジェクトで Codex を用いて制作
-- **入手 URL**: https://github.com/bannzai/godotpractice/blob/game/rollball/games/rollball/scripts/dev/generate_audio.py
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/polish/rollball/games/rollball/scripts/dev/generate_audio.py
 - **ライセンス**: 本プロジェクトのオリジナル生成物（第三者音源なし）
 - **クレジット表記**: **不要**
 - **改変**: 生成した波形を無圧縮 WAV として保存
-- **備考**: 外部音声・既存楽曲を使用せず、独自の音列と正弦波から生成。OpenAI 利用規約では、適用法の認める範囲で出力は利用者に帰属する。CC0 とは宣言しない。再生成: python3 scripts/dev/generate_audio.py。BGM は 19.2 秒でループ。
-- **生成**: Python 3 標準ライブラリによる数式合成（実装支援: Codex） / プロンプトの要点: 温かい玩具工房、木琴風の静かなループ、拾得・衝突・成功・失敗が聞き分けられる短い音
+- **備考**: 外部音声・既存楽曲を使用せず、独自の音列と木琴・弦のプラック・ベース・ブラシ・ベルを数式合成。OpenAI 利用規約では、適用法の認める範囲で出力は利用者に帰属する。CC0 とは宣言しない。再生成: python3 scripts/dev/generate_audio.py。場面ごとに8〜15秒のループ。music.wav は従来入口との互換用に play.wav と同内容。
+- **生成**: Python 3 標準ライブラリによる数式合成（実装支援: Codex） / プロンプトの要点: 温かい玩具工房、木琴風の静かなループ、タイトル・プレイ・残り30秒・成功・失敗の場面別BGM、拾得・衝突・成長・成功・失敗が聞き分けられる短い音
 
 ## オリジナル画像 (`assets/`)
 
@@ -43,3 +43,25 @@
 - **クレジット表記**: 不要
 - **生成**: GDScript と Godot 組み込みプリミティブ / プロンプトの要点: 木の床とティールの壁、コーラル色の玉、玩具と家具のある工房。独自の基本図形の組み合わせで構成。
 - **備考**: 外部のモデル・テクスチャは使用していない。適用法の認める範囲で出力は利用者に帰属する。
+
+## 第2ラウンドの独立モデル (`assets/models/`)
+
+- **素材名**: 巻き取りボール `ball.tscn`、木のアヒル `duck.tscn`、ぜんまいロボット `robot.tscn`、玩具の汽車 `train.tscn`、花鉢 `plant.tscn`
+- **作者**: 本プロジェクトで Codex を用いて制作
+- **入手 URL**: 外部取得なし。本リポジトリの `games/rollball/assets/models/`。
+- **ライセンス**: 本プロジェクトのオリジナル生成物（第三者モデルなし、CC0とは宣言しない）
+- **クレジット表記**: 不要
+- **改変**: なし
+- **生成**: Codex による Godot シーン・AnimationLibrary の記述。木製玩具を顔・装備・車輪・葉の形で見分け、待機・移動・回収・反発・喜び・時間切れの部位アニメーションを備える。
+- **備考**: 部屋の窓外風景・雲・カーテン・腰壁・縫い目、紙吹雪と輪の演出も GDScript と組み込みメッシュで独自制作。外部モデル・原作素材を使用していない。
+
+## 第2ラウンドのUI (`assets/ui/`)
+
+- **素材名**: `atelier-theme.tres`、`logo-emblem.svg`、`title-key-art.svg`、`goal-rosette.svg`、`timer-clock.svg`、`collected-blocks.svg`
+- **作者**: 本プロジェクトで Codex を用いて制作
+- **入手 URL**: 外部取得なし。本リポジトリの `games/rollball/assets/ui/`。
+- **ライセンス**: 本プロジェクトのオリジナル生成物（第三者画像なし、CC0とは宣言しない）
+- **クレジット表記**: 不要
+- **改変**: なし
+- **生成**: Codex による SVG と Godot Theme の直接記述。クリーム・青緑・コーラル・金の配色、糸玉・アヒル・ロボットの独自図案。日本語ロゴ文字は同梱フォントで描画。
+- **備考**: 画像生成モデルは使用していない。適用法の認める範囲で生成出力は利用者に帰属する。
