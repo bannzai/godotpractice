@@ -23,8 +23,26 @@ BGM と SE は外部サンプルなしの数式合成。scripts/dev/generate_aud
 
 ## 判断と残りの検証
 
-独自造形・独自音声で進め、追加の外部 API は導入していない。ゲーム仕様に関する判断待ちはない。描画の性能計測・入力統合検証・録画・全プラットフォームの export・CI の検証結果は、実行後に追記する。
+独自造形・独自音声で進め、追加の外部 API は導入していない。ゲーム仕様に関する判断待ちはない。ローカルの検証結果は以下。CI の最終結果と成果物確認は PR の検証欄に記録する。
 
 ## skill への改善提案
 
 Godot の skill に「固定刻みモデルによる通常ステージの操作経路検証」「着地座標の確定」「サンドボックス内ログパス」「日本語フォントのライセンスを export に含める検査」を取り込むと、他ゲームでも再利用できる。共有 skill は本作業では変更しない。
+
+## ローカルの検証結果
+
+- `make test GAMES=crewrts`: exit 0。selfcheck に加えて実際の InputEvent を投入する integration 検証を Makefile に含めた。矢印キーの定数違いと、ui_accept のパッド決定イベント不足をこの検証で見つけて修正した。
+- `make screenshot GAMES=crewrts`: exit 0。8枚の代表画面で日本語・HUD・庭の表示を目視確認。
+- `make movie GAMES=crewrts`: exit 0。5秒の起動動画を1秒ごとのフレームに展開して目視し、音声トラックも無音でないことを確認。
+- `make build-all GAMES=crewrts` / `make build-web GAMES=crewrts`: exit 0。サンドボックス内のビルドでは、一時ディレクトリにコピーした同一 Godot 4.7 バイナリを `GODOT` で渡した。デスクトップ3種とWebのすべてで OFL.txt / CREDITS.md の梱包をログから確認。
+- `scripts/dev/performance.gd`: M4 Max / OpenGL Compatibility / 1280×720、30体追従・敵2体の600フレームを計測。平均581.5fps、p95 3.56ms、exit 0、警告なし。V-Sync を外し120フレームの準備後に計測する。この値は当該ハードウェアの実測で、他のGPUやCIのソフトウェア描画の性能保証ではない。
+
+## 検証環境に関する追加の知見
+
+録画の `--quit-after` による即時終了では、再生中の WAV が終了時にリークした。録画用 SceneTree で終わりの6フレーム前に音声を停止する。撮影・性能計測・通常のウィンドウ終了でも停止後に0.15秒を確保する。警告行を除外して成功にするのではなく、終了前の解放を行う。関連する Godot の報告: https://github.com/godotengine/godot/issues/76745 。
+
+macOS の export は editor_settings を保存する。サンドボックス外への書き込みを避けるため、tmp 内へコピーしたバイナリに `_sc_` を置く self-contained mode を使用した。コピーしたバイナリには ad-hoc 署名を行い、既存 export_templates へは読み取り用シンボリックリンクを置いた。元の Godot.app やシステム設定は変更しない。仕様: https://docs.godotengine.org/en/4.7/classes/class_editorpaths.html 。既存の macOS zip を Godot がゴミ箱へ動かそうとするため、再生成可能な zip は export 前にゲームの build ディレクトリ内で除去する。
+
+`documents/knowledge/crewrts.md` も変更すると、現行の changed-games.sh は共有変更と扱い全9ゲームを検証する。知見文書はゲームコードに影響しないので、司令塔への改善提案としてゲーム別文書の変更をCI対象の絞り込みに反映するとよい。共有スクリプトは本作業では変更しない。
+
+入力統合検証は headless に加え macOS の実ウィンドウでも成功した。左右のマウス操作、照準の移動、F11 の全画面・ウィンドウ復帰を確認した。照準は InputEventMouseMotion.position を保持して計算し、入力イベントの座標とOSからのポインター再取得が混在しないようにする。

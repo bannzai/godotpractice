@@ -33,6 +33,8 @@ func _capture_scenes() -> bool:
 		return false
 	if not await _capture_results(main):
 		return false
+	main.stop_audio()
+	await create_timer(0.15).timeout
 	main.queue_free()
 	await process_frame
 	return true

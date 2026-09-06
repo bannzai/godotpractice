@@ -90,7 +90,7 @@ func sync(model: Node, delta: float, target: Vector3) -> void:
 	whistle_time = maxf(0.0, whistle_time - delta)
 	whistle_ring.visible = whistle_time > 0
 	whistle_ring.position = model.leader + Vector3(0, 0.12, 0)
-	whistle_ring.scale = Vector3.ONE * (1.0 + (1.0 - whistle_time) * 7.0)
+	whistle_ring.scale = Vector3.ONE * lerpf(1.0, model.WHISTLE_RANGE, 1.0 - whistle_time)
 
 
 func set_camera(model: Node, yaw: float, delta: float, snap: bool = false) -> void:
@@ -116,6 +116,9 @@ func _sync_crew(model: Node) -> void:
 		var robot: Node3D = crew_meshes[identity]
 		var previous: Vector3 = robot.position
 		robot.position = member.position
+		if member.state == "attack":
+			var angle: float = identity * 2.4 + elapsed
+			robot.position += Vector3(cos(angle), 0, sin(angle)) * 1.25
 		if member.state in ["follow", "carry", "attack"]:
 			robot.position.y += absf(sin(elapsed * 10.0 + identity * 1.4)) * 0.16
 			robot.rotation.z = sin(elapsed * 10.0 + identity) * 0.09

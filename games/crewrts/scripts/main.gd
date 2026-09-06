@@ -12,13 +12,16 @@ var yaw: float = 0.0
 var aim := Vector3.ZERO
 var paused: bool = false
 var mouse_aim: bool = false
+var pointer_position := Vector2.ZERO
 var throw_cooldown: float = 0.0
 var music: AudioStreamPlayer
 var sounds: Dictionary = {}
+var closing: bool = false
 
 
 ## シーン生成時の接続・音声開始は一度だけ実行する。
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
 	model = get_node("/root/Expedition")
 	model.start_day()
 	model.show_title()
@@ -60,6 +63,7 @@ func _input(event: InputEvent) -> void:
 		)
 	if event is InputEventMouseMotion:
 		mouse_aim = true
+		pointer_position = event.position
 	if event is InputEventJoypadMotion and absf(event.axis_value) > 0.3:
 		mouse_aim = false
 	if event.is_action_pressed("pause") and model.phase == "playing":
@@ -108,9 +112,8 @@ func _physics_process(delta: float) -> void:
 func _update_aim() -> void:
 	aim = model.leader + Vector3(0, 0, -8).rotated(Vector3.UP, yaw)
 	if mouse_aim:
-		var pointer: Vector2 = get_viewport().get_mouse_position()
-		var origin: Vector3 = world.camera.project_ray_origin(pointer)
-		var ray: Vector3 = world.camera.project_ray_normal(pointer)
+		var origin: Vector3 = world.camera.project_ray_origin(pointer_position)
+		var ray: Vector3 = world.camera.project_ray_normal(pointer_position)
 		if ray.y < -0.01:
 			aim = origin + ray * (-origin.y / ray.y)
 	var direction: Vector3 = aim - model.leader
@@ -163,8 +166,20 @@ func _consume_events() -> void:
 	model.events.clear()
 
 
-func _exit_tree() -> void:
+func stop_audio() -> void:
 	if is_instance_valid(music):
 		music.stop()
 	for player: AudioStreamPlayer in sounds.values():
 		player.stop()
+
+
+func _exit_tree() -> void:
+	stop_audio()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and not closing:
+		closing = true
+		stop_audio()
+		await get_tree().create_timer(0.15).timeout
+		get_tree().quit()
