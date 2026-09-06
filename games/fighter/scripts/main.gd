@@ -33,6 +33,7 @@ var last_screen: int = -1
 var feedback: String = ""
 var feedback_time: float = 0.0
 var suppress_attacks: bool = false
+var music_start_pending: bool = true
 
 
 func _ready() -> void:
@@ -45,6 +46,27 @@ func _ready() -> void:
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(buttons)
 	show_title()
+	if OS.is_debug_build() and OS.get_environment("FIGHTER_VERIFY_RUN") == "1":
+		_verify_run.call_deferred()
+
+
+## 通常起動の描画を保存し、開発時の自動確認だけを終了する。
+func _verify_run() -> void:
+	await get_tree().create_timer(0.5).timeout
+	if DisplayServer.get_name() == "headless" or get_tree().current_scene != self:
+		push_error("通常のゲームウィンドウで起動していない")
+		get_tree().quit(1)
+		return
+	await RenderingServer.frame_post_draw
+	DirAccess.make_dir_recursive_absolute("res://tmp")
+	var status: Error = get_viewport().get_texture().get_image().save_png("res://tmp/run-title.png")
+	stop_audio()
+	await get_tree().create_timer(0.2).timeout
+	if status != OK:
+		push_error("通常起動の撮影に失敗: " + error_string(status))
+	else:
+		print("fighter run OK")
+	get_tree().quit(0 if status == OK else 1)
 
 
 func _exit_tree() -> void:
@@ -52,6 +74,7 @@ func _exit_tree() -> void:
 
 
 func stop_audio() -> void:
+	music_start_pending = false
 	bgm.stop()
 	for sound: AudioStreamPlayer in sounds.values():
 		sound.stop()
@@ -62,13 +85,6 @@ func _build_audio() -> void:
 	bgm.stream = preload("res://assets/audio/arena.wav")
 	bgm.volume_db = -13.0
 	add_child(bgm)
-	# 最初の描画と音声ミキサーの準備が済んでから再生する。
-	var music_start: Timer = Timer.new()
-	music_start.wait_time = 0.12
-	music_start.one_shot = true
-	music_start.timeout.connect(bgm.play)
-	add_child(music_start)
-	music_start.start()
 	for sound: String in ["hit", "guard", "special"]:
 		var audio: AudioStreamPlayer = AudioStreamPlayer.new()
 		audio.stream = load("res://assets/audio/%s.wav" % sound)
@@ -173,6 +189,10 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# ウィンドウの初期描画が終わるまで音声再生を待つ。
+	if music_start_pending and Engine.get_process_frames() >= 3:
+		music_start_pending = false
+		bgm.play()
 	elapsed += delta
 	if not previewing:
 		_update_effects(delta)

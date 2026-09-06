@@ -30,6 +30,8 @@
 
 ## 検証と素材
 
+シーンやautoloadを変更した後は `make -C games/fighter run` で、エディタなしのウィンドウにタイトルが表示されることを確認する。自動確認には `FIGHTER_VERIFY_RUN=1 make -C games/fighter run` を使える。同じ通常起動経路で描画を `games/fighter/tmp/run-title.png` に保存し、正常終了する。環境変数を指定しない通常起動とreleaseビルドでは自動終了しない。
+
 `make test GAMES=fighter` は技性能・実Area2D接触・コマンド入力・試合状態と、キーボード／パッドの入力による画面遷移を検証する。
 
 `make screenshot GAMES=fighter` はタイトル・選択・対戦・全12通常技の途中・命中・ガード・必殺技・KO・勝敗結果・タイトル復帰・全画面を撮影する。`make movie GAMES=fighter` は起動から5秒の映像を生成する。

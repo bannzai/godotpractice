@@ -11,6 +11,7 @@
 
 - `FontVariation.variation_opentype` の `{"wght": 600}` では同梱可変フォントが細いままだった。`TextServerManager.get_primary_interface().name_to_tag("wght")` の整数タグで指定すると、期待した太さになった。公式の整数タグ例に合わせ、撮影し直して確認した。
   https://docs.godotengine.org/en/stable/classes/class_fontvariation.html
+- 高負荷時は初回フレームのdeltaが長くなり、0.12秒のTimerでも起動チェックの終了前にBGMが再生された。`Engine.get_process_frames() >= 3` を開始条件にし、初期描画後に再生するよう変更した。
 - `AudioStreamPlayer.stop()` を呼んでも音声ミキサーの解放周期より早く撮影プロセスを終了すると、WAV再生リソースが終了時に残ることがあった。`_exit_tree` で再生を止め、撮影側でシーンを解放して0.2秒待つと警告なしになった。
 - BGMはループ方式だけを実行時に変更しても終端が0のまま残り、即座に停止した。WAVのimport設定でForwardループと全サンプル範囲を指定し、録画の音量検査を追加した。修正後の録画は平均-37.1dB・最大-19.6dB。Movie Makerでは終了直前の4フレームで音声を停止し、ミキサーが解放した後で終了する。
 - 型付き `Array[int]` を、動的なNode参照経由で通常の配列に置換すると実行時エラーになる。撮影の状態作りでは `wins.assign(...)` を使う。
@@ -32,6 +33,7 @@
 
 ## 検証状況
 
+- `make -C games/fighter run` の実プロセスとウィンドウ表示を確認した。macOSの画面収録権限がない環境でも同じ起動経路を撮影できるよう、開発時だけ有効な `FIGHTER_VERIFY_RUN=1` を追加。Godot自身が描画を `tmp/run-title.png` に保存し、音声の終了処理後にexit 0で終了する。タイトルを目視確認済み。run targetは `Godot --path .` のままにした。
 - Godot 4.7 stable / gdlint 4.5.0。selfcheckは268条件。技性能12種、キャラクター差、硬直差、コマンド成立・不成立、試合状態、実Area2D接触・一度のみのダメージ・ガード・飛び道具、両入力経路の一連の対戦を検証した。
 - ローカルの `make test GAMES=fighter` と `make screenshot movie build-all build-web GAMES=fighter` が最終コードでexit 0。23枚の撮影画像、5秒の起動動画の各秒と最終フレームを確認。動画はBGMの最大音量も検査する。CIの最終結果とartifact確認はPRに記録する。
 - パッドはGodotの入力イベント注入で検証。物理コントローラー実機は接続していない。Windows/LinuxはエクスポートとCI検証で、実OS上の手操作は対象外。
