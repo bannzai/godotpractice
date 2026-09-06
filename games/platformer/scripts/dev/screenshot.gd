@@ -27,7 +27,7 @@ func _capture_scenes() -> bool:
 	if not await _capture("tmp/screenshot-title.png"):
 		return false
 	main.queue_free()
-	await process_frame
+	await create_timer(0.2).timeout
 	return true
 
 
