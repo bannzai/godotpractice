@@ -26,6 +26,8 @@ func _capture_scenes() -> bool:
 	await create_timer(0.5).timeout
 	if not await _capture("tmp/screenshot-title.png"):
 		return false
+	main.stop_audio()
+	await create_timer(0.2).timeout
 	main.queue_free()
 	await process_frame
 	return true
