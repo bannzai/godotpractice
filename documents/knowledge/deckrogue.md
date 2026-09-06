@@ -77,3 +77,17 @@
 - スクリーンショットは全キャラ5動作の開始・途中・終了15枚、6種の演出、視差の両端と既存の代表画面・大量手札・状態異常を撮る。撮影用PNGをGodotが再インポートしないよう、tmpを作る際に `.gdignore` も用意する。
 - `godot-development` への再利用候補は、コマごとの透明領域検査、フレームを固定した連続撮影、実入力録画、音声の終了時解放検証。共有skillは変更せず、このゲームの生成・検証スクリプトを提案例として残す。
 - 現在の共有CIはknowledgeの変更でも全ゲームを実行し、初回CIでは変更対象外のcrewrtsに音声リソースの終了時リークが出た。ゲーム別文書を変更対象のゲームへ対応付ける共有PR #23が改善経路。共有ファイルや他ゲームはこの作業から変更しない。
+
+### 第 2 ラウンドの検証結果
+
+- ローカルで `make test GAMES=deckrogue`、`make screenshot GAMES=deckrogue`、`make movie GAMES=deckrogue`、`make -C games/deckrogue movie-play`、`make build-all GAMES=deckrogue`、`make build-web GAMES=deckrogue` がすべてexit 0。ログ全文にWARNING / ERRORなし。macOS・Windows・Linux・Webの成果物を生成した。
+- PR #25が未マージのため、指定された代替の `make -C games/deckrogue run` で起動した。今回のworktreeで起動したPIDを確認して通常のアプリ終了要求を送り、exit 0とリーク警告なしを確認。完成したメインシーンでも `--quit-after 1/30/120` がすべてexit 0、WARNING / ERRORなし。
+- ローカル撮影42枚を目視し、7キャラ×5動作×開始・途中・終了、6種の演出、背景、各画面に欠けや文字の重なりがないことを確認した。30秒の実入力録画を2秒間隔の15枚と末尾画像で確認し、カード使用・敵行動・敗北・タイトル復帰まで到達した。
+- 実装コミット `0f5ac32` のCIはrun `34025602623` で全ジョブ成功。deckrogueは初回から成功し、変更対象外のcrewrtsだけ終了時リークで失敗したため、そのジョブを2回再実行した。deckrogueのartifactのPNG42枚とmp4の2秒間隔・末尾フレームも目視した。LinuxのV-Sync非対応警告は既存Makefileの許容行で、音声リークや描画エラーはない。
+- webtunnelを `--software-webgl --ref polish/deckrogue` で起動し、runnerのChromiumでEnterによる開始・地図選択・カード使用、Eによるターン終了、敗北結果からマウスクリックによるタイトル復帰を確認した。ゲーム状態や体力は変更していない。6枚のスクリーンショットを撮影し、ブラウザーの実行エラーは0件。検証後に `down deckrogue` を実行した。
+- webtunnelではGodotの描画はcanvas内なので、DOMの要素一覧では手札や体力を読めない。起動はstatus要素の消滅で確認し、操作後の状態は画像で確認する。キーボード操作なら座標変換が不要で、マウス操作は実際のcanvas領域と中央寄せの余白から座標を求める。SwiftShaderでは静止画を撮るまでに数秒かかるため、実時間の滑らかさの判断はローカルの固定fps録画で補う。
+
+### 本番に向けた判断点
+
+- 切り絵と細密線画の方向を採用し、待機は小さく、攻撃・被弾・死亡を大きく動かした。美術の好みと、動きの強さ・音楽の密度はPRの画像・プレイ録画でレビューできるようにした。
+- Steam連携・公開・マージは今回の対象外。物理ゲームパッドを使った実機検証は第1ラウンド同様に行っておらず、InputMapを通る入力イベントの検証を維持している。Windows・Linuxはエクスポートを確認し、Linuxの描画はCIで確認した。
