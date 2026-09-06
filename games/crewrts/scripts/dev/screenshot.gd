@@ -20,14 +20,76 @@ func _run() -> void:
 ## 撮影する画面の並び。雛形はメインシーン (タイトル) だけを撮る。失敗した撮影は _capture() が
 ## quit(1) 済みなので、false を受けたらそのまま抜ける。
 func _capture_scenes() -> bool:
-	var main_scene_path: String = ProjectSettings.get_setting("application/run/main_scene")
-	var main: Node = load(main_scene_path).instantiate()
+	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await create_timer(0.5).timeout
 	if not await _capture("tmp/screenshot-title.png"):
 		return false
+	main.start_day()
+	await create_timer(0.5).timeout
+	if not await _capture("tmp/screenshot-play.png"):
+		return false
+	if not await _capture_actions(main):
+		return false
+	if not await _capture_results(main):
+		return false
+	main.stop_audio()
+	await create_timer(0.15).timeout
 	main.queue_free()
 	await process_frame
+	return true
+
+
+func _capture_actions(main: Node) -> bool:
+	main.set_physics_process(false)
+	var model: Node = main.model
+	var point: Vector3 = model.cargo[0].position
+	model.throw_at(point)
+	model.throw_at(point)
+	model.step(0.24, Vector3.ZERO)
+	main.world.sync(model, 0.24, point)
+	main.hud.refresh(model)
+	if not await _capture("tmp/screenshot-throw.png"):
+		return false
+	model.step(1.0, Vector3.ZERO)
+	model.whistle()
+	main.world.whistle_time = 1.0
+	main.world.sync(model, 0.45, point)
+	if not await _capture("tmp/screenshot-whistle.png"):
+		return false
+	model.throw_at(point)
+	model.throw_at(point)
+	model.step(1.5, Vector3.ZERO)
+	main.world.sync(model, 0.2, point)
+	main.hud.refresh(model)
+	if not await _capture("tmp/screenshot-carry.png"):
+		return false
+	model.leader = Vector3(-8, 0, -4)
+	model.whistle()
+	for index: int in range(6):
+		model.throw_at(model.enemies[0].position)
+	model.step(0.8, Vector3.ZERO)
+	main.world.set_camera(model, 0, 0, true)
+	main.world.sync(model, 0.2, model.enemies[0].position)
+	main.hud.refresh(model)
+	if not await _capture("tmp/screenshot-combat.png"):
+		return false
+	return true
+
+
+func _capture_results(main: Node) -> bool:
+	var model: Node = main.model
+	model.collected = model.goal
+	model.step(0.01, Vector3.ZERO)
+	main.hud.refresh(model)
+	if not await _capture("tmp/screenshot-clear.png"):
+		return false
+	model.start_day()
+	model.remaining = 0.01
+	model.step(0.02, Vector3.ZERO)
+	main.hud.refresh(model)
+	if not await _capture("tmp/screenshot-failed.png"):
+		return false
 	return true
 
 
