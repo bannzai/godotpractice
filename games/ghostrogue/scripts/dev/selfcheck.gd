@@ -6,6 +6,8 @@ var failed := false
 
 
 func _initialize() -> void:
+	preload("res://scripts/dev/logic_checks.gd").run(_check)
+	_check_actors()
 	_check_scenes("res://scenes")
 	_check_assets_credited()
 
@@ -20,6 +22,30 @@ func _check(cond: bool, label: String) -> void:
 	if not cond:
 		push_error("selfcheck FAIL: " + label)
 		failed = true
+
+
+func _check_actors() -> void:
+	var characters: Array = preload("res://scripts/catalog.gd").SPIRITS.keys()
+	characters.append_array(["hero_0", "hero_1", "hero_2", "hero_3", "police", "boss"])
+	for id: String in characters:
+		var actor: Node2D = preload("res://scripts/actor.gd").new()
+		root.add_child(actor)
+		actor.setup(id)
+		_check(actor.sprite.texture != null, "キャラごとの画像を読める: " + id)
+		_check(actor.detail.texture != null, "キャラごとの可動部位を読める: " + id)
+		for motion: String in actor.DURATIONS:
+			_check(actor.animator.has_animation(motion), "実行可能なアニメーション: " + id + motion)
+			actor.play_motion(motion)
+			var initial_position: Vector2 = actor.sprite.position
+			var initial_scale: Vector2 = actor.sprite.scale
+			actor.animator.advance(float(actor.DURATIONS[motion]) * 0.3)
+			_check(actor.animator.current_animation_position > 0.0,
+				"AnimationPlayerの時間が進む: " + id + motion)
+			_check(actor.sprite.position != initial_position or actor.sprite.scale != initial_scale,
+				"再生時間に応じて姿勢が変わる: " + id + motion)
+		actor.seek_motion("dissolve", float(actor.DURATIONS.dissolve))
+		_check(actor.sprite.modulate.a == 0.0, "消滅アニメーションの終端で霊が霧散する: " + id)
+		actor.free()
 
 
 ## tree には入れず (autoload に依存する _ready を走らせず) インスタンス化だけを確認して free する

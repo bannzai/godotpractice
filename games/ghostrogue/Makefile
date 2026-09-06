@@ -1,109 +1,125 @@
-# ghostrogue の検証・ビルド入口。target 命名は ~/.claude/rules/makefile-target-naming.md に従う
-# (`build-<対象>` = ビルドだけ。配置・起動を伴う `macos` 等の target は本プロジェクトでは持たない)。
-# 全ゲーム共通の構成で、リポジトリルートの Makefile から GAMES=<slug> で個別に呼べる。
-#
-# GODOT は Godot 4.7 の実行ファイル。macOS ローカルの既定値は /Applications/Godot.app。CI では
-# 環境変数 GODOT で Linux バイナリを渡す。
+# ghostrogue の検証・ビルド入口。build-* はエクスポートだけ、run はエディタなしの起動。
 GODOT ?= /Applications/Godot.app/Contents/MacOS/Godot
 LOG_DIR := tmp
-
-# 描画付きで起動する target (screenshot / movie) の共通オプション。headless では描画されないため付けない。
-# CI の Linux では Xvfb + llvmpipe 上で実行する
+RUN_FLAGS ?=
 WINDOWED_FLAGS := --audio-driver Dummy --rendering-driver opengl3 --resolution 1280x720 --windowed --position 0,0
-# 描画付き起動でだけ出る、描画に影響しない OS / ドライバ由来の行。ログの WARNING / ERROR 検査から除外する
-# (llvmpipe は V-Sync を設定できない WARNING を毎回 1 件出す。macOS は入力メソッドの mach port のエラーを稀に出す)
+# llvmpipe の V-Sync 非対応と macOS の入力メソッド由来の既知ログだけを除外する。
 WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpReliable'
-# movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
+LOG_FAILURES := -e WARNING -e ERROR -e 'ObjectDB instances were leaked' -e 'resources still in use'
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck integration lint test screenshot movie movie-play check-shutdown check-shutdown-windowed run generate-art generate-audio build-macos build-windows build-linux build-web build-all clean
 
-# アセットのインポート (初回・素材追加後)。.godot/ を生成する
+generate-art:
+	python3 scripts/dev/generate_art.py
+
+generate-audio:
+	python3 scripts/dev/generate_audio.py
+
 import:
 	@mkdir -p $(LOG_DIR) build
 	@touch $(LOG_DIR)/.gdignore build/.gdignore
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
-	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
-	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-import.log)" --headless --path . --import > $(LOG_DIR)/import.log 2>&1
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/import.log
 
-# 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --quit > $(LOG_DIR)/check.log 2>&1; \
-	echo "exit=$$?" >> $(LOG_DIR)/check.log; \
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-check.log)" --headless --path . --quit > $(LOG_DIR)/check.log 2>&1
 	grep -q '^ghostrogue boot$$' $(LOG_DIR)/check.log
-	tail -n 1 $(LOG_DIR)/check.log | grep -q '^exit=0$$'
-	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/check.log
 
-# シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
 selfcheck: import
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
-	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-selfcheck.log)" --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
-	tail -n 1 $(LOG_DIR)/selfcheck.log | grep -q '^exit=0$$'
-	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/selfcheck.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/selfcheck.log
 
-# GDScript の lint (gdtoolkit の gdlint。設定は ./gdlintrc)
+integration: import
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-integration.log)" --headless --path . --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1
+	grep -q '^integration OK$$' $(LOG_DIR)/integration.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/integration.log
+
 lint:
 	gdlint scripts/
 
-# ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration check-shutdown
 
-# 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
-# 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
-screenshot: import
-	rm -f $(LOG_DIR)/screenshot-*.png
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --path . $(WINDOWED_FLAGS) --script res://scripts/dev/screenshot.gd > $(LOG_DIR)/screenshot.log 2>&1; \
-	echo "exit=$$?" >> $(LOG_DIR)/screenshot.log; \
-	tail -n 1 $(LOG_DIR)/screenshot.log | grep -q '^exit=0$$'
-	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/screenshot.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+screenshot: import check-shutdown-windowed
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-screenshot.log)" --path . $(WINDOWED_FLAGS) --script res://scripts/dev/screenshot.gd > $(LOG_DIR)/screenshot.log 2>&1
+	grep -q '^screenshot OK$$' $(LOG_DIR)/screenshot.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/screenshot.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 	ls $(LOG_DIR)/screenshot-*.png
 
-# 操作を伴わない起動〜メインシーン表示を Movie Maker モードで録画して mp4 にする (起動直後の描画崩れ・真っ黒を
-# 検出する。headless は dummy レンダラで落ちるため描画付きで起動する)。真っ黒な動画を成功と誤認しないよう、
-# 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
+# 音を停止してから12フレーム以上待ち、描画を残したまま終了する。
 movie: import
-	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
-	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
-	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
-	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
-	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-movie.log)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --script res://scripts/dev/movie.gd -- $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1
+	grep -q '^movie OK$$' $(LOG_DIR)/movie.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
+	ffmpeg -loglevel error -y -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 $(LOG_DIR)/movie-last.png
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
-# エディタなしでゲームを起動する (ローカルの手動確認用)
-run: import
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --path .
+# 30 fps・30秒。通常の初期状態から実入力だけで進行し、結果とタイトル復帰を記録する。
+movie-play: import
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-movie-play.log)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1
+	grep -q '^demo OK$$' $(LOG_DIR)/movie-play.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/movie-play-frame-%02d.png
+	ffmpeg -loglevel error -y -sseof -0.034 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
 
-# エクスポート。プリセット名は export_presets.cfg と一致させる。
-# 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要
-# (AGENTS.md「検証方法」参照)
+check-shutdown: import
+	@for frames in 1 8 40 150; do \
+	  "$(GODOT)" --log-file "$(abspath $(LOG_DIR))/engine-quit-after-$$frames.log" --headless --path . --fixed-fps 30 --quit-after $$frames > $(LOG_DIR)/quit-after-$$frames.log 2>&1 || exit $$?; \
+	  if grep -i $(LOG_FAILURES) $(LOG_DIR)/quit-after-$$frames.log; then exit 1; fi; \
+	done
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-shutdown.log)" --headless --path . --script res://scripts/dev/shutdown.gd > $(LOG_DIR)/shutdown.log 2>&1
+	grep -q '^shutdown OK$$' $(LOG_DIR)/shutdown.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/shutdown.log
+
+# 描画時は実際に音声を再生し、音声リソースを持った終了も検査する。
+check-shutdown-windowed: import
+	@for frames in 1 8 40; do \
+	  "$(GODOT)" --log-file "$(abspath $(LOG_DIR))/engine-quit-windowed-$$frames.log" --path . $(WINDOWED_FLAGS) --fixed-fps 30 --quit-after $$frames > $(LOG_DIR)/quit-windowed-$$frames.log 2>&1 || exit $$?; \
+	  if grep -i $(LOG_FAILURES) $(LOG_DIR)/quit-windowed-$$frames.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .; then exit 1; fi; \
+	done
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-shutdown-windowed.log)" --path . $(WINDOWED_FLAGS) --script res://scripts/dev/shutdown.gd > $(LOG_DIR)/shutdown-windowed.log 2>&1
+	grep -q '^shutdown OK$$' $(LOG_DIR)/shutdown-windowed.log
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/shutdown-windowed.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+
+run: import
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-run.log)" --path . $(RUN_FLAGS)
+
+# Godot 4.7 の export templates を利用し、各ログの全文を検査する。
 build-macos: import
 	@mkdir -p build/macos
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --export-release "macOS" build/macos/ghostrogue.zip
-	test -f build/macos/ghostrogue.zip
+	rm -f build/macos/ghostrogue.zip
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-build-macos.log)" --headless --path . --export-release "macOS" build/macos/ghostrogue.zip > $(LOG_DIR)/build-macos.log 2>&1
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/build-macos.log
+	test -s build/macos/ghostrogue.zip
 
 build-windows: import
 	@mkdir -p build/windows
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --export-release "Windows Desktop" build/windows/ghostrogue.exe
-	test -f build/windows/ghostrogue.exe
-	test -f build/windows/ghostrogue.pck
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-build-windows.log)" --headless --path . --export-release "Windows Desktop" build/windows/ghostrogue.exe > $(LOG_DIR)/build-windows.log 2>&1
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/build-windows.log
+	test -s build/windows/ghostrogue.exe
+	test -s build/windows/ghostrogue.pck
 
 build-linux: import
 	@mkdir -p build/linux
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --export-release "Linux" build/linux/ghostrogue.x86_64
-	test -f build/linux/ghostrogue.x86_64
-	test -f build/linux/ghostrogue.pck
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-build-linux.log)" --headless --path . --export-release "Linux" build/linux/ghostrogue.x86_64 > $(LOG_DIR)/build-linux.log 2>&1
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/build-linux.log
+	test -s build/linux/ghostrogue.x86_64
+	test -s build/linux/ghostrogue.pck
 
-# Web エクスポート (動作確認専用。配布はデスクトップ 3 種)。webtunnel での確認に使う
 build-web: import
 	@mkdir -p build/web
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR)/engine.log) --headless --path . --export-release "Web" build/web/index.html
-	test -f build/web/index.html
-	test -f build/web/index.wasm
-	test -f build/web/index.pck
+	"$(GODOT)" --log-file "$(abspath $(LOG_DIR)/engine-build-web.log)" --headless --path . --export-release "Web" build/web/index.html > $(LOG_DIR)/build-web.log 2>&1
+	! grep -i $(LOG_FAILURES) $(LOG_DIR)/build-web.log
+	test -s build/web/index.html
+	test -s build/web/index.wasm
+	test -s build/web/index.pck
 
 build-all: build-macos build-windows build-linux
 
