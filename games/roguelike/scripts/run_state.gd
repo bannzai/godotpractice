@@ -447,13 +447,14 @@ func _enemy_action(enemy: Dictionary, data: Dictionary) -> void:
 	var difference: Vector2i = player_pos - Vector2i(enemy.pos)
 	var adjacent: bool = maxi(absi(difference.x), absi(difference.y)) <= 1
 	if adjacent and dungeon.can_step(enemy.pos, player_pos):
+		event.emit("enemy_attack", enemy.pos, 0)
 		_hurt_player(maxi(1, int(data.attack) + floor_number - 1 - defense_power()),
 			"%sに倒された" % str(data.name))
 		return
 	if str(data.ai) == "ranged" and player_pos.distance_to(enemy.pos) <= 6 and (
 		difference.x == 0 or difference.y == 0 or absi(difference.x) == absi(difference.y)):
 		if dungeon.line_of_sight(enemy.pos, player_pos):
-			event.emit("attack", enemy.pos, 0)
+			event.emit("enemy_attack", enemy.pos, 0)
 			_hurt_player(maxi(1, int(data.attack) - defense_power()), "灯射手の矢に倒れた")
 			return
 	var diagonal: Vector2i = Vector2i(signi(difference.x), signi(difference.y))

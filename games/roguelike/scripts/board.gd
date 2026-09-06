@@ -11,9 +11,14 @@ var run: Node
 var origin: Vector2i = Vector2i.ZERO
 var map_open: bool = false
 var textures: Dictionary = {}
+var minimap: Node2D
 
 
 func _ready() -> void:
+	minimap = Node2D.new()
+	minimap.z_index = 15
+	add_child(minimap)
+	minimap.draw.connect(_draw_minimap)
 	run = get_node("/root/RunState")
 	for kind: String in ["floor", "wall"]:
 		textures[kind] = load("res://assets/tiles/" + kind + ".svg")
@@ -59,7 +64,7 @@ func _draw() -> void:
 	var hero: Vector2 = point(run.player_pos)
 	draw_arc(hero, 19, 0, TAU, 32, UI.GOLD, 1.5, true)
 	draw_line(hero + Vector2(run.facing) * 18, hero + Vector2(run.facing) * 26, UI.GOLD, 3)
-	_draw_minimap()
+	minimap.queue_redraw()
 
 
 func _draw_minimap() -> void:
@@ -67,14 +72,18 @@ func _draw_minimap() -> void:
 	var base := Vector2(950, 290)
 	if map_open:
 		base = Vector2(290, 135)
-		draw_rect(Rect2(base - Vector2(20, 40), Vector2(345, 225)), Color("102330f5"))
+		minimap.draw_rect(Rect2(base - Vector2(20, 40), Vector2(345, 225)), Color("102330f5"))
 	for cell: Vector2i in run.dungeon.explored:
 		if not run.dungeon.is_floor(cell):
 			continue
 		var color := Color("547278")
 		if run.dungeon.visible.has(cell):
 			color = UI.TEAL.darkened(0.3)
-		draw_rect(Rect2(base + Vector2(cell) * scale_map, Vector2.ONE * (scale_map - 1)), color)
+		minimap.draw_rect(
+			Rect2(base + Vector2(cell) * scale_map, Vector2.ONE * (scale_map - 1)), color
+		)
 	if run.dungeon.explored.has(run.dungeon.stairs):
-		draw_circle(base + Vector2(run.dungeon.stairs) * scale_map, scale_map * 0.7, UI.GOLD)
-	draw_circle(base + Vector2(run.player_pos) * scale_map, scale_map * 0.65, Color.WHITE)
+		minimap.draw_circle(
+			base + Vector2(run.dungeon.stairs) * scale_map, scale_map * 0.7, UI.GOLD
+		)
+	minimap.draw_circle(base + Vector2(run.player_pos) * scale_map, scale_map * 0.65, Color.WHITE)

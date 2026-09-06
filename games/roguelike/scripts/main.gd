@@ -1,6 +1,7 @@
 extends Control
 ## 入力は一手ずつ RunState へ渡す。画面にはアニメーションとフォーカスだけを保持する。
 
+const Data := preload("res://scripts/game_data.gd")
 const UI := preload("res://scripts/ui.gd")
 const Board := preload("res://scripts/board.gd")
 const Actor := preload("res://scripts/actor_view.gd")
@@ -32,6 +33,7 @@ var stats: Label
 var health: Label
 var food: Label
 var log_label: Label
+var log_scroll: ScrollContainer
 var equipment: Label
 var floor_label: Label
 var hp_bar: ProgressBar
@@ -41,6 +43,7 @@ var clock_time: float = 0.0
 var cooldown: float = 0.0
 var closing: bool = false
 var displayed_floor: int = 0
+var pending_result: bool = false
 
 
 func _ready() -> void:
@@ -85,16 +88,19 @@ func _input(event: InputEvent) -> void:
 		)
 		get_viewport().set_input_as_handled()
 		return
-	if event.is_echo() or run.status != "playing":
+	if event is InputEventJoypadMotion or event.is_echo():
 		return
-	if event.is_action_pressed("ui_cancel"):
+	if (
+		event.is_action_pressed("ui_cancel")
+		and (run.status == "playing" or not modal_kind.is_empty())
+	):
 		if modal_kind.is_empty():
 			_open_pause()
 		else:
 			_close_modal()
 		get_viewport().set_input_as_handled()
 		return
-	if not modal_kind.is_empty() or busy:
+	if run.status != "playing" or not modal_kind.is_empty() or busy:
 		return
 	if event.is_action_pressed("inventory"):
 		_open_inventory()
@@ -132,20 +138,40 @@ func return_title() -> void:
 
 
 func _refresh() -> void:
+	if run.status in ["won", "dead"] and current_screen == "playing":
+		if not pending_result:
+			pending_result = true
+			_finish_result_transition()
+		return
 	if run.status != current_screen:
 		_build_screen()
 	if run.status == "playing":
 		_sync_world()
 		_update_hud()
-		sound.track("boss" if run.floor_number == 5 else "floor%d" % run.floor_number)
+		var track_name: String = "floor%d" % run.floor_number
+		for enemy: Dictionary in run.enemies:
+			if enemy.kind == "boss" and run.dungeon.visible.has(enemy.pos):
+				track_name = "boss"
+		sound.track(track_name)
 	elif run.status == "title":
 		sound.track("title")
 	else:
 		sound.track("result")
 
 
+func _finish_result_transition() -> void:
+	busy = true
+	await get_tree().create_timer(0.55).timeout
+	if run.status in ["won", "dead"] and current_screen == "playing":
+		_build_screen()
+		sound.track("result")
+	pending_result = false
+	busy = false
+
+
 func _build_screen() -> void:
 	_close_modal()
+	first_focus = null
 	if is_instance_valid(screen):
 		remove_child(screen)
 		screen.queue_free()
@@ -218,7 +244,14 @@ func _build_play() -> void:
 	UI.label(screen, "灯守りの記録", Rect2(985, 126, 250, 30), 20, UI.GOLD)
 	equipment = UI.label(screen, "", Rect2(985, 165, 250, 65), 16)
 	UI.label(screen, "探索図   M / セレクト", Rect2(985, 365, 250, 30), 17, UI.MUTED)
-	log_label = UI.label(screen, "", Rect2(985, 241, 252, 125), 15)
+	log_scroll = ScrollContainer.new()
+	log_scroll.position = Vector2(985, 236)
+	log_scroll.size = Vector2(252, 120)
+	log_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	screen.add_child(log_scroll)
+	log_label = UI.label(log_scroll, "", Rect2(), 15)
+	log_label.custom_minimum_size.x = 232
+	log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UI.label(
 		screen,
@@ -233,6 +266,14 @@ func _build_play() -> void:
 	effects = Effects.new()
 	board.add_child(effects)
 	effects.z_index = 10
+	var mist := ColorRect.new()
+	mist.position = Vector2(20, 112)
+	mist.size = Vector2(920, 520)
+	mist.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var material := ShaderMaterial.new()
+	material.shader = load("res://scripts/atmosphere.gdshader")
+	mist.material = material
+	screen.add_child(mist)
 	displayed_floor = 0
 
 
@@ -269,6 +310,7 @@ func _update_hud() -> void:
 	for index: int in range(maxi(0, run.messages.size() - 4), run.messages.size()):
 		lines.append(run.messages[index])
 	log_label.text = "\n".join(lines)
+	log_scroll.set_deferred("scroll_vertical", 100000)
 
 
 func _sync_world() -> void:
@@ -319,10 +361,20 @@ func _event(kind: String, cell: Vector2i, value: int) -> void:
 		"attack":
 			if actors.has(-1):
 				actors[-1].animate("attack", Vector2(run.facing))
+			if value > 0:
+				for id: int in actors:
+					if id != -1 and actors[id].position.distance_to(point) < 24:
+						actors[id].animate("hurt")
 			effects.slash(point, Vector2(run.facing))
 			effects.popup(point, str(value), UI.GOLD)
 			sound.play("hit")
 			_hit_stop()
+		"enemy_attack":
+			for actor: Node2D in actors.values():
+				if actor.position.distance_to(point) < 24:
+					actor.animate("attack", Vector2(run.player_pos - cell))
+			if value > 0:
+				effects.slash(point, Vector2(run.player_pos - cell))
 		"hurt":
 			effects.burst(point, Color("ea776d"))
 			effects.popup(point, "−%d" % value, Color("ff9988"))
@@ -341,14 +393,24 @@ func _event(kind: String, cell: Vector2i, value: int) -> void:
 		"pickup", "use":
 			effects.burst(point, UI.TEAL)
 			sound.play("pickup")
+		"win":
+			effects.burst(point, UI.GOLD, 48)
+			effects.popup(point, "灯を取り戻した！", UI.GOLD)
+			sound.play("level")
 		"death", "kill":
+			if kind == "death" and actors.has(-1):
+				actors[-1].animate("death")
 			effects.burst(point, UI.GOLD)
 			sound.play("death")
 
 
 func _hit_stop() -> void:
 	busy = true
+	for actor: Node2D in actors.values():
+		actor.animation.speed_scale = 0.0
 	await get_tree().create_timer(0.055).timeout
+	for actor: Node2D in actors.values():
+		actor.animation.speed_scale = 1.0
 	busy = false
 
 
@@ -384,15 +446,27 @@ func _build_result() -> void:
 	var won: bool = run.status == "won"
 	UI.label(screen, "灯を地上へ" if won else "灯火は、次の旅へ", Rect2(390, 133, 500, 64), 36, UI.GOLD)
 	UI.label(screen, run.result_cause, Rect2(390, 213, 500, 56), 21)
-	UI.label(
-		screen,
-		(
-			"到達  %d 階    /    討伐  %d 体\n\nレベル %d    ·    %d 手の探索\n\n最深到達記録  %d 階"
-			% [run.floor_number, run.kills, run.level, run.turns, run.best_floor]
-		),
-		Rect2(390, 285, 500, 170),
-		23
+	var summary: Label = UI.label(screen, "", Rect2(390, 285, 500, 170), 23)
+	var result_numbers: Array[int] = [
+		run.floor_number, run.kills, run.level, run.turns, run.best_floor
+	]
+	summary.create_tween().tween_method(
+		func(progress: float) -> void:
+			summary.text = (
+				"到達  %d 階    /    討伐  %d 体\n\nレベル %d    ·    %d 手の探索\n\n最深到達記録  %d 階"
+				% [
+					result_numbers[0],
+					int(result_numbers[1] * progress),
+					result_numbers[2],
+					int(result_numbers[3] * progress),
+					result_numbers[4]
+				]
+			),
+		0.0,
+		1.0,
+		0.42
 	)
+
 	first_focus = UI.button(screen, "もう一度潜る", Rect2(390, 508, 230, 58), start_new)
 	UI.button(screen, "タイトルへ", Rect2(644, 508, 230, 58), return_title)
 	first_focus.grab_focus()
@@ -404,6 +478,7 @@ func _new_modal(kind: String) -> void:
 	for button: Node in screen.find_children("*", "Button", true, false):
 		button.disabled = true
 	modal = Control.new()
+	modal.z_index = 20
 	modal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(modal)
 	var dim := ColorRect.new()
@@ -417,11 +492,12 @@ func _close_modal() -> void:
 	if is_instance_valid(modal):
 		remove_child(modal)
 		modal.queue_free()
+		modal = null
 	modal_kind = ""
 	if is_instance_valid(screen):
 		for button: Node in screen.find_children("*", "Button", true, false):
 			button.disabled = false
-	if is_instance_valid(first_focus) and run.status != "playing":
+	if is_instance_valid(first_focus) and first_focus.is_inside_tree() and run.status != "playing":
 		first_focus.grab_focus()
 
 
@@ -442,6 +518,11 @@ func _open_inventory() -> void:
 			caption,
 			Rect2(265 + (index % 2) * 380, 190 + (index / 2) * 55, 360, 46),
 			_select_item.bind(index)
+		)
+		UI.picture(
+			modal,
+			"res://assets/items/%s.svg" % Data.ITEMS[item].image,
+			Rect2(270 + (index % 2) * 380, 195 + (index / 2) * 55, 36, 36)
 		)
 		if first == null:
 			first = button
@@ -486,10 +567,9 @@ func _item_action(action: String) -> void:
 func _open_help() -> void:
 	_new_modal("help")
 	UI.label(modal, "探索の手引き", Rect2(280, 100, 700, 58), 32, UI.GOLD)
-	(
-		UI
-		. label(
-			modal,
+	UI.label(
+		modal,
+		(
 			"移動は矢印 / WASD / 十字キー・左スティック。\n"
 			+ "Q E Z C またはスティックで斜めに移動。接敵で攻撃。\n"
 			+ "\n"
@@ -500,10 +580,10 @@ func _open_help() -> void:
 			+ "部屋を探索して食料を確保し、道具を使い分けましょう。\n"
 			+ "巻物と杖は使うまで未識別。投げる方向は直前の移動方向。\n"
 			+ "5階の番人を倒すか、5階の階段から脱出すればクリア。\n"
-			+ "F11：全画面切替。敗北すると持ち物を失います。",
-			Rect2(280, 184, 740, 350),
-			20
-		)
+			+ "F11：全画面切替。敗北すると持ち物を失います。"
+		),
+		Rect2(280, 184, 740, 350),
+		20
 	)
 	var close: Button = UI.button(modal, "閉じる", Rect2(740, 558, 240, 50), _close_modal)
 	close.grab_focus()

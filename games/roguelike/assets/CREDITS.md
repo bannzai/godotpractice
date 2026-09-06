@@ -77,3 +77,5 @@
 - **クレジット表記**: **必要**
 - **改変**: ファイル名のみ変更。フォントデータは変更なし
 - **備考**: 既存 games/cardbattle/assets/fonts から同一のフォントとライセンス全文をコピー。OFL.txt を同梱する。
+
+探索時の霧は `scripts/atmosphere.gdshader` に記述した独自のGL Compatibility対応シェーダ。手続き的な濃淡と時間変化のみで、外部画像を使用していない。

@@ -16,7 +16,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -25,6 +25,7 @@ import:
 	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/import.log
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
@@ -47,7 +48,15 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration
+
+# 入力定義だけでなく製品のGUIへ実イベントを配送する。
+integration: import
+	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/integration.log; \
+	tail -n 1 $(LOG_DIR)/integration.log | grep -q '^exit=0$$'
+	grep -q '^integration OK' $(LOG_DIR)/integration.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -68,39 +77,61 @@ movie: import
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
-	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
+# 30秒の実入力プレイ。終了前に音声を解放してから録画を閉じる。
+movie-play: import
+	"$(GODOT)" --path . --log-file $(abspath tmp/engine.log) $(WINDOWED_FLAGS) --script res://scripts/dev/demo.gd --fixed-fps 30 --write-movie $(LOG_DIR)/movie-play.avi > $(LOG_DIR)/movie-play.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
+	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
+	grep -q '^demo OK' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
-	"$(GODOT)" --path . --log-file $(abspath tmp/engine.log)
+	"$(GODOT)" --path . --log-file $(abspath tmp/engine.log) $(RUN_FLAGS)
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
 # 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要
 # (AGENTS.md「検証方法」参照)
 build-macos: import
 	@mkdir -p build/macos
-	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "macOS" build/macos/roguelike.zip
+	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "macOS" build/macos/roguelike.zip > $(LOG_DIR)/build-macos.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-macos.log; \
+	tail -n 1 $(LOG_DIR)/build-macos.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-macos.log
 	test -f build/macos/roguelike.zip
 
 build-windows: import
 	@mkdir -p build/windows
-	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "Windows Desktop" build/windows/roguelike.exe
+	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "Windows Desktop" build/windows/roguelike.exe > $(LOG_DIR)/build-windows.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-windows.log; \
+	tail -n 1 $(LOG_DIR)/build-windows.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-windows.log
 	test -f build/windows/roguelike.exe
 	test -f build/windows/roguelike.pck
 
 build-linux: import
 	@mkdir -p build/linux
-	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "Linux" build/linux/roguelike.x86_64
+	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "Linux" build/linux/roguelike.x86_64 > $(LOG_DIR)/build-linux.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-linux.log; \
+	tail -n 1 $(LOG_DIR)/build-linux.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-linux.log
 	test -f build/linux/roguelike.x86_64
 	test -f build/linux/roguelike.pck
 
 # Web エクスポート (動作確認専用。配布はデスクトップ 3 種)。webtunnel での確認に使う
 build-web: import
 	@mkdir -p build/web
-	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "Web" build/web/index.html
+	"$(GODOT)" --headless --path . --log-file $(abspath tmp/engine.log) --export-release "Web" build/web/index.html > $(LOG_DIR)/build-web.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-web.log; \
+	tail -n 1 $(LOG_DIR)/build-web.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-web.log
 	test -f build/web/index.html
 	test -f build/web/index.wasm
 	test -f build/web/index.pck

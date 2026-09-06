@@ -70,10 +70,17 @@ func same_room(first: Vector2i, second: Vector2i) -> bool:
 
 func line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 	var steps: int = maxi(absi(to.x - from.x), absi(to.y - from.y))
-	for index: int in range(1, steps):
+	var previous: Vector2i = from
+	for index: int in range(1, steps + 1):
 		var point: Vector2i = Vector2i(Vector2(from).lerp(Vector2(to), float(index) / steps).round())
-		if not is_floor(point):
+		if index < steps and not is_floor(point):
 			return false
+		var difference: Vector2i = point - previous
+		if difference.x != 0 and difference.y != 0:
+			if not is_floor(previous + Vector2i(difference.x, 0)) or not is_floor(
+				previous + Vector2i(0, difference.y)):
+				return false
+		previous = point
 	return true
 
 
