@@ -355,15 +355,15 @@ static func _offer(main: Control, id: String, area: Rect2) -> void:
 		28,
 		UI.GOLD
 	)
-	_actor(main.content, id, area.position + Vector2(area.size.x / 2, 143), 0.52)
+	_actor(main.content, id, area.position + Vector2(area.size.x / 2, 134), 0.48)
 	UI.label(
 		main.content,
 		"攻撃力 %d   /   %s" % [card.atk, Catalog.RARITY_NAMES[card.rarity]],
-		Rect2(area.position.x + 23, area.position.y + 219, 245, 27),
+		Rect2(area.position.x + 23, area.position.y + 201, 245, 27),
 		20
 	)
 	UI.paragraph(
-		main.content, card.text, Rect2(area.position.x + 19, area.position.y + 254, 255, 68), 17
+		main.content, card.text, Rect2(area.position.x + 19, area.position.y + 232, 255, 68), 17
 	)
 
 

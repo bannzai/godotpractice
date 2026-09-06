@@ -4,6 +4,7 @@ extends Control
 const Catalog = preload("res://scripts/core/catalog.gd")
 const Views = preload("res://scripts/ui/views.gd")
 const UI = preload("res://scripts/ui/widgets.gd")
+const Actor = preload("res://scripts/visual/actor.gd")
 const Backdrop = preload("res://scripts/visual/backdrop.gd")
 const Effects = preload("res://scripts/visual/effects.gd")
 const Sound = preload("res://scripts/visual/sound.gd")
@@ -159,7 +160,8 @@ func choose_node(index: int) -> void:
 		busy = true
 		sound.play_sfx("drum")
 		effects.spawn("boss", Vector2(640, 300))
-		await get_tree().create_timer(0.9).timeout
+		_show_boss_banner()
+		await get_tree().create_timer(1.5).timeout
 		busy = false
 
 
@@ -594,3 +596,30 @@ func _save_progress() -> bool:
 	if not success:
 		note = run.save_error
 	return success
+
+
+# 将軍と対峙する瞬間だけ、相手の名前と姿を一度大きく見せる。
+func _show_boss_banner() -> void:
+	var banner := Control.new()
+	banner.name = "BossEntrance"
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(banner)
+	banner.position = Vector2(-1280, 0)
+	UI.panel(banner, Rect2(0, 216, 1280, 226), Color("0e1b17f5"))
+	UI.label(banner, "将軍の陣", Rect2(266, 239, 700, 35), 23, UI.RED)
+	UI.label(
+		banner, Catalog.ENEMIES[run.battle.enemy_id].name, Rect2(264, 277, 720, 74), 54, UI.GOLD
+	)
+	UI.paragraph(
+		banner, Catalog.ENEMIES[run.battle.enemy_id].lines.start, Rect2(268, 365, 753, 55), 22
+	)
+	var portrait := Actor.new()
+	banner.add_child(portrait)
+	portrait.setup(run.battle.enemy_id, 0.74)
+	portrait.position = Vector2(1130, 324)
+	portrait.play_pose("attack")
+	var tween: Tween = banner.create_tween()
+	tween.tween_property(banner, "position:x", 0.0, 0.22).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_interval(1.0)
+	tween.tween_property(banner, "position:x", 1280.0, 0.23).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_callback(banner.queue_free)

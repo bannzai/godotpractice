@@ -41,6 +41,7 @@ func _capture_scenes() -> void:
 	await _capture("map")
 	await _click("route_0_0")
 	await _wait_idle()
+	await create_timer(0.4).timeout
 	await _capture("battle-opening")
 	await _click("hand_0")
 	await _capture("hand-selected")
@@ -71,8 +72,10 @@ func _representative_scenes() -> void:
 	_visit(3, "general")
 	main._render()
 	main.effects.spawn("boss", Vector2(640, 265))
-	await create_timer(0.18).timeout
+	main._show_boss_banner()
+	await create_timer(0.35).timeout
 	await _capture("general-entrance")
+	await create_timer(1.3).timeout
 	_visit(8, "final")
 	_board_fixture()
 	main._render()
