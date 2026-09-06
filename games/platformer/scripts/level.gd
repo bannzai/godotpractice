@@ -3,6 +3,7 @@ extends Node2D
 ## ステージ生成は初期化時に一度だけ実行する。物理・取得処理はイベントを消費するため非冪等。
 
 signal sound_requested(sound: String)
+signal feedback_requested(kind: String, at: Vector2)
 const TILE: int = 48
 const WIDTHS: Array[int] = [100, 112]
 const NAMES: Array[String] = ["風の草原", "ひかりの洞窟"]
@@ -16,16 +17,26 @@ var blocks: Array[SupplyBlock] = []
 var goal_x: float = 0.0
 var session: Node
 var elapsed: float = 0.0
+var effects: RouteEffects
+var hit_stop: float = 0.0
+var shake_strength: float = 0.0
+var shake_time: float = 0.0
+var goal: Sprite2D
 
 
 func _ready() -> void:
 	session = get_node("/root/Session")
+	effects = RouteEffects.new()
+	add_child(effects)
 	_build_terrain()
 	_build_objects()
 	player = Courier.new()
 	player.position = Vector2(130, 624)
 	player.sound_requested.connect(func(sound: String) -> void: sound_requested.emit(sound))
+	player.landed.connect(func(at: Vector2) -> void: effects.burst("land", at))
 	add_child(player)
+	for enemy: TrailEnemy in enemies:
+		enemy.target = player
 	camera = Camera2D.new()
 	camera.position = Vector2(640, 360)
 	camera.limit_left = 0
@@ -99,7 +110,7 @@ func _build_objects() -> void:
 		add_child(enemy)
 		enemies.append(enemy)
 	goal_x = (WIDTHS[stage] - 5) * TILE
-	var goal: Sprite2D = Sprite2D.new()
+	goal = Sprite2D.new()
 	goal.texture = load("res://assets/images/goal.svg")
 	goal.position = Vector2(goal_x, 564)
 	add_child(goal)
@@ -113,34 +124,57 @@ func spawn_item(at: Vector2, kind: String) -> void:
 	item.set_meta("origin_y", at.y)
 	add_child(item)
 	items.append(item)
+	if kind == "power":
+		item.scale = Vector2(0.2, 0.2)
+		var tween: Tween = item.create_tween()
+		tween.tween_property(item, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK)
 
 
 func _block_opened(at: Vector2, contents: String) -> void:
 	if contents == "coin":
 		session.collect_coin()
 		sound_requested.emit("coin")
+		impact("coin", at, "+100")
 	else:
 		spawn_item(at, contents)
 		sound_requested.emit("power")
+		effects.burst("power", at)
+
+
+func _process(delta: float) -> void:
+	if session.phase == "paused":
+		return
+	shake_time += delta
+	shake_strength = move_toward(shake_strength, 0.0, delta * 25.0)
+	camera.offset = Vector2(sin(shake_time * 97), cos(shake_time * 83)) * shake_strength
+	goal.rotation = sin(shake_time * 1.8) * 0.025
 
 
 func _physics_process(delta: float) -> void:
 	if session.phase != "playing":
 		return
-	elapsed += delta
-	camera.position.x = clampf(player.position.x + 160, 640, WIDTHS[stage] * TILE - 640)
 	if player.position.y > 810:
 		session.damage(true, "穴に落ちた")
 		return
+	if hit_stop > 0.0:
+		hit_stop = maxf(hit_stop - delta, 0.0)
+		return
+	elapsed += delta
+	camera.position.x = clampf(player.position.x + 160, 640, WIDTHS[stage] * TILE - 640)
 	_collect_items()
 	_check_enemies()
-	if absf(player.position.x - goal_x) < 32 and player.position.y > 490:
+	if session.phase == "playing" and absf(player.position.x - goal_x) < 32:
+		if player.position.y <= 490:
+			return
+		impact("clear", Vector2(goal_x, 540), "配達完了")
 		session.finish_stage()
 
 
 func _collect_items() -> void:
 	for item: Sprite2D in items.duplicate():
 		item.position.y = float(item.get_meta("origin_y")) + sin(elapsed * 4 + item.position.x) * 4
+		if item.get_meta("kind") == "coin":
+			item.scale.x = 0.78 + absf(sin(elapsed * 3.4 + item.position.x)) * 0.22
 		var height: float = 64.0 if session.powered else 42.0
 		var body: Rect2 = Rect2(player.position - Vector2(19, height), Vector2(38, height))
 		if not body.grow(10).has_point(item.position):
@@ -148,9 +182,11 @@ func _collect_items() -> void:
 		var kind: String = item.get_meta("kind")
 		if kind == "coin":
 			session.collect_coin()
+			impact("coin", item.position, "+100")
 		else:
 			session.collect_power()
 			player.transform()
+			impact("power", item.position, "+500")
 		sound_requested.emit(kind)
 		items.erase(item)
 		item.queue_free()
@@ -166,6 +202,7 @@ func _check_enemies() -> void:
 					if enemy.position.distance_to(other.position) < 36:
 						other.defeat()
 						session.score += 200
+						impact("stomp", other.position + Vector2(0, -18), "+200")
 		var distance: Vector2 = player.position - enemy.position
 		var height: float = 64 if session.powered else 42
 		if absf(distance.x) > 31 or distance.y < -36 or distance.y > height:
@@ -174,10 +211,26 @@ func _check_enemies() -> void:
 			enemy.stomp(player.position.x)
 			player.bounce()
 			session.score += 200
+			impact("stomp", enemy.position + Vector2(0, -18), "+200")
 		elif enemy.mode == "resting":
 			enemy.stomp(player.position.x)
+			impact("stomp", enemy.position + Vector2(0, -18))
 		elif enemy.kick_grace == 0.0:
 			var result: String = session.damage()
 			if result == "shrunk":
-				player.transform()
-				sound_requested.emit("power")
+				player.hurt()
+				sound_requested.emit("hurt")
+				impact("hurt", player.position + Vector2(0, -28), "-1")
+
+
+func impact(kind: String, at: Vector2, score_text: String = "") -> void:
+	effects.burst(kind, at, score_text)
+	feedback_requested.emit(kind, at)
+	if kind in ["stomp", "power", "hurt", "death", "clear"]:
+		shake_strength = maxf(shake_strength, 7.0 if kind in ["hurt", "death"] else 3.5)
+	if kind in ["stomp", "power", "hurt"]:
+		hit_stop = maxf(hit_stop, 0.045)
+		player.freeze(hit_stop)
+		for enemy: TrailEnemy in enemies:
+			if is_instance_valid(enemy):
+				enemy.freeze(hit_stop)

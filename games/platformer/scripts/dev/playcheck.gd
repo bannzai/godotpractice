@@ -29,12 +29,14 @@ func _run() -> void:
 	await _frames(25)
 	_check(game.route.player.position.x > start_x + 60, "左右移動で位置が進む")
 	_check(game.route.player.velocity.x > 240, "歩行加速")
+	_check(game.route.player.sprite.animation == &"run", "移動中は走行フレームを再生")
 	Input.action_press("dash")
 	await _frames(15)
 	_check(game.route.player.velocity.x > 390, "ダッシュ加速")
 	_release()
 	await _frames(15)
 	_check(absf(game.route.player.velocity.x) < 1, "減速して停止")
+	await _check_arrow_keys()
 	var short_height: float = await _jump_height(2)
 	var long_height: float = await _jump_height(30)
 	_check(long_height > short_height + 50, "ジャンプ長押しで到達高度が増える")
@@ -43,6 +45,7 @@ func _run() -> void:
 	await _check_enemy()
 	await _check_damage_and_restart()
 	await _check_pad_and_pause()
+	await _check_effects_cleanup()
 	for stage_index: int in 2:
 		await _traverse(stage_index)
 	game._show_title()
@@ -70,6 +73,21 @@ func _frames(count: int) -> void:
 func _release() -> void:
 	for action: String in ["move_left", "move_right", "jump", "dash"]:
 		Input.action_release(action)
+
+
+func _check_arrow_keys() -> void:
+	var start_x: float = game.route.player.position.x
+	_send_key(KEY_RIGHT, true)
+	await _frames(25)
+	_send_key(KEY_RIGHT, false)
+	_check(game.route.player.position.x > start_x + 60, "右矢印の実キーイベントで右へ移動")
+	await _frames(15)
+	start_x = game.route.player.position.x
+	_send_key(KEY_LEFT, true)
+	await _frames(25)
+	_send_key(KEY_LEFT, false)
+	_check(game.route.player.position.x < start_x - 60, "左矢印の実キーイベントで左へ移動")
+	await _frames(15)
 
 
 func _jump_height(held_frames: int) -> float:
@@ -122,6 +140,7 @@ func _check_enemy() -> void:
 	await _frames(20)
 	_check(not is_instance_valid(enemy) or enemy.mode == "dead", "落下して歩行敵を踏む")
 	_check(session.lives == 3 and session.score >= 200, "踏みつけでは被弾せず加点")
+	_check(game.route.player.sprite.animation == &"stomp", "踏みつけ後は専用フレームを再生")
 	var shell: TrailEnemy = game.route.enemies[1]
 	shell.position = Vector2(500, 624)
 	game.route.player.position = Vector2(500, 525)
@@ -141,9 +160,11 @@ func _check_damage_and_restart() -> void:
 	game.route.enemies[0].position = game.route.player.position + Vector2(20, 0)
 	await _frames(3)
 	_check(not session.powered and session.lives == 3, "横から被弾すると一度だけ縮む")
+	_check(game.route.player.sprite.animation == &"hurt", "縮小時は被弾フレームを再生")
 	game.route.player.position.y = 850
 	await _frames(3)
 	_check(session.phase == "dead" and session.lives == 2, "穴で残機が減る")
+	_check(game.route.player.sprite.animation == &"death", "死亡中も専用フレームを再生")
 	game._continue()
 	await _frames(3)
 	_check(session.phase == "playing" and session.lives == 2, "残機を保って再開")
@@ -208,6 +229,21 @@ func _check_pad_and_pause() -> void:
 	_pad_button(false)
 	await _frames(2)
 	_check(session.phase == "playing", "パッド A ボタンで一時停止から再開")
+
+
+func _check_effects_cleanup() -> void:
+	game.start_run()
+	await _frames(4)
+	game.route.impact("power", Vector2(280, 520), "+500")
+	_check(game.route.effects.get_child_count() == 3, "取得時に粒子・光輪・得点を生成")
+	var stopped_at: Vector2 = game.route.player.position
+	Input.action_press("move_right")
+	await _frames(1)
+	_check(game.route.player.position == stopped_at, "ヒットストップ中はキャラ移動が停止")
+	_release()
+	await _frames(110)
+	_check(game.route.effects.get_child_count() == 0, "完了した粒子・光輪・数字を解放")
+	_check(game.route.camera.offset.is_zero_approx(), "画面揺れが収束する")
 
 
 func _traverse(stage_index: int) -> void:

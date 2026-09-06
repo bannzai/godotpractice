@@ -5,10 +5,13 @@ extends CharacterBody2D
 var kind: String = "walker"
 var mode: String = "walking"
 var direction: float = -1.0
-var sprite: Sprite2D
+var sprite: AnimatedSprite2D
 var age: float = 0.0
 var kick_grace: float = 0.0
+var hurt_time: float = 0.0
+var hit_stop: float = 0.0
 var session: Node
+var target: Courier
 
 
 func _ready() -> void:
@@ -21,17 +24,26 @@ func _ready() -> void:
 	collision.shape = shape
 	collision.position.y = -14
 	add_child(collision)
-	sprite = Sprite2D.new()
-	sprite.texture = load("res://assets/images/%s.svg" % kind)
-	sprite.offset.y = -16
+	sprite = AnimatedSprite2D.new()
+	sprite.sprite_frames = ActorFrames.build(kind)
+	sprite.offset.y = -24
+	sprite.scale = Vector2(0.83, 0.83)
 	add_child(sprite)
+	sprite.play("idle")
 
 
 func _physics_process(delta: float) -> void:
 	if session.phase != "playing" or mode == "dead":
+		sprite.speed_scale = 0.0 if session.phase == "paused" else 1.0
 		return
+	if hit_stop > 0.0:
+		hit_stop = maxf(0.0, hit_stop - delta)
+		sprite.speed_scale = 0.0
+		return
+	sprite.speed_scale = 1.0
 	age += delta
 	kick_grace = maxf(0.0, kick_grace - delta)
+	hurt_time = maxf(0.0, hurt_time - delta)
 	velocity.y = minf(velocity.y + 1700 * delta, 1000)
 	velocity.x = direction * (470 if mode == "sliding" else 65)
 	if mode == "resting":
@@ -41,8 +53,26 @@ func _physics_process(delta: float) -> void:
 		direction *= -1
 	if position.y > 850:
 		queue_free()
-	sprite.flip_h = direction > 0
-	sprite.rotation = sin(age * 13) * 0.08 if mode == "walking" else 0.0
+	_update_visual()
+
+
+func _update_visual() -> void:
+	sprite.flip_h = direction < 0
+	var state: String = "walk"
+	if hurt_time > 0.0:
+		state = "hurt"
+	elif mode == "resting" or age < 0.25:
+		state = "idle"
+	elif mode == "sliding":
+		state = "attack"
+	elif is_instance_valid(target):
+		var distance: Vector2 = target.position - position
+		if absf(distance.x) < 115 and absf(distance.y) < 65:
+			state = "attack"
+	sprite.play(state)
+	sprite.scale = Vector2(0.83, 0.52 if mode in ["resting", "sliding"] else 0.83)
+	if mode == "sliding":
+		sprite.speed_scale = 1.8
 
 
 func stomp(from_x: float) -> void:
@@ -52,11 +82,18 @@ func stomp(from_x: float) -> void:
 		defeat()
 	elif mode == "walking" or mode == "sliding":
 		mode = "resting"
-		sprite.scale.y = 0.55
+		hurt_time = 0.36
+		_update_visual()
 	else:
 		mode = "sliding"
+		hurt_time = 0.0
 		kick_grace = 0.25
 		direction = 1.0 if position.x > from_x else -1.0
+		_update_visual()
+
+
+func freeze(duration: float) -> void:
+	hit_stop = maxf(hit_stop, duration)
 
 
 func defeat() -> void:
@@ -64,8 +101,12 @@ func defeat() -> void:
 		return
 	mode = "dead"
 	collision_layer = 0
+	sprite.speed_scale = 1.0
+	sprite.play("hurt")
 	var tween: Tween = create_tween()
-	tween.tween_property(sprite, "scale", Vector2(1.4, 0.18), 0.13)
-	tween.tween_interval(0.28)
-	tween.tween_property(sprite, "modulate:a", 0.0, 0.15)
+	tween.tween_interval(0.16)
+	tween.tween_callback(func() -> void: sprite.play("death"))
+	tween.tween_property(sprite, "position:y", -14.0, 0.18).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(sprite, "position:y", 4.0, 0.25).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(sprite, "modulate:a", 0.0, 0.20)
 	tween.tween_callback(queue_free)
