@@ -106,11 +106,28 @@ func _check_simulation() -> void:
 	_check(evolved == Sim.advance_month(city), "月次処理は決定的")
 	_check(evolved.month == 1, "月の進行")
 	_check(evolved.money == city.money + evolved.income - evolved.expenses, "月次収支")
+	_check_current_expenses(city)
 	_check_growth_and_problems(city)
 	_check_disconnected_power(city)
 	_check_problem_regression(city)
 	_check_endings(city)
 	_check_save(city)
+
+
+func _check_current_expenses(city: Dictionary) -> void:
+	_check(city.expenses == 148, "新規都市は既設の道路と施設の維持費148を表示")
+	var original: Dictionary = city.duplicate(true)
+	var upkeep: Dictionary = {"power": 65, "park": 5, "police": 28, "fire": 24}
+	for kind: String in upkeep:
+		var built: Dictionary = Sim.place(city, Vector2i(8, 16), kind)
+		_check(built.expenses == 148 + upkeep[kind], kind + "建設直後に維持費が増える")
+		_check(built.money == city.money - Sim.COSTS[kind], kind + "建設時には建設費だけ支払う")
+		var removed: Dictionary = Sim.place(built, Vector2i(8, 16), "empty")
+		_check(removed.expenses == 148, kind + "撤去直後に維持費が戻る")
+		_check(built.expenses == 148 + upkeep[kind], kind + "撤去は元の状態を変更しない")
+		var next: Dictionary = Sim.advance_month(built)
+		_check(next.money == built.money - built.expenses, kind + "の維持費は翌月に一度だけ支払う")
+	_check(city == original, "維持費更新は入力の都市を変更しない")
 
 
 func _check_growth_and_problems(city: Dictionary) -> void:

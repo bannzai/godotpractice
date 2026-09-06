@@ -123,6 +123,7 @@ func _play() -> void:
 	needs = UI.label(screen, "", Rect2(980, 357, 265, 54), 16)
 	tax_label = UI.label(screen, "", Rect2(980, 421, 266, 26), 16)
 	var tax := HSlider.new()
+	tax.focus_mode = Control.FOCUS_NONE
 	tax_slider = tax
 	tax.position = Vector2(980, 459)
 	tax.size = Vector2(262, 22)
@@ -289,8 +290,24 @@ func _paint(point: Vector2) -> void:
 	var cell: Vector2i = view.screen_to_cell(point)
 	if cell == last_cell:
 		return
+	var current: Vector2i = last_cell
+	var distance: Vector2i = (cell - current).abs()
+	var moved: Vector2i = Vector2i.ZERO
+	if last_cell == Vector2i(-1, -1):
+		_place(cell)
+	else:
+		# 移動イベントが飛んでも、道路を上下左右で接続する通過セルを埋める。
+		while current != cell:
+			var cross_x: int = (2 * moved.x + 1) * distance.y
+			var cross_y: int = (2 * moved.y + 1) * distance.x
+			if current.x != cell.x and (current.y == cell.y or cross_x <= cross_y):
+				current.x += signi(cell.x - current.x)
+				moved.x += 1
+			else:
+				current.y += signi(cell.y - current.y)
+				moved.y += 1
+			_place(current)
 	last_cell = cell
-	_place(cell)
 
 
 func _place(cell: Vector2i) -> void:

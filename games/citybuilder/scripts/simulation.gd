@@ -56,7 +56,7 @@ static func new_city() -> Dictionary:
 	tiles[16 * SIZE + 11].kind = "park"
 	tiles[16 * SIZE + 13].kind = "police"
 	tiles[16 * SIZE + 15].kind = "fire"
-	return {
+	var result: Dictionary = {
 		"version": 1,
 		"tiles": tiles,
 		"money": 6000,
@@ -70,6 +70,8 @@ static func new_city() -> Dictionary:
 		"expenses": 0,
 		"demand": {"r": 60, "c": 40, "i": 50},
 	}
+	result.expenses = _expenses(result)
+	return result
 
 
 static func can_place(state: Dictionary, cell: Vector2i, kind: String) -> bool:
@@ -91,6 +93,7 @@ static func place(state: Dictionary, cell: Vector2i, kind: String) -> Dictionary
 		result.tiles[index] = {"terrain": "flat", "kind": kind, "level": 0, "age": 0}
 		result.money -= COSTS[kind]
 		_update_totals(result)
+		result.expenses = _expenses(result)
 		result.demand = _demand(result)
 	return result
 

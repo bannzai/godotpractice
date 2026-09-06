@@ -82,6 +82,13 @@ func _keyboard_and_mouse() -> void:
 	await _mouse_button(second, MOUSE_BUTTON_LEFT, false)
 	_check(_tile(Vector2i(8, 16)).kind == "residential", "マウス押下で建設")
 	_check(_tile(Vector2i(9, 16)).kind == "residential", "マウスドラッグで連続建設")
+	var fast_start: Vector2 = _point(Vector2i(8, 18))
+	var fast_end: Vector2 = _point(Vector2i(12, 18))
+	await _mouse_button(fast_start, MOUSE_BUTTON_LEFT, true)
+	await _motion(fast_end, fast_end - fast_start, MOUSE_BUTTON_MASK_LEFT)
+	await _mouse_button(fast_end, MOUSE_BUTTON_LEFT, false)
+	for x: int in range(8, 13):
+		_check(_tile(Vector2i(x, 18)).kind == "residential", "高速ドラッグの通過区画 %d,18" % x)
 	var zoom: float = main.view.zoom
 	await _key(KEY_EQUAL)
 	_check(main.view.zoom > zoom, "キーボードで拡大")
@@ -98,6 +105,11 @@ func _keyboard_and_mouse() -> void:
 	_check(main.view.pan.distance_to(pan) > 1.0, "右ドラッグでパン")
 	await _click(Vector2(1180, 470))
 	_check(city.state.tax > 9, "税率スライダーをマウスで操作")
+	var cursor_after_tax: Vector2i = main.view.cursor
+	await _key(KEY_RIGHT)
+	_check(main.view.cursor == cursor_after_tax + Vector2i.RIGHT, "税率操作直後も方向キーで地図移動")
+	await _pad(JOY_BUTTON_DPAD_LEFT)
+	_check(main.view.cursor == cursor_after_tax, "税率操作直後もパッドで地図移動")
 	await _key(KEY_E)
 	await _key(KEY_Q)
 	await _key(KEY_O)
