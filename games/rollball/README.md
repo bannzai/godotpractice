@@ -30,3 +30,5 @@
 - `make build-all GAMES=rollball` / `make build-web GAMES=rollball`: デスクトップ3種 / Web のエクスポート。
 
 素材の由来は `assets/CREDITS.md`、実装中の知見は `documents/knowledge/rollball.md` を参照してください。
+
+音声付きで `--quit-after N` を直接使う場合は、末尾に `-- --audio-stop-at-frame N` も付けてください。Godot が消費した終了フレームはスクリプトから取得できず、強制終了通知では音声の解放待ちもできないため、12フレーム前に再生を停止します。`make movie` 系の入口は両方を渡します。通常のウィンドウ終了は停止後に8フレーム待ってから終了します。

@@ -38,8 +38,9 @@ var title_elapsed: float = 0.0
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
-	var arguments: PackedStringArray = OS.get_cmdline_args()
-	var quit_index: int = arguments.find("--quit-after")
+	# --quit-after はエンジンが消費するため、録画入口から終了フレームを別途渡す。
+	var arguments: PackedStringArray = OS.get_cmdline_user_args()
+	var quit_index: int = arguments.find("--audio-stop-at-frame")
 	if quit_index >= 0 and quit_index + 1 < arguments.size():
 		quit_frame = int(arguments[quit_index + 1])
 		# 解放を待てないほど短い終了指定では、再生バッファを作らない。
@@ -373,7 +374,8 @@ func _set_music(kind: String) -> void:
 	music.stop()
 	music.stream = load("res://assets/audio/%s.wav" % kind)
 	music.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	music.stream.loop_end = music.stream.data.size() / 2 / (2 if music.stream.stereo else 1)
+	# インポート後は QOA 圧縮されるため、バイト数ではなく長さからサンプル数を求める。
+	music.stream.loop_end = roundi(music.stream.get_length() * music.stream.mix_rate)
 	music.volume_db = -28.0
 	music.play()
 	music_tween = create_tween()

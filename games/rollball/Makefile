@@ -75,7 +75,7 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/$(MOVIE_BASENAME).avi $(LOG_DIR)/$(MOVIE_BASENAME).mp4
-	"$(GODOT)" --path . $(WINDOWED_FLAGS) $(MOVIE_SCRIPT) --write-movie $(LOG_DIR)/$(MOVIE_BASENAME).avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/$(MOVIE_BASENAME).log 2>&1; \
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) $(MOVIE_SCRIPT) --write-movie $(LOG_DIR)/$(MOVIE_BASENAME).avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) -- --audio-stop-at-frame $(MOVIE_FRAMES) > $(LOG_DIR)/$(MOVIE_BASENAME).log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/$(MOVIE_BASENAME).log; \
 	tail -n 1 $(LOG_DIR)/$(MOVIE_BASENAME).log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/$(MOVIE_BASENAME).log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
