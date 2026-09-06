@@ -119,7 +119,7 @@ performance: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/performance.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	"$(GODOT)" --path . $(RUN_ARGS)
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。

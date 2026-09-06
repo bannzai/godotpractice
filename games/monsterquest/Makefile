@@ -95,7 +95,7 @@ check-shutdown: import
 	! grep -i -e WARNING -e ERROR -e 'resources still in use' $(LOG_DIR)/shutdown.log
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	"$(GODOT)" --path .
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。

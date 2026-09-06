@@ -111,7 +111,7 @@ shutdown-check: import
 	! grep -i -e 'WARNING' -e 'ERROR' -e 'ObjectDB instances were leaked' -e 'resources still in use' $(LOG_DIR)/shutdown-normal.log $(LOG_DIR)/shutdown-quit-after.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	"$(GODOT)" --path .
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。

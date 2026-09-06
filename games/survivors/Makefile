@@ -104,7 +104,7 @@ quitcheck: import
 	! grep -i -e 'WARNING' -e 'ERROR' -e 'instances were leaked' -e 'resources still in use' $(LOG_DIR)/quitcheck.log
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	"$(GODOT)" --path .
 
 # 通常の run 起動経路・音声ドライバでタイトルを撮り、終了時のログまで検査する。

@@ -73,7 +73,7 @@ movie: import
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	"$(GODOT)" --path .
 
 # 実入力を時刻ごとに投入した26秒のプレイ。起動だけの movie と別の検証成果物にする。

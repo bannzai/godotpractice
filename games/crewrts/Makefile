@@ -90,7 +90,7 @@ movie-play: import
 	ffmpeg -loglevel error -y -sseof -0.05 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/play-last.png
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
-run:
+run: import
 	@mkdir -p $(LOG_DIR)
 	"$(GODOT)" $(ENGINE_LOG) --path .
 
