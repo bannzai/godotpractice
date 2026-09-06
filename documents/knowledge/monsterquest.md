@@ -80,6 +80,18 @@ https://docs.godotengine.org/en/stable/classes/class_os.html#class-os-method-get
 - `make -C games/monsterquest movie-play` は26秒・30fps・780フレーム。初期条件だけコハネLv15・経験値179へ設定し、その後は実キーとマウスイベントで、タイトル→12歩移動→隊長対話→戦闘→成長→クリア→タイトルまで進める。セーブは読み書きしない。2秒間隔のPNGも同targetが生成する。
 - `make -C games/monsterquest run` で通常起動し、対象Godotプロセスのウィンドウとbootを確認して、そのプロセスだけへmacOSの通常終了要求を送った。makeはexit0で戻り、終了警告も無かった。ルートの `monsterquest-run` 追加PRが未マージのため、指示書にある代替コマンドを使用した。
 
+### Web と CI での検証結果
+
+- `polish/monsterquest` の実装コミット `1d33574` を webtunnel の Chromium / SwiftShader で実操作した。新規冒険のコハネLv5を使い、タイトル→町を移動→隊長対話→戦闘→全滅結果→タイトル復帰まで到達した。ゲーム状態の注入はしていない。各画面を撮影して目視し、ブラウザの例外とGodotの警告・エラーは無かった。終了後は `down monsterquest` でセッションを停止した。
+- 配信ポートは caller workflow の `port: "8000"` が正。参考例の8080へ開くと接続拒否になるため、対象workflowの値を先に確認する。canvasは1279×656で、1280×720のゲームは左右に余白を付けて表示された。
+- リモートのキー押下と解放の間に通信時間が入ると、長押し扱いで一入力が複数歩になった。経路を入力回数だけで断定せず、画像を見て位置を調整した。アニメーションの時間や滑らかさはローカルの30fps録画で確認する。
+- ローカルの `make test GAMES=monsterquest`、`make screenshot GAMES=monsterquest`、`make movie GAMES=monsterquest`、`make build-all GAMES=monsterquest`、`make build-web GAMES=monsterquest`、代替の `make -C games/monsterquest run` はすべてexit 0。通常終了と `--quit-after 1/8/40/150` でも音声リソースのリーク警告は無かった。
+- CI実行34025619470は全ジョブ成功。artifactのPNG36枚と5秒の起動mp4をダウンロードし、全PNG・動画の0/2/4秒・最終フレームを目視した。Xvfbの既知のV-Sync非対応警告は撮影・録画に各1件あり、それ以外のWARNING/ERRORと終了リークは無かった。
+
+検証実行:
+https://github.com/bannzai/godotpractice/actions/runs/34025619470
+https://github.com/bannzai/godotpractice/actions/runs/34025635603
+
 ### 共有ツールへの改善提案
 
 - godot-developmentに、描画付きのシート検査、実入力と時刻を固定したプレイ録画、音声ミキサーとMovie Makerで異なる終了処理を再利用できる形で追加したい。
