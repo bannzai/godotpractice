@@ -45,3 +45,11 @@
 - knowledge文書の変更でも現在の共有CIは全ゲームを対象にすることを初回CIで確認した。ゲーム個別のknowledgeだけを変更した際に対象ゲームへ絞る案を司令塔へ提案する。共有workflowは変更していない。
 
 ユーザーの判断を要する未解決の仕様分岐はなし。公開・マージ・Steamworks連携は依頼どおり行わない。
+
+## 通常起動の確認
+
+`games/survivors/Makefile` の `run` は `Godot --path .` のまま維持する。`make -C games/survivors run` でエディタを開かずゲーム用ウィンドウが生成され、起動ログに `survivors boot` が出ることを確認した。
+
+OS経由のウィンドウ撮影はこの環境で失敗したため、`SURVIVORS_RUN_CAPTURE=1 make -C games/survivors run` でも同じ起動経路を実行した。ゲーム自身のビューポートを `tmp/run-title.png` に保存し、タイトル画面を目視確認。exit 0 / runcheck OK、WARNING / ERRORなし。
+
+`run_capture.gd` はエディタバイナリで上記環境変数を指定した時だけ有効になり、撮影後に終了する。通常起動とエクスポートでは有効にならない。シーン・autoload変更後にも、個別ゲームのrunからウィンドウとタイトルを確認する。ルートのrunがmainへ入ったら `git fetch origin main` と `git merge origin/main` で取り込み、ルートの起動経路も確認する。

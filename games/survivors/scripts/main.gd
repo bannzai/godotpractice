@@ -67,6 +67,8 @@ func _ready() -> void:
 	add_child(controls)
 	_refresh_screen()
 	print("survivors boot")
+	if OS.has_feature("editor") and OS.get_environment("SURVIVORS_RUN_CAPTURE") == "1":
+		add_child(load("res://scripts/dev/run_capture.gd").new())
 
 
 func _exit_tree() -> void:
