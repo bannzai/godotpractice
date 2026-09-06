@@ -24,6 +24,15 @@
 - **備考**: 外部画像生成サービス・既存作品・既存録音は使用していない。再生成: python3 scripts/dev/generate_art.py。
 - **生成**: Codex による独自記述、Python と SVG / プロンプトの要点: 剣・盾・薬草・携行食・炎と転移の巻物・杖・階段・金貨を独立した 64 px SVG にする。
 
+- **素材名**: 強化装備の独立画像 (`sunblade.svg`, `ironshield.svg`)
+- **作者**: godotpractice プロジェクト
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/main/games/roguelike/scripts/dev/generate_art.py
+- **ライセンス**: 本プロジェクト独自制作。第三者素材の利用なし
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **備考**: 外部画像生成サービス・既存作品は使用していない。再生成: python3 scripts/dev/generate_art.py。
+- **生成**: Codex による独自記述、Python と SVG / プロンプトの要点: 暁の剣は二股の金刃と太陽形の鍔。古鉄の盾は大型の菱形金属盾と鋲。通常装備と輪郭で区別できる独立した64px SVG。
+
 ## 地形 (`assets/tiles/`)
 
 - **素材名**: 地下遺跡の石畳と壁 (`floor.svg`, `wall.svg`)

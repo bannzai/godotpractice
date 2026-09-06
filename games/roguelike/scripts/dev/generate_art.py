@@ -104,6 +104,20 @@ items={
 'stairs':path('M7 8L57 8 57 58 7 58Z','#101e2a')+path('M12 16L51 16 51 25 18 25 18 33 45 33 45 41 25 41 25 49 39 49','none','#8da79a',5)+line('M30 13L50 13','#d6bb79',2),
 'coin':ellipse(32,34,19,23,'url(#gold)','#78573a',2)+ellipse(32,32,14,17,'none','#fae2a0',2)+gem(32,32,9,'#8d633b'),
 }
+# 強化装備は色だけでなく、二股刃・放射状の鍔・大型菱形の輪郭で見分ける。
+items['sunblade'] = path('M18 42L38 10 49 5 44 19 56 11 52 26 28 48Z','url(#gold)')
+items['sunblade'] += path('M25 38L44 16 39 29 49 23 31 43Z','#fff0ba','#b88243',1)
+items['sunblade'] += path('M18 34L24 35 29 31 30 39 37 42 30 46 28 53 22 49 15 50 16 43 11 38Z','url(#gold)')
+items['sunblade'] += ellipse(24,42,7,7,'#bf8a43','#fff0ae',1)+gem(24,42,4,'#fff0b3')
+items['sunblade'] += line('M19 49L12 58','#947041',6)+line('M18 50L14 55','#f0d48b',2)
+items['sunblade'] += path('M8 55L14 52 18 58 12 62Z','url(#gold)',sw=1)
+items['ironshield'] = path('M32 3L59 25 48 46 32 62 16 46 5 25Z','url(#stone)')
+items['ironshield'] += path('M32 8L53 26 44 43 32 55 20 43 11 26Z','url(#bone)')
+items['ironshield'] += path('M32 14L46 27 40 40 32 48 24 40 18 27Z','url(#stone)')
+items['ironshield'] += line('M32 13V49M17 27H47','#889e98',3)+gem(32,28,8,'#caac71')
+for x,y in [(32,9),(11,25),(53,25),(20,43),(44,43),(32,55)]:
+    items['ironshield'] += ellipse(x,y,2,2,'#f1d799','#40535a',.7)
+items['ironshield'] += line('M41 17L37 22M19 31L23 36','#e1d1a4',1)
 for key,col in [('scroll_fire','#e9ad6d'),('scroll_warp','#8bd8cb')]:
     items[key]=path('M20 11L49 11 44 51 15 51Z','url(#bone)')+path('M17 9Q7 9 10 19L23 19Q18 9 27 9M16 46Q25 46 22 56L47 56Q54 48 46 46Z','url(#gold)')+gem(32,32,9,col)+line('M29 19L41 19M23 43L38 43','#7c8c7f')
 for key,body in items.items(): save('items/'+key+'.svg',ellipse(32,56,22,5,'#081523')+body,64,64)
@@ -171,4 +185,4 @@ body+=line('M44 145H598','#7e927f',1)+gem(325,145,6,'#d8bd7d')
 save('ui/logo.svg',body,680,180)
 body=line('M0 32H216M296 32H512','#7c927e')+path('M227 32L256 9 285 32 256 55Z','none','#ceac6f',2)+gem(256,32,9)
 save('ui/ornament.svg',body,512,64)
-print('画像素材 23 点を生成しました')
+print('画像素材 25 点を生成しました')

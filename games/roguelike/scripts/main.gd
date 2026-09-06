@@ -123,7 +123,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _step(direction: Vector2i) -> void:
-	run.move(direction)
+	if not run.move(direction):
+		board.refresh()
 	cooldown = 0.18
 
 

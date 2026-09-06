@@ -23,7 +23,17 @@ func _ready() -> void:
 	for kind: String in ["floor", "wall"]:
 		textures[kind] = load("res://assets/tiles/" + kind + ".svg")
 	for kind: String in [
-		"stairs", "weapon", "shield", "herb", "food", "scroll_fire", "scroll_warp", "wand", "coin"
+		"stairs",
+		"weapon",
+		"sunblade",
+		"shield",
+		"ironshield",
+		"herb",
+		"food",
+		"scroll_fire",
+		"scroll_warp",
+		"wand",
+		"coin"
 	]:
 		textures[kind] = load("res://assets/items/" + kind + ".svg")
 

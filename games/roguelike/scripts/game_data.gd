@@ -28,11 +28,11 @@ const FLOOR_ENEMIES: Array = [
 const ITEMS: Dictionary = {
 	"blade": {"image": "weapon", "name": "旅人の剣", "type": "weapon", "power": 4,
 		"description": "装備すると攻撃 +4。"},
-	"sunblade": {"image": "weapon", "name": "暁の剣", "type": "weapon", "power": 8,
+	"sunblade": {"image": "sunblade", "name": "暁の剣", "type": "weapon", "power": 8,
 		"description": "装備すると攻撃 +8。"},
 	"shield": {"image": "shield", "name": "木の盾", "type": "shield", "power": 2,
 		"description": "装備すると防御 +2。"},
-	"ironshield": {"image": "shield", "name": "古鉄の盾", "type": "shield", "power": 5,
+	"ironshield": {"image": "ironshield", "name": "古鉄の盾", "type": "shield", "power": 5,
 		"description": "装備すると防御 +5。"},
 	"herb": {"image": "herb", "name": "灯り草", "type": "heal", "power": 35,
 		"description": "HP を 35 回復する。"},

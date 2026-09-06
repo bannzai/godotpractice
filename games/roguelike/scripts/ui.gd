@@ -53,6 +53,7 @@ static func button(parent: Node, caption: String, rect: Rect2, action: Callable)
 	node.text = caption
 	node.position = rect.position
 	node.size = rect.size
+	node.pressed.connect(func() -> void: node.get_node("/root/Sound").play("select"))
 	node.pressed.connect(action)
 	parent.add_child(node)
 	return node
