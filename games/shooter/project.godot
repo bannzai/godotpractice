@@ -10,10 +10,14 @@ config_version=5
 
 [application]
 
-config/name="shooter"
+config/name="星環防衛線"
 config/version="0.1.0"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+GameState="*res://scripts/game_state.gd"
 
 [display]
 
@@ -27,3 +31,50 @@ window/stretch/aspect="keep"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[input]
+
+move_left={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":65), Object(InputEventKey,"physical_keycode":4194319), Object(InputEventJoypadButton,"button_index":13), Object(InputEventJoypadMotion,"axis":0,"axis_value":-1.0)]
+}
+
+move_right={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":68), Object(InputEventKey,"physical_keycode":4194321), Object(InputEventJoypadButton,"button_index":14), Object(InputEventJoypadMotion,"axis":0,"axis_value":1.0)]
+}
+
+move_up={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":87), Object(InputEventKey,"physical_keycode":4194320), Object(InputEventJoypadButton,"button_index":11), Object(InputEventJoypadMotion,"axis":1,"axis_value":-1.0)]
+}
+
+move_down={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":83), Object(InputEventKey,"physical_keycode":4194322), Object(InputEventJoypadButton,"button_index":12), Object(InputEventJoypadMotion,"axis":1,"axis_value":1.0)]
+}
+
+shoot={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":90), Object(InputEventKey,"physical_keycode":32), Object(InputEventJoypadButton,"button_index":0)]
+}
+
+bomb={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":88), Object(InputEventJoypadButton,"button_index":1)]
+}
+
+start={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":4194309), Object(InputEventJoypadButton,"button_index":0)]
+}
+
+pause={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":4194305), Object(InputEventJoypadButton,"button_index":6)]
+}
+
+fullscreen={
+"deadzone":0.22,
+"events":[Object(InputEventKey,"physical_keycode":4194342), Object(InputEventJoypadButton,"button_index":9)]
+}
