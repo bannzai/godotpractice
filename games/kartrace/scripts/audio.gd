@@ -15,7 +15,6 @@ var _tracks: Dictionary = {}
 var _initialized: bool = false
 var _stopped: bool = false
 var _enabled: bool = false
-var _quit_after: int = 0
 
 
 func _ready() -> void:
@@ -28,14 +27,6 @@ func _setup() -> void:
 		return
 	_initialized = true
 	_enabled = DisplayServer.get_name() != "headless"
-	var arguments: PackedStringArray = OS.get_cmdline_args()
-	for index: int in range(arguments.size()):
-		if arguments[index] == "--quit":
-			_quit_after = 1
-		elif arguments[index] == "--quit-after" and index + 1 < arguments.size():
-			_quit_after = maxi(0, arguments[index + 1].to_int())
-	if _quit_after > 0 and _quit_after <= 8:
-		_enabled = false
 	if not _enabled:
 		return
 	_music = AudioStreamPlayer.new()
@@ -110,17 +101,10 @@ func stop_all() -> void:
 	_tracks.clear()
 
 
-func _process(_delta: float) -> void:
-	if _enabled and not _stopped and _quit_after > 0:
-		if Engine.get_process_frames() >= maxi(1, _quit_after - 8):
-			stop_all()
-			# 自動終了は close 通知を通らないため、音声スレッドに解放時間を与える。
-			if not OS.has_feature("web"):
-				OS.delay_msec(150)
-
-
 func _exit_tree() -> void:
 	var was_playing: bool = _enabled and not _stopped
 	stop_all()
+	# 通常起動の --quit-after は close 通知を通らないので音声スレッドの解放を待つ。
+	# Movie Maker は同期混合のため、呼び出し側が終了フレームより前に stop_all() する。
 	if was_playing and not OS.has_feature("web"):
 		OS.delay_msec(150)

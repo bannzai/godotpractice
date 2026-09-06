@@ -16,6 +16,7 @@ func _initialize() -> void:
 	_check_items_and_drift()
 	_check_checkpoints_and_save()
 	_check_timestep_and_driving()
+	_check_routes_and_collisions()
 
 	if failed:
 		quit(1)
@@ -92,6 +93,9 @@ func _check_course() -> void:
 			_check(absf(object.lateral) < Course.ROAD_WIDTH * 0.5, "配置物が路面にある")
 	_check(Course.on_shortcut(105.0, -7.0), "内側のショートカットを認識")
 	_check(not Course.on_shortcut(10.0, -7.0), "通常区間はショートカットにならない")
+	_check(Course.is_on_surface(105.0, -8.0), "ショートカットの板上は路面")
+	_check(not Course.is_on_surface(160.0, 7.0), "柵のない本線の外は海")
+	_check(not Course.is_on_surface(118.0, -7.0), "板の終端の先は海")
 
 
 func _check_race() -> void:
@@ -197,6 +201,35 @@ func _check_items_and_drift() -> void:
 	state.free()
 
 
+func _check_routes_and_collisions() -> void:
+	for kind: int in range(State.KARTS.size()):
+		var state: Node = State.new()
+		state.save_enabled = false
+		state.selected_kart = kind
+		state.reset_race()
+		state.tick(3.0, 0.0, 0.0, false, false)
+		for racer: Dictionary in state.racers:
+			racer.progress = -float(racer.id) * 0.3
+			racer.lateral = 0.0
+		for _frame: int in range(4500):
+			var lateral: float = state.racers[0].lateral
+			state.tick(1.0 / 30.0, 1.0, clampf(-lateral * 0.5 - 0.08, -1.0, 1.0), false, true)
+			if state.phase == "results":
+				break
+		_check(state.phase == "results", "車種 %d は接触が続く密集スタートでも全車完走" % kind)
+		state.reset_race()
+		state.tick(3.0, 0.0, 0.0, false, false)
+		state.racers[0].progress = 95.0
+		state.racers[0].lateral = -4.0
+		state.racers[0].speed = 16.0
+		for _frame: int in range(35):
+			state.tick(1.0 / 60.0, 1.0, -1.0, false, false)
+		_check(Course.on_shortcut(state.racers[0].progress, state.racers[0].lateral),
+			"車種 %d はステア入力でショートカットへ入れる" % kind)
+		_check(state.racers[0].respawn_timer == 0.0, "板上を走っている間は落下しない")
+		state.free()
+
+
 func _check_checkpoints_and_save() -> void:
 	var state: Node = State.new()
 	state.reset_race()
@@ -215,4 +248,12 @@ func _check_checkpoints_and_save() -> void:
 	_check(State.parse_best("42") == 0.0, "文字列の保存タイムを除外")
 	_check(State.parse_best(INF) == 0.0, "無限大の保存タイムを除外")
 	_check(State.parse_best(42.5) == 42.5, "正しい保存タイムを復元")
+	state.save_enabled = false
+	state.elapsed = 45.0
+	state.racers[0].checkpoint_count = 11
+	state.racers[0].next_checkpoint = 3
+	state.racers[0].progress = Course.LENGTH * Course.LAPS + 1.0
+	state._update_checkpoints(0, Course.LENGTH * Course.LAPS - 1.0)
+	_check(state.best_time == 45.0 and state.racers[1].finish_time < 0.0,
+		"他車の完走待ちをせずプレイヤーのゴール時点でベストを確定")
 	state.free()

@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 ## 各モデルの形状と全部位アニメーションを同じ照明で撮影する。
 
 const MODEL: Script = preload("res://scripts/kart_visual.gd")
@@ -6,12 +6,9 @@ var _world: Node3D
 var _models: Array[Node3D] = []
 
 
-func _initialize() -> void:
-	call_deferred("_capture")
-
-
 # 描画フレームを進めて PNG を出力する開発用エントリーポイント。
-func _capture() -> void:
+func capture_frames(prefix: String = "res://tmp/screenshot-model") -> bool:
+	var root: Window = get_tree().root
 	root.size = Vector2i(1280, 720)
 	_world = Node3D.new()
 	root.add_child(_world)
@@ -46,17 +43,22 @@ func _capture() -> void:
 		for frame: int in range(3):
 			for model: Node3D in _models:
 				model.animation_player.play(state, 0.0)
-				model.animation_player.seek(float(frame) * 0.22, true)
+				model.animation_player.seek(
+					model.animation_player.get_animation(state).length * [0.0, 0.5, 0.95][frame], true)
 				model.animation_player.pause()
 				model.sparks.emitting = state == "drift"
 				model.boost_trail.emitting = state == "boost"
 				model.exhaust.emitting = state == "drive"
-			await create_timer(0.12).timeout
-			await process_frame
+			await get_tree().create_timer(0.12).timeout
+			await get_tree().process_frame
 			await RenderingServer.frame_post_draw
-			root.get_texture().get_image().save_png(
-				"res://tmp/model-%s-%d.png" % [state, frame])
+			var path: String = "%s-%s-%d.png" % [prefix, state, frame]
+			if root.get_texture().get_image().save_png(path) != OK:
+				push_error("モデル画像の保存失敗: " + path)
+				_world.queue_free()
+				return false
+			print("screenshot: " + path)
 	_world.queue_free()
-	await process_frame
+	await get_tree().process_frame
 	print("model gallery OK")
-	quit()
+	return true

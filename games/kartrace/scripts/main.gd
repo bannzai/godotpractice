@@ -52,7 +52,7 @@ func _ready() -> void:
 	print("kartrace boot")
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("fullscreen"):
 		var full: bool = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full
@@ -60,6 +60,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("mute"):
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 	if event.is_action_pressed("confirm") and state.phase in ["title", "results"]:
+		get_viewport().set_input_as_handled()
 		start_race()
 	if event.is_action_pressed("cancel"):
 		show_title()
@@ -84,6 +85,7 @@ func show_title() -> void:
 	hit_pause = 0
 	camera.h_offset = 0
 	camera.v_offset = 0
+	hud.refresh()
 
 
 func start_race() -> void:
@@ -94,6 +96,7 @@ func start_race() -> void:
 	audio.set_scene("race")
 	_update_racers()
 	_update_camera(1.0, true)
+	hud.refresh()
 
 
 func _reset_karts() -> void:
@@ -119,7 +122,7 @@ func _physics_process(delta: float) -> void:
 	if hit_pause > 0:
 		hit_pause -= delta
 	else:
-		state.tick(minf(delta, 0.05), Input.get_axis("brake", "accelerate"),
+		state.tick(delta, Input.get_axis("brake", "accelerate"),
 			Input.get_axis("steer_left", "steer_right"),
 			Input.is_action_pressed("drift"), Input.is_action_just_pressed("item"))
 	if state.phase == "title":
@@ -160,6 +163,10 @@ func _update_racers() -> void:
 
 
 func _update_camera(delta: float, snap: bool = false) -> void:
+	if state.phase == "results":
+		camera.position = Vector3(65, 22, -36)
+		camera.look_at(Vector3(30, 1, -5))
+		return
 	var racer: Dictionary = state.racers[0]
 	var tangent: Vector3 = Course.tangent(racer.progress)
 	var target: Vector3 = karts[0].position
@@ -176,15 +183,53 @@ func _update_weapons() -> void:
 	var count: int = state.projectiles.size() + state.obstacles.size()
 	while weapons.get_child_count() > count:
 		weapons.get_child(weapons.get_child_count() - 1).free()
-	while weapons.get_child_count() < count:
-		World.cylinder(weapons, Vector3.ZERO, 0.55, 0.8, Color("ffb96d"), 0.1)
 	var index: int = 0
 	for group: Array in [state.projectiles, state.obstacles]:
 		for shot: Dictionary in group:
-			var visual: Node3D = weapons.get_child(index)
+			var kind: String = "pulse" if index < state.projectiles.size() else "buoy"
+			var visual: Node3D
+			if index < weapons.get_child_count():
+				visual = weapons.get_child(index)
+				if visual.get_meta("kind") != kind:
+					visual.free()
+					visual = _make_weapon(kind)
+					weapons.move_child(visual, index)
+			else:
+				visual = _make_weapon(kind)
 			visual.position = World.point_at(shot.progress, shot.lateral) + Vector3.UP * 0.6
-			visual.rotation.y = clock * 6
+			visual.rotation.y = clock * 6 if kind == "pulse" else 0.0
 			index += 1
+
+
+# 発射・設置イベントの描画ノードを必要な数だけ作る。
+func _make_weapon(kind: String) -> Node3D:
+	var visual: Node3D = Node3D.new()
+	visual.set_meta("kind", kind)
+	weapons.add_child(visual)
+	var ring: MeshInstance3D = MeshInstance3D.new()
+	var torus: TorusMesh = TorusMesh.new()
+	torus.inner_radius = 0.35
+	torus.outer_radius = 0.6
+	torus.rings = 16
+	torus.ring_segments = 8
+	ring.mesh = torus
+	ring.material_override = World.material(Color("60ffe0") if kind == "pulse"
+		else Color("fff0bb"), true)
+	visual.add_child(ring)
+	if kind == "pulse":
+		ring.rotation.x = PI / 2
+		var core: MeshInstance3D = MeshInstance3D.new()
+		var sphere: SphereMesh = SphereMesh.new()
+		sphere.radius = 0.25
+		sphere.height = 0.5
+		core.mesh = sphere
+		core.material_override = World.material(Color("b7ffef"), true)
+		visual.add_child(core)
+	else:
+		World.cylinder(visual, Vector3.ZERO, 0.45, 0.85, Color("f48f66"), 0.18)
+		World.box(visual, Vector3(0, 0.7, 0), Vector3(0.05, 0.8, 0.05), Color("183e50"))
+		World.box(visual, Vector3(0.22, 0.94, 0), Vector3(0.4, 0.22, 0.05), Color("ffdd73"))
+	return visual
 
 
 func _effect(kind: String, racer: int) -> void:
@@ -215,6 +260,9 @@ func _effect(kind: String, racer: int) -> void:
 			hud.popup("チェックポイントへ復帰", true)
 		"start":
 			hud.popup("スタート！")
+		"goal":
+			hud.popup("ゴール！ ほかのカートの到着を待っています")
+			audio.play_sfx("finish")
 		"finish":
 			audio.play_sfx("finish")
 
@@ -222,6 +270,7 @@ func _effect(kind: String, racer: int) -> void:
 func _phase_changed() -> void:
 	if state.phase == "results":
 		audio.set_scene("results")
+		_update_camera(1.0, true)
 		camera.h_offset = 0
 		camera.v_offset = 0
 

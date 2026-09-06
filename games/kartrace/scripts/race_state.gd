@@ -99,10 +99,6 @@ func _tick_step(delta: float, throttle: float, steer: float, drift: bool, fire: 
 	_update_weapons(delta)
 	_check_collisions()
 	if racers.all(func(racer: Dictionary) -> bool: return racer.finish_time >= 0.0):
-		if best_time <= 0.0 or racers[0].finish_time < best_time:
-			best_time = racers[0].finish_time
-			if save_enabled:
-				save_best()
 		_set_phase("results")
 		effect.emit("finish", 0)
 
@@ -124,6 +120,10 @@ func results() -> Array[Dictionary]:
 			return a.finish_time >= 0.0
 		return a.progress > b.progress)
 	return order
+
+
+func box_available(index: int) -> bool:
+	return phase == "title" or elapsed >= float(_box_cooldowns.get(index, 0.0))
 
 
 # 消費入力は同じ引数でも所持品を消費するイベント。
@@ -233,7 +233,7 @@ func _drive(index: int, delta: float, throttle: float, steer: float, drift: bool
 				racer.speed *= 0.58
 				racer.invulnerable = 0.45
 				effect.emit("wall", index)
-		elif absf(racer.lateral) > 10.5 and not Course.on_shortcut(racer.progress, racer.lateral):
+		elif not Course.is_on_surface(racer.progress, racer.lateral):
 			respawn(index)
 			return
 	_update_checkpoints(index, previous)
@@ -288,6 +288,11 @@ func _update_checkpoints(index: int, previous: float) -> void:
 	if racer.checkpoint_count >= Course.LAPS * Course.CHECKPOINTS.size():
 		racer.finish_time = elapsed
 		racer.speed = 0.0
+		# 他車待ちの途中でタイトルへ戻っても、プレイヤーの完走記録は失わない。
+		if index == 0 and (best_time <= 0.0 or racer.finish_time < best_time):
+			best_time = racer.finish_time
+			if save_enabled:
+				save_best()
 		effect.emit("goal", index)
 	else:
 		racer.lap += 1
@@ -304,7 +309,7 @@ func _collect_track_objects(index: int, previous: float) -> void:
 		var box: Dictionary = Course.ITEM_BOXES[i]
 		var point: float = lap_start + box.progress
 		if previous < point and racer.progress >= point and absf(racer.lateral - box.lateral) < 1.7:
-			if racer.item == 0 and elapsed >= float(_box_cooldowns.get(i, 0.0)):
+			if racer.item == 0 and box_available(i):
 				racer.item = _rng.randi_range(1, 3)
 				_box_cooldowns[i] = elapsed + 2.0
 				effect.emit("pickup", index)
@@ -318,23 +323,27 @@ func _collect_track_objects(index: int, previous: float) -> void:
 
 # 飛翔体の積分と命中による消費を行うため非冪等。
 func _update_weapons(delta: float) -> void:
-	for weapons: Array[Dictionary] in [projectiles, obstacles]:
-		for i: int in range(weapons.size() - 1, -1, -1):
-			var weapon: Dictionary = weapons[i]
-			weapon.ttl -= delta
-			if weapons == projectiles:
-				weapon.progress += 42.0 * delta
-			for racer: Dictionary in racers:
-				if racer.id == weapon.owner or racer.finish_time >= 0.0:
-					continue
-				var gap: float = absf(wrapf(racer.progress - weapon.progress,
-					-Course.LENGTH * 0.5, Course.LENGTH * 0.5))
-				if gap < 2.2 and absf(racer.lateral - weapon.lateral) < 1.65:
-					hit(racer.id)
-					weapon.ttl = 0.0
-					break
-			if weapon.ttl <= 0.0:
-				weapons.remove_at(i)
+	_advance_weapons(projectiles, delta, 42.0)
+	_advance_weapons(obstacles, delta, 0.0)
+
+
+# 武器の時間経過と命中を処理するため非冪等。
+func _advance_weapons(weapons: Array[Dictionary], delta: float, speed: float) -> void:
+	for i: int in range(weapons.size() - 1, -1, -1):
+		var weapon: Dictionary = weapons[i]
+		weapon.ttl -= delta
+		weapon.progress += speed * delta
+		for racer: Dictionary in racers:
+			if racer.id == weapon.owner or racer.finish_time >= 0.0:
+				continue
+			var gap: float = absf(wrapf(racer.progress - weapon.progress,
+				-Course.LENGTH * 0.5, Course.LENGTH * 0.5))
+			if gap < 2.2 and absf(racer.lateral - weapon.lateral) < 1.65:
+				hit(racer.id)
+				weapon.ttl = 0.0
+				break
+		if weapon.ttl <= 0.0:
+			weapons.remove_at(i)
 
 
 # 接触イベントで速度を落とすため非冪等。接触直後の再適用は無敵時間で抑える。

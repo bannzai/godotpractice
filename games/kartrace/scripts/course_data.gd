@@ -42,6 +42,18 @@ static func on_shortcut(progress: float, lateral: float) -> bool:
 	)
 
 
+static func is_on_surface(progress: float, lateral: float) -> bool:
+	# 車体の半幅が残る間は端へ乗り上げられるが、路面のない海上は走れない。
+	const EDGE_ALLOWANCE: float = 0.55
+	if absf(lateral) <= ROAD_WIDTH * 0.5 + EDGE_ALLOWANCE:
+		return true
+	var local: float = fposmod(progress, LENGTH)
+	return (
+		local >= SHORTCUT.start - EDGE_ALLOWANCE and local <= SHORTCUT.end + EDGE_ALLOWANCE
+		and absf(lateral - SHORTCUT.lateral) <= SHORTCUT.width * 0.5 + EDGE_ALLOWANCE
+	)
+
+
 static func has_wall(progress: float, lateral: float) -> bool:
 	var local: float = fposmod(progress, LENGTH)
 	if local > 146.0 and local < 176.0:

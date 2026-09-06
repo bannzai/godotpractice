@@ -18,6 +18,7 @@ var result: Control
 var place: Label
 var lap: Label
 var timer: Label
+var lap_timer: Label
 var speed: Label
 var item: Label
 var item_icon: TextureRect
@@ -29,6 +30,7 @@ var choice: Label
 var cards: Array[Button] = []
 var map: Control
 var flash: ColorRect
+var result_reveal: float = 1.0
 var last_phase: String = ""
 var popup_tween: Tween
 
@@ -154,6 +156,7 @@ func _build_race() -> void:
 	lap = _label(race, "1 / 3 周", Vector2(57, 108), 21)
 	_panel(race, Rect2(475, 28, 330, 58))
 	timer = _label(race, "", Vector2(507, 38), 24)
+	lap_timer = _label(race, "", Vector2(505, 91), 19, INK)
 	_panel(race, Rect2(1018, 28, 232, 113))
 	item_icon = _image(race, "res://assets/items/turbo.svg", Rect2(1032, 44, 66, 66))
 	item = _label(race, "", Vector2(1103, 48), 19)
@@ -183,12 +186,17 @@ func _build_results() -> void:
 	_label(result, "レース結果", Vector2(472, 107), 48)
 	_image(result, "res://assets/ui/trophy.svg", Rect2(364, 97, 84, 84))
 	standings = _label(result, "", Vector2(370, 217), 26)
-	best = _label(result, "", Vector2(381, 463), 22, MINT)
+	best = _label(result, "", Vector2(381, 489), 22, MINT)
 	_button(result, "もう一度走る", Rect2(367, 532, 262, 66),
 		func() -> void: start_requested.emit())
 	_button(result, "タイトルへ", Rect2(649, 532, 262, 66),
 		func() -> void: title_requested.emit())
 	_label(result, "Enter / A 再走　Esc タイトル", Vector2(451, 625), 18)
+
+
+func _process(delta: float) -> void:
+	# 結果表示に入ってからタイムを数え上げる視覚演出。
+	result_reveal = minf(1.0, result_reveal + delta * 1.5)
 
 
 func refresh() -> void:
@@ -197,6 +205,8 @@ func refresh() -> void:
 	result.visible = state.phase == "results"
 	if state.phase != last_phase:
 		last_phase = state.phase
+		if state.phase == "results":
+			result_reveal = 0
 		_transition()
 	if menu.visible:
 		choice.text = ["しずく：加速と曲がりやすさが得意", "あかね：最高速で追い抜く", "すみれ：安定したハンドリング"][state.selected_kart]
@@ -207,12 +217,18 @@ func refresh() -> void:
 		place.text = "%d 位" % state.rank_of(0)
 		lap.text = "%d / 3 周" % mini(player.lap, 3)
 		timer.text = "タイム  %s" % format_time(state.elapsed)
+		var lap_seconds: float = state.elapsed - player.lap_started
+		if player.finish_time >= 0 and not player.lap_times.is_empty():
+			lap_seconds = player.lap_times.back()
+		lap_timer.text = "ラップ  " + format_time(lap_seconds)
 		speed.text = "%03d" % roundi(absf(player.speed) * 3.6)
 		item.text = ["パルス", "ブイ", "ターボ"][player.item - 1] if player.item > 0 else "空っぽ"
 		item_icon.visible = player.item > 0
 		if player.item > 0:
 			item_icon.texture = load("res://assets/items/%s.svg" % ITEMS[player.item - 1])
 		center.text = str(ceili(state.countdown)) if state.phase == "countdown" else ""
+		if player.finish_time >= 0:
+			center.text = "ゴール！"
 		if player.speed < -1:
 			center.text = "逆走中"
 		map.queue_redraw()
@@ -220,7 +236,8 @@ func refresh() -> void:
 		standings.text = ""
 		var row: int = 1
 		for racer: Dictionary in state.results():
-			standings.text += "%d位  %-8s   %s\n\n" % [row, racer.name, format_time(racer.finish_time)]
+			standings.text += "%d位  %-8s   %s\n\n" % [
+				row, racer.name, format_time(racer.finish_time * result_reveal)]
 			row += 1
 		best.text = "ベストタイム  " + format_time(state.best_time)
 
@@ -253,8 +270,8 @@ func popup(text: String, impact: bool = false) -> void:
 	popup_tween.tween_property(notice, "scale", Vector2.ONE, 0.2)
 	popup_tween.tween_property(notice, "modulate:a", 0.0, 0.5).set_delay(1.0)
 	if impact:
-		flash.color.a = 0.38
-		popup_tween.tween_property(flash, "color:a", 0.0, 0.2)
+		flash.color = Color(1.0, 0.94, 0.8, 0.38)
+	popup_tween.tween_property(flash, "color:a", 0.0, 0.2)
 
 
 func _transition() -> void:

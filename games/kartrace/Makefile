@@ -25,6 +25,7 @@ import:
 	"$(GODOT)" --log-file $(abspath $(LOG_DIR))/engine.log --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/import.log
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
@@ -35,7 +36,7 @@ check: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import
+selfcheck: import integration
 	"$(GODOT)" --log-file $(abspath $(LOG_DIR))/engine.log --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
@@ -47,7 +48,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -64,7 +65,7 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --log-file $(abspath $(LOG_DIR))/engine.log --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
+	"$(GODOT)" --log-file $(abspath $(LOG_DIR))/engine.log --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) --script res://scripts/dev/movie.gd > $(LOG_DIR)/movie.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
@@ -106,6 +107,22 @@ build-web: import
 	test -f build/web/index.pck
 
 build-all: build-macos build-windows build-linux
+
+# キーボードとパッドの実イベントで完走・再走を検証する。
+.PHONY: integration movie-play
+integration: import
+	"$(GODOT)" --log-file $(abspath $(LOG_DIR))/integration-engine.log --headless --fixed-fps 60 --path . --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1
+	grep -q 'integration OK' $(LOG_DIR)/integration.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
+
+# 実入力の25秒プレイ。終了前に音声停止と解放待ちを行う。
+movie-play: import
+	"$(GODOT)" --log-file $(abspath $(LOG_DIR))/demo-engine.log --path . $(WINDOWED_FLAGS) --fixed-fps 30 --write-movie $(LOG_DIR)/movie-play.avi --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1
+	grep -q 'demo OK' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf "fps=1/2,scale=384:-1,tile=4x4" -frames:v 1 $(LOG_DIR)/movie-play-frames.png
+	ffmpeg -loglevel error -y -sseof -0.1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
 
 clean:
 	rm -rf build $(LOG_DIR)

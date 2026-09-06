@@ -16,6 +16,7 @@ func _process(delta: float) -> void:
 	# 時間に沿う浮遊と回転なのでフレームごとに進める。
 	clock += delta
 	for index: int in range(boxes.size()):
+		boxes[index].visible = get_node("/root/RaceState").box_available(index)
 		boxes[index].rotation.y = clock * 1.2
 		boxes[index].position.y = Course.sample(Course.ITEM_BOXES[index].progress).y + 1.2
 		boxes[index].position.y += sin(clock * 2.5 + index) * 0.2
@@ -65,14 +66,14 @@ func _build_environment() -> void:
 	settings.background_color = Color("99d8e4")
 	settings.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	settings.ambient_light_color = Color("d5eef2")
-	settings.ambient_light_energy = 0.7
-	settings.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	settings.ambient_light_energy = 0.35
+	settings.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	environment.environment = settings
 	add_child(environment)
 	var sun: DirectionalLight3D = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -28, 0)
 	sun.light_color = Color("fff0d1")
-	sun.light_energy = 1.45
+	sun.light_energy = 0.85
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 110.0
 	add_child(sun)
@@ -139,9 +140,10 @@ func _build_track() -> void:
 	sign.text = "潮 風 カ ー ト"
 	sign.font_size = 72
 	sign.pixel_size = 0.015
-	sign.outline_size = 8
+	sign.outline_size = 4
+	sign.font = load("res://assets/fonts/MPLUSRounded1c-Medium.ttf")
 	sign.position = Vector3(0, 6, 0.44)
-	sign.rotation.y = PI
+	sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	gate.add_child(sign)
 	for row: int in range(2):
 		for col: int in range(12):
@@ -160,7 +162,7 @@ func _build_shortcut() -> void:
 
 
 static func point_at(distance: float, lateral: float) -> Vector3:
-	return Course.sample(distance) + Course.tangent(distance).cross(Vector3.UP) * lateral
+	return Course.sample(distance) + Course.right(distance) * lateral
 
 
 func _build_scenery() -> void:
