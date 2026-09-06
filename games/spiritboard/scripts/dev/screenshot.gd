@@ -1,43 +1,57 @@
 extends SceneTree
-## 実際の描画で代表画面を撮影する (headless では描画されないため、Makefile の screenshot target が
-## --headless なしで起動する)。撮影した PNG は tmp/screenshot-<名前>.png に保存し、失敗したら quit(1) で終わる。
-## ゲーム固有の状態作り (画面遷移・スコアの投入・操作の再現等) は _capture_scenes() に足す。
-## autoload は --script 起動でも root から取得できる。
+## 画面と動作の描画証拠を、本番シーンを通して作る。
+
+const AudioStop = preload("res://scripts/dev/audio_stop.gd")
+
+var main: Control
+var session: Node
+var failed: bool = false
 
 
 func _initialize() -> void:
-	# BGM の autoload やゲーム側の SE が撮影中に鳴らないよう Master バスをミュートする
-	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), true)
 	_run.call_deferred()
 
 
-## 時間経過と物理で画面を進めるため、同じ実行中に重ねて呼び出さない。
+# 撮影一式を一度だけ順番に進める。
 func _run() -> void:
-	if await _capture_scenes():
-		quit(0)
-
-
-## 撮影する画面の並び。雛形はメインシーン (タイトル) だけを撮る。失敗した撮影は _capture() が
-## quit(1) 済みなので、false を受けたらそのまま抜ける。
-func _capture_scenes() -> bool:
-	var main_scene_path: String = ProjectSettings.get_setting("application/run/main_scene")
-	var main: Node = load(main_scene_path).instantiate()
+	root.size = Vector2i(1280, 720)
+	session = root.get_node("Session")
+	session.save_enabled = false
+	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
-	await create_timer(0.5).timeout
-	if not await _capture("tmp/screenshot-title.png"):
-		return false
+	await _capture_scenes()
+	AudioStop.stop(root)
+	await create_timer(0.25).timeout
 	main.queue_free()
 	await process_frame
-	return true
+	quit(1 if failed else 0)
 
 
-func _capture(path: String) -> bool:
+func _capture_scenes() -> void:
+	await create_timer(0.8).timeout
+	await _capture("title")
+	session.new_run(222223)
+	await create_timer(0.8).timeout
+	await _capture("map")
+	var branch: int = 0 if session.run.nodes[0][0].kind == "battle" else 1
+	session.choose_node(branch)
+	await create_timer(0.8).timeout
+	await _capture("battle")
+	session.abandon_run()
+	await create_timer(0.8).timeout
+	await _capture("defeat")
+	session.to_title()
+	await create_timer(0.8).timeout
+	await _capture("return-title")
+
+
+func _capture(name: String) -> void:
 	await process_frame
-	await process_frame
-	var status: Error = root.get_viewport().get_texture().get_image().save_png(path)
+	await RenderingServer.frame_post_draw
+	var path: String = "res://tmp/screenshot-%s.png" % name
+	var status: Error = root.get_texture().get_image().save_png(path)
 	if status != OK:
-		push_error("スクリーンショット保存失敗: %s (%s)" % [path, error_string(status)])
-		quit(1)
-		return false
-	print("screenshot: " + path)
-	return true
+		push_error("撮影に失敗: %s" % name)
+		failed = true
+	else:
+		print("screenshot: " + path)
