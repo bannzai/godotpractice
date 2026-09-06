@@ -2,7 +2,7 @@ extends SceneTree
 ## シーン・クレジット・進行ロジック・入力設定の検証。
 ## release ビルドで assert が消えるため、明示的な判定と exit code で結果を返す。
 
-var failed := false
+var failed: bool = false
 
 
 func _initialize() -> void:
@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_check_timer_and_pause()
 	_check_stage_progression()
 	_check_input_actions()
+	_check_actor_animations()
 
 	if failed:
 		quit(1)
@@ -194,3 +195,52 @@ func _check_input_actions() -> void:
 		if event is InputEventKey:
 			has_f11 = has_f11 or event.physical_keycode == KEY_F11
 	_check(has_f11, "入力: 全画面切替は物理キーF11")
+	var left: InputEventKey = InputEventKey.new()
+	left.physical_keycode = KEY_LEFT
+	var right: InputEventKey = InputEventKey.new()
+	right.physical_keycode = KEY_RIGHT
+	_check(InputMap.action_has_event("move_left", left), "入力: 左矢印は左移動に割り当てる")
+	_check(InputMap.action_has_event("move_right", right), "入力: 右矢印は右移動に割り当てる")
+	_check(not InputMap.action_has_event("move_right", left), "入力: 左矢印で右移動しない")
+	_check(not InputMap.action_has_event("move_left", right), "入力: 右矢印で左移動しない")
+
+
+func _check_actor_animations() -> void:
+	var sheets: Array[Texture2D] = []
+	for kind: String in ["player", "walker", "shell"]:
+		var frames: SpriteFrames = ActorFrames.build(kind)
+		_check(frames.get_animation_names().size() >= 4, "%s: 4種類以上の動作" % kind)
+		var first: AtlasTexture = frames.get_frame_texture("idle", 0) as AtlasTexture
+		_check(first != null and first.atlas != null, "%s: 専用シートが存在する" % kind)
+		if first == null or first.atlas == null:
+			continue
+		_check(first.atlas not in sheets, "%s: 他キャラと画像を共有しない" % kind)
+		sheets.append(first.atlas)
+		for animation: StringName in frames.get_animation_names():
+			_check(frames.get_frame_count(animation) == 6,
+				"%s %s: 6フレームある" % [kind, animation])
+			_check(frames.get_animation_speed(animation) > 0,
+				"%s %s: 時間経過で再生する" % [kind, animation])
+			if animation in [&"hurt", &"death", &"stomp"]:
+				_check(not frames.get_animation_loop(animation),
+					"%s %s: 一度再生して終了する" % [kind, animation])
+			_check_animation_images(kind, animation, frames)
+
+
+func _check_animation_images(kind: String, animation: StringName, frames: SpriteFrames) -> void:
+	var distinct: Dictionary = {}
+	for index: int in frames.get_frame_count(animation):
+		var frame: AtlasTexture = frames.get_frame_texture(animation, index) as AtlasTexture
+		var label: String = "%s %s のフレーム %d" % [kind, animation, index]
+		_check(frame != null and frame.atlas != null, label + ": 画像をロードできる")
+		if frame == null or frame.atlas == null:
+			continue
+		var bounds: Rect2 = Rect2(Vector2.ZERO, frame.atlas.get_size())
+		var valid: bool = frame.region.has_area() and bounds.encloses(frame.region)
+		_check(valid, label + ": 切り出し矩形が画像内に収まる")
+		if not valid:
+			continue
+		var pixels: Image = frame.atlas.get_image().get_region(Rect2i(frame.region))
+		_check(pixels.get_used_rect().has_area(), label + ": 透明な空画像ではない")
+		distinct[hash(pixels.get_data())] = true
+	_check(distinct.size() == 6, "%s %s: 6枚すべての描画が異なる" % [kind, animation])

@@ -17,8 +17,15 @@ WINDOWED_FLAGS := --audio-driver Dummy --rendering-driver opengl3 --resolution 1
 WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpReliable'
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
+RUN_ARGS ?=
 
-.PHONY: import check selfcheck lint playcheck test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: assets import check selfcheck lint playcheck test screenshot movie movie-play exitcheck run build-macos build-windows build-linux build-web build-all clean
+
+# 従来素材に戻らないよう、品質向上後の生成を最後に適用する。
+assets:
+	python3 scripts/dev/generate_assets.py
+	python3 scripts/dev/generate_polish_art.py
+	python3 scripts/dev/generate_polish_audio.py
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -78,15 +85,36 @@ movie: import
 	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
 	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
-	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
+	ffmpeg -loglevel error -threads 2 -y -i $(LOG_DIR)/movie.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
+# 実入力で2ステージを走破する30秒の録画。通常の起動録画と分けて再現できる。
+movie-play: import
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --script res://scripts/dev/demo.gd --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --quit-after 900 > $(LOG_DIR)/movie-play.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
+	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
+	grep -q '^demo OK:' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -threads 2 -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf "fps=1/2,scale=384:216,tile=3x5" -frames:v 1 $(LOG_DIR)/movie-play-frames.png
+	ffmpeg -loglevel error -sseof -1 -y -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
+
+# メインシーンを差し替えず、ウィンドウを閉じる経路と --quit-after の終了を検査する。
+exitcheck: import
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --fixed-fps 60 -- --verify-close > $(LOG_DIR)/exit-normal.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/exit-normal.log
+	"$(GODOT)" $(ENGINE_LOG) --path . $(WINDOWED_FLAGS) --fixed-fps 60 --quit-after 120 > $(LOG_DIR)/exit-quit-after.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/exit-quit-after.log
+	grep -q '^exit=0$$' $(LOG_DIR)/exit-normal.log
+	grep -q '^exit=0$$' $(LOG_DIR)/exit-quit-after.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/exit-normal.log $(LOG_DIR)/exit-quit-after.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
 	@mkdir -p $(LOG_DIR)
-	"$(GODOT)" $(ENGINE_LOG) --path .
+	"$(GODOT)" $(ENGINE_LOG) --path . $(RUN_ARGS)
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
 # 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要

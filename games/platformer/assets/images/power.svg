@@ -1,5 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-      <path d="M16 1l12 9-3 16-9 5-9-5-3-16z" fill="#fef3b8" stroke="#f8b345" stroke-width="2"/>
-      <path d="M7 18l5-2 4-10 4 10 5 2-6 3-3 6-3-6z" fill="#33bdb6"/>
-      <path d="M12 16l4-10v12z" fill="#a9efcc"/>
-    </svg>
+<defs>
+  <linearGradient id="coat" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#ffe5a0"/><stop offset=".5" stop-color="#f5bd59"/>
+    <stop offset="1" stop-color="#d68c3a"/>
+  </linearGradient>
+  <linearGradient id="teal" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#98e6cd"/><stop offset=".55" stop-color="#48b8ae"/>
+    <stop offset="1" stop-color="#23898d"/>
+  </linearGradient>
+  <linearGradient id="coral" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#ffd09b"/><stop offset=".55" stop-color="#ef9471"/>
+    <stop offset="1" stop-color="#cf6658"/>
+  </linearGradient>
+  <linearGradient id="skin" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#fff0cb"/><stop offset="1" stop-color="#eab18b"/>
+  </linearGradient>
+  <linearGradient id="brass" x1="0" y1="0" x2=".9" y2="1">
+    <stop stop-color="#fff3b7"/><stop offset=".45" stop-color="#f9ce63"/>
+    <stop offset="1" stop-color="#cf873d"/>
+  </linearGradient>
+  <linearGradient id="rock" x1="0" y1="0" x2=".8" y2="1">
+    <stop stop-color="#548895"/><stop offset="1" stop-color="#294956"/>
+  </linearGradient>
+  <linearGradient id="dirt" x1="0" y1="0" x2="0" y2="1">
+    <stop stop-color="#bc8865"/><stop offset="1" stop-color="#916753"/>
+  </linearGradient>
+</defs>
+<path d="M16 1l11 7 3 15-14 8L2 23 3 8Z" fill="url(#brass)" stroke="#234751" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /><path d="M16 4l9 5 2 12-11 7L5 21 6 9Z" fill="#fff3c5" stroke="#d9a559" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" /><path d="M8 21l2-9 7-6 6 9-3 9Z" fill="url(#teal)" stroke="#234751" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" /><path d="M17 6l-3 10 6 8-10-12Z" fill="#baf2d3" stroke="#409c92" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" /><path d="M24 4.5Q25 7 27.5 8Q25 9 24 11.5Q23 9 20.5 8Q23 7 24 4.5Z" fill="#fff5d8" stroke="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /><path d="M7 24l4 2" fill="none" stroke="#fff5d8" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
