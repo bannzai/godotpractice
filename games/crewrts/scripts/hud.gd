@@ -1,17 +1,27 @@
 extends CanvasLayer
-## ゲーム状態を保持せず、モデルを日本語の操作案内と進捗へ写す。
+## モデルを表示へ写す。ここに保持する数値はカウント演出の途中値だけ。
 
 signal start_requested
 signal title_requested
 
-const INK: Color = Color("263f37")
-const MUTED: Color = Color("65776c")
-const PAPER: Color = Color(0.97, 0.96, 0.90, 0.95)
-const ORANGE: Color = Color("c95c35")
-const TEAL: Color = Color("237e80")
+const INK: Color = Color("244b3d")
+const MUTED: Color = Color("697761")
+const PAPER: Color = Color("fbf5e1")
+const ORANGE: Color = Color("bb5639")
+const TEAL: Color = Color("367e87")
+const GOLD: Color = Color("d3a449")
+const UI_THEME: Theme = preload("res://assets/ui/garden-theme.tres")
+const LOGO: Texture2D = preload("res://assets/ui/logo-mark.svg")
+const KEY_ART: Texture2D = preload("res://assets/ui/title-garden.svg")
+const RED_CREW: Texture2D = preload("res://assets/ui/crew-red.svg")
+const BLUE_CREW: Texture2D = preload("res://assets/ui/crew-blue.svg")
+const CRYSTAL: Texture2D = preload("res://assets/ui/crystal.svg")
+const SUN: Texture2D = preload("res://assets/ui/sun.svg")
+const WHISTLE: Texture2D = preload("res://assets/ui/whistle.svg")
 
 var _root: Control
 var _title: PanelContainer
+var _title_art: Control
 var _playing: Control
 var _result: PanelContainer
 var _pause: PanelContainer
@@ -21,9 +31,30 @@ var _progress: Label
 var _timer: Label
 var _crew: Label
 var _kind: Label
+var _following: Label
+var _red_count: Label
+var _blue_count: Label
+var _red_card: PanelContainer
+var _blue_card: PanelContainer
 var _result_heading: Label
 var _result_body: Label
+var _result_stamp: Label
+var _time_bar: ProgressBar
+var _toast: PanelContainer
+var _toast_label: Label
+var _toast_icon: TextureRect
+var _flash: ColorRect
+var _curtain: ColorRect
+var _gems: Array[TextureRect] = []
 var _phase: String = ""
+var _targets: Dictionary = {}
+var _display_values: Dictionary = {}
+var _number_tweens: Dictionary = {}
+var _button_tweens: Dictionary = {}
+var _screen_tween: Tween
+var _toast_tween: Tween
+var _flash_tween: Tween
+var _art_tween: Tween
 
 
 func setup(font: Font) -> void:
@@ -33,16 +64,16 @@ func setup(font: Font) -> void:
 	_root = Control.new()
 	_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ui_theme: Theme = Theme.new()
-	ui_theme.default_font = font
-	ui_theme.default_font_size = 16
-	ui_theme.set_color("font_color", "Label", INK)
-	_root.theme = ui_theme
+	_root.theme = UI_THEME.duplicate()
+	_root.theme.default_font = font
 	add_child(_root)
 	_build_title()
 	_build_playing()
+	_curtain = _overlay(Color(0.06, 0.16, 0.11, 0.42))
+	_curtain.visible = false
 	_build_result()
 	_build_pause()
+	_build_effects()
 
 
 func refresh(model: Node) -> void:
@@ -51,104 +82,280 @@ func refresh(model: Node) -> void:
 	var goal: int = int(model.get("goal"))
 	var remaining: int = maxi(0, ceili(float(model.get("remaining"))))
 	var crew: Array = model.get("crew")
-	var living: int = crew.size()
-	_progress.text = "回収した結晶   %d / %d" % [collected, goal]
-	_timer.text = "日暮れまで   %02d:%02d" % [remaining / 60, remaining % 60]
+	_count_to("progress", _progress, collected, "", " / %d" % goal)
+	_timer.text = "%02d:%02d" % [remaining / 60, remaining % 60]
 	_timer.add_theme_color_override("font_color", ORANGE if remaining < 60 else INK)
-	_crew.text = "隊列 %d 人  /  仲間 %d 人" % [int(model.call("following_count")), living]
-	var red_selected: bool = int(model.get("selected_kind")) == 0
-	_kind.text = "● 朱の仲間  /  攻撃が得意" if red_selected else "● 青の仲間  /  運搬が得意"
-	_kind.add_theme_color_override("font_color", ORANGE if red_selected else TEAL)
+	_time_bar.max_value = float(model.DAY_SECONDS)
+	_time_bar.value = float(model.get("remaining"))
+	_refresh_crew(model, crew)
+	for index: int in range(_gems.size()):
+		_gems[index].modulate = Color.WHITE if index < collected else Color(0.65, 0.64, 0.51, 0.3)
 	_result_heading.text = "おかえりなさい！" if phase == "clear" else "今日の探索はここまで"
+	_result_stamp.text = "探索達成" if phase == "clear" else "探索終了"
 	_result_body.text = "結晶を %d / %d 個 回収\n帰ってきた仲間  %d 人\n\n%s" % [
-		collected, goal, living,
+		collected, goal, crew.size(),
 		"みんなの力で、庭の宝物が集まりました。" if phase == "clear"
-		else "仲間を集めて、もう一度出かけましょう。"]
-	if _phase == phase:
-		return
-	_phase = phase
-	_title.visible = phase == "title"
-	_playing.visible = phase == "playing"
-	_result.visible = phase == "clear" or phase == "failed"
-	if phase == "title":
-		_start.grab_focus()
-	elif _result.visible:
-		_retry.grab_focus()
-	else:
-		_root.get_viewport().gui_release_focus()
+		else "次はどの結晶から運びましょう？\n仲間と一緒に、もう一度出発。"]
+	if _phase != phase:
+		_show_phase(phase)
 
 
 func set_paused(value: bool) -> void:
 	_pause.visible = value
+	_curtain.visible = value or _result.visible
 
 
-# 画面構築はノードを追加するため非冪等。setup の生成済みガード内から一度だけ呼ぶ。
+## イベントごとに演出を再生するため非冪等。ゲーム状態は変更しない。
+func notify_event(event: String) -> void:
+	match event:
+		"delivery":
+			_show_toast("結晶を回収！ 新しい仲間が到着", CRYSTAL, INK)
+			_screen_flash(Color(1.0, 0.86, 0.4, 0.2))
+		"defeat":
+			_show_toast("庭の道が開けました", RED_CREW, ORANGE)
+		"lost":
+			_show_toast("仲間を失った！ 笛で隊列を集めよう", WHISTLE, ORANGE)
+			_screen_flash(Color(0.87, 0.25, 0.13, 0.18))
+		"whistle":
+			_show_toast("笛の届く仲間が集まります", WHISTLE, TEAL)
+
+
+func _refresh_crew(model: Node, crew: Array) -> void:
+	var red: int = 0
+	for member: Dictionary in crew:
+		if int(member.kind) == 0:
+			red += 1
+	_count_to("following", _following, int(model.call("following_count")))
+	_count_to("red", _red_count, red, "", " 人")
+	_count_to("blue", _blue_count, crew.size() - red, "", " 人")
+	_crew.text = "人が隊列にいます  /  仲間 %d 人" % crew.size()
+	var selected: bool = int(model.get("selected_kind")) == 0
+	_kind.text = "朱を投げる  /  Tab・X で切替" if selected else "青を投げる  /  Tab・X で切替"
+	_kind.add_theme_color_override("font_color", ORANGE if selected else TEAL)
+	_red_card.modulate = Color.WHITE if selected else Color(0.83, 0.83, 0.77)
+	_blue_card.modulate = Color(0.83, 0.83, 0.77) if selected else Color.WHITE
+
+
+## 表示対象が変わった時だけ Tween を開始し、同一状態の refresh では作り直さない。
+func _count_to(key: String, label: Label, target: int, prefix: String = "",
+		suffix: String = "") -> void:
+	if _targets.has(key) and int(_targets[key]) == target:
+		return
+	if _number_tweens.has(key) and _number_tweens[key].is_valid():
+		_number_tweens[key].kill()
+	var previous: float = float(_display_values.get(key, target))
+	_targets[key] = target
+	if not _display_values.has(key) or _phase != "playing":
+		_write_number(float(target), key, label, prefix, suffix)
+		return
+	var tween: Tween = create_tween()
+	_number_tweens[key] = tween
+	tween.tween_method(_write_number.bind(key, label, prefix, suffix), previous,
+		float(target), 0.32).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+func _write_number(value: float, key: String, label: Label, prefix: String,
+		suffix: String) -> void:
+	_display_values[key] = value
+	label.text = prefix + str(roundi(value)) + suffix
+
+
+func _show_phase(phase: String) -> void:
+	_phase = phase
+	if is_instance_valid(_screen_tween) and _screen_tween.is_valid():
+		_screen_tween.kill()
+	if is_instance_valid(_art_tween) and _art_tween.is_valid():
+		_art_tween.kill()
+	_title.visible = phase == "title"
+	_title_art.visible = phase == "title"
+	_playing.visible = phase == "playing"
+	_result.visible = phase == "clear" or phase == "failed"
+	_curtain.visible = _result.visible
+	_toast.visible = false
+	var target: Control = _playing
+	if phase == "title":
+		target = _title
+		_start.grab_focus()
+		_title_art.position = Vector2(545, 72)
+		_art_tween = create_tween().set_loops()
+		_art_tween.tween_property(_title_art, "position:y", 64.0, 2.6).set_trans(Tween.TRANS_SINE)
+		_art_tween.tween_property(_title_art, "position:y", 72.0, 2.6).set_trans(Tween.TRANS_SINE)
+	elif _result.visible:
+		target = _result
+		_retry.grab_focus()
+	else:
+		_root.get_viewport().gui_release_focus()
+	var settled: Vector2 = target.get_meta("settled_position", target.position)
+	target.set_meta("settled_position", settled)
+	target.position = settled + Vector2(0, 14)
+	target.modulate.a = 0.0
+	_screen_tween = create_tween().set_parallel(true)
+	_screen_tween.tween_property(target, "modulate:a", 1.0, 0.36)
+	_screen_tween.tween_property(target, "position", settled, 0.42).set_trans(
+		Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## トーストは最新の出来事へ切り替え、古い Tween を終了して表示の競合を防ぐ。
+func _show_toast(message: String, icon: Texture2D, color: Color) -> void:
+	if is_instance_valid(_toast_tween) and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_label.text = message
+	_toast_label.add_theme_color_override("font_color", color)
+	_toast_icon.texture = icon
+	_toast.visible = true
+	_toast.position = Vector2(415, 16)
+	_toast.modulate.a = 0.0
+	_toast_tween = create_tween()
+	_toast_tween.set_parallel(true)
+	_toast_tween.tween_property(_toast, "modulate:a", 1.0, 0.16)
+	_toast_tween.tween_property(_toast, "position:y", 30.0, 0.22).set_trans(Tween.TRANS_BACK)
+	_toast_tween.chain().tween_interval(2.3)
+	_toast_tween.chain().tween_property(_toast, "modulate:a", 0.0, 0.3)
+	_toast_tween.chain().tween_callback(_toast.hide)
+
+
+## 被弾と回収の短いフラッシュはイベント発生ごとに再生する。
+func _screen_flash(color: Color) -> void:
+	if is_instance_valid(_flash_tween) and _flash_tween.is_valid():
+		_flash_tween.kill()
+	_flash.color = color
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(_flash, "color:a", 0.0, 0.3)
+
+
+# 画面構築はノードを追加するため非冪等。setup の生成済みガード内で一度だけ呼ぶ。
 func _build_title() -> void:
-	_title = _panel(_root, Vector2(48, 32), Vector2(480, 656))
-	var box: VBoxContainer = _column(_title, 12)
-	box.add_theme_constant_override("separation", 10)
-	_label(box, "庭の調査記録  /  01", 15, TEAL)
-	var heading: Label = _label(box, "こもれび\n回収隊", 56)
+	_title = _panel(_root, Vector2(40, 34), Vector2(450, 652))
+	var box: VBoxContainer = _column(_title, 8, 10)
+	_label(box, "庭の調査記録  /  はじまりの朝", 14, MUTED)
+	var heading_row: HBoxContainer = _row(box, 8)
+	var heading: Label = _label(heading_row, "こもれび\n回収隊", 58)
 	heading.add_theme_constant_override("line_spacing", -10)
-	_label(box, "小さな仲間と、大きな冒険。", 20)
-	_label(box, "日暮れまでに結晶を 5 個、拠点へ。\n仲間を投げて任せ、笛で呼び戻そう。", 16, MUTED)
-	_start = _button(box, "庭へ出発する   →", ORANGE)
-	_start.custom_minimum_size.y = 54
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_icon(heading_row, LOGO, Vector2(86, 86))
+	_label(box, "小さな仲間と、大きな冒険。", 20, INK)
+	_label(box, "日暮れまでに、結晶を 5 個。\n仲間を投げて任せ、笛で呼び戻そう。", 16, MUTED)
+	var team: HBoxContainer = _row(box, 16)
+	var red: HBoxContainer = _row(team, 3)
+	_icon(red, RED_CREW, Vector2(56, 62))
+	_label(red, "朱の仲間\n攻撃が得意", 14, ORANGE)
+	var blue: HBoxContainer = _row(team, 3)
+	_icon(blue, BLUE_CREW, Vector2(56, 62))
+	_label(blue, "青の仲間\n運搬が得意", 14, TEAL)
+	_start = _button(box, "庭へ出発する    →", INK)
+	_start.custom_minimum_size.y = 57
 	_start.pressed.connect(func() -> void: start_requested.emit())
-	_label(box, "移動  WASD / 左スティック\n視点  Q・E / 右スティック"
-		+ "\n投げる  左クリック・Space / A\n笛  右クリック・Shift / B", 14, MUTED)
-	_label(box, "解散  R / Y    種類切替  Tab / X\n休憩  Esc / Start    全画面  F11    出発  Enter", 13, MUTED)
-	var space: Control = Control.new()
-	space.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	space.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(space)
-	_label(box, "素材: 独自生成 / 書体: M PLUS Rounded 1c (OFL)", 11, MUTED)
+	_label(box, "Enter / A ボタンでも出発", 12, MUTED).horizontal_alignment = \
+		HORIZONTAL_ALIGNMENT_CENTER
+	_label(box, "移動  WASD / 左スティック    視点  Q E / 右スティック\n"
+		+ "投げる  左クリック・Space / A    笛  右クリック・Shift / B\n"
+		+ "解散  R / Y    切替  Tab / X    休憩  Esc / Start", 12, MUTED)
+	_spacer(box)
+	_label(box, "全画面 F11   /   書体 M PLUS Rounded 1c (OFL)", 10, MUTED)
+	_title_art = Control.new()
+	_title_art.position = Vector2(545, 72)
+	_title_art.size = Vector2(660, 550)
+	_title_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_title_art)
+	var art: TextureRect = _icon(_title_art, KEY_ART, Vector2(660, 490))
+	art.position = Vector2.ZERO
+	var caption: PanelContainer = _panel(_title_art, Vector2(128, 475), Vector2(410, 64))
+	caption.add_theme_stylebox_override("panel", _style(INK, 32, 12))
+	var line: Label = _label(caption, "ひとりでは運べない宝物が、待っている。", 16, PAPER)
+	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
-# 画面構築はノード追加を伴うため一度だけ呼ぶ。
 func _build_playing() -> void:
 	_playing = Control.new()
 	_playing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_playing.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_playing)
-	var top: PanelContainer = _panel(_playing, Vector2(28, 24), Vector2(1224, 76))
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row: HBoxContainer = HBoxContainer.new()
-	row.add_theme_constant_override("separation", 30)
-	top.add_child(row)
-	_label(row, "こもれび回収隊", 23)
-	_progress = _label(row, "", 22, TEAL)
-	_progress.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_timer = _label(row, "", 20)
-	var guide: PanelContainer = _panel(_playing, Vector2(956, 124), Vector2(296, 142))
-	guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var guide_box: VBoxContainer = _column(guide, 0)
-	_label(guide_box, "庭の歩き方", 17, TEAL)
-	_label(guide_box, "結晶へ照準 → 必要な人数を投げる\n青の仲間は運搬が速い\n笛で仕事中の仲間も集合", 14, MUTED)
-	var team: PanelContainer = _panel(_playing, Vector2(28, 548), Vector2(344, 96))
-	team.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var team_box: VBoxContainer = _column(team, 0)
-	_crew = _label(team_box, "", 19)
-	_kind = _label(team_box, "", 17, ORANGE)
-	var footer: PanelContainer = _panel(_playing, Vector2(28, 658), Vector2(1224, 42))
-	footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_build_progress()
+	_build_timer()
+	_build_team()
+	var guide: PanelContainer = _panel(_playing, Vector2(982, 522), Vector2(270, 116))
+	var guide_box: VBoxContainer = _column(guide, 0, 4)
+	_label(guide_box, "回収のコツ", 15, INK)
+	_label(guide_box, "結晶の数字だけ仲間を投げよう。\n青は運搬、朱は戦いが得意。\n仕事中でも、笛で集合！", 13, MUTED)
+	var footer: PanelContainer = _panel(_playing, Vector2(28, 657), Vector2(1224, 42))
+	footer.add_theme_stylebox_override("panel", _style(Color(0.11, 0.24, 0.18, 0.92), 16, 8))
 	var help: Label = _label(footer,
-		"移動 WASD / 左スティック     視点 Q E / 右スティック     投げる 左クリック / A"
-		+ "     笛 右クリック / B     解散 R / Y     切替 Tab / X     休憩 Esc / Start", 13)
+		"移動 WASD / 左スティック    視点 Q E / 右スティック    投げる 左クリック・Space / A"
+		+ "    笛 右クリック・Shift / B    解散 R / Y    休憩 Esc / Start", 12, PAPER)
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
-# 画面構築はノード追加を伴うため一度だけ呼ぶ。
+func _build_progress() -> void:
+	var panel: PanelContainer = _panel(_playing, Vector2(28, 24), Vector2(304, 123))
+	var box: VBoxContainer = _column(panel, 0, 0)
+	_label(box, "今日の目標  /  結晶を拠点へ", 13, MUTED)
+	var row: HBoxContainer = _row(box, 12)
+	_icon(row, CRYSTAL, Vector2(47, 47))
+	_progress = _label(row, "", 35, INK)
+	var gems: HBoxContainer = _row(box, 6)
+	_label(gems, "回収記録", 11, MUTED)
+	for index: int in range(5):
+		_gems.append(_icon(gems, CRYSTAL, Vector2(23, 23)))
+
+
+func _build_timer() -> void:
+	var panel: PanelContainer = _panel(_playing, Vector2(1016, 24), Vector2(236, 110))
+	var box: VBoxContainer = _column(panel, 0, 3)
+	var row: HBoxContainer = _row(box, 11)
+	_icon(row, SUN, Vector2(42, 42))
+	var time_box: VBoxContainer = _column(row, 0, 0)
+	_label(time_box, "日暮れまで", 12, MUTED)
+	_timer = _label(time_box, "", 30)
+	_time_bar = ProgressBar.new()
+	_time_bar.custom_minimum_size = Vector2(194, 7)
+	_time_bar.show_percentage = false
+	_time_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_time_bar.add_theme_stylebox_override("fill", _style(GOLD, 4, 0))
+	box.add_child(_time_bar)
+
+
+func _build_team() -> void:
+	var team: PanelContainer = _panel(_playing, Vector2(28, 479), Vector2(398, 159))
+	var box: VBoxContainer = _column(team, 0, 2)
+	var row: HBoxContainer = _row(box, 8)
+	_following = _label(row, "", 28)
+	_crew = _label(row, "", 13, MUTED)
+	_crew.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var cards: HBoxContainer = _row(box, 8)
+	_red_card = _crew_card(cards, RED_CREW, ORANGE, "朱 / 攻撃")
+	_red_count = _red_card.get_meta("count_label")
+	_blue_card = _crew_card(cards, BLUE_CREW, TEAL, "青 / 運搬")
+	_blue_count = _blue_card.get_meta("count_label")
+	_kind = _label(box, "", 12, ORANGE)
+
+
+func _crew_card(parent: Node, texture: Texture2D, color: Color, title: String) -> PanelContainer:
+	var card: PanelContainer = _panel(parent, Vector2.ZERO, Vector2.ZERO)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var style: StyleBoxFlat = _style(color.lightened(0.82), 12, 5)
+	style.border_color = color.lightened(0.45)
+	style.set_border_width_all(1)
+	card.add_theme_stylebox_override("panel", style)
+	var row: HBoxContainer = _row(card, 4)
+	_icon(row, texture, Vector2(49, 51))
+	var box: VBoxContainer = _column(row, 0, 0)
+	_label(box, title, 11, color)
+	card.set_meta("count_label", _label(box, "", 19, color))
+	return card
+
+
 func _build_result() -> void:
-	_result = _panel(_root, Vector2(390, 136), Vector2(500, 448))
-	var box: VBoxContainer = _column(_result, 24)
-	box.add_theme_constant_override("separation", 20)
-	_label(box, "庭の調査記録  /  探索結果", 16, TEAL)
-	_result_heading = _label(box, "", 30)
+	_result = _panel(_root, Vector2(380, 105), Vector2(520, 510))
+	var box: VBoxContainer = _column(_result, 14, 12)
+	var row: HBoxContainer = _row(box, 12)
+	_icon(row, LOGO, Vector2(68, 68))
+	var intro: VBoxContainer = _column(row, 0, 2)
+	_label(intro, "庭の調査記録", 13, MUTED)
+	_result_stamp = _label(intro, "", 23, ORANGE)
+	_result_heading = _label(box, "", 28)
 	_result_body = _label(box, "", 17, MUTED)
 	_result_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_retry = _button(box, "もう一度、庭へ", ORANGE)
+	_retry = _button(box, "もう一度、庭へ    →", INK)
 	_retry.pressed.connect(func() -> void: start_requested.emit())
 	var back: Button = _button(box, "タイトルへ戻る", TEAL)
 	back.pressed.connect(func() -> void: title_requested.emit())
@@ -156,37 +363,57 @@ func _build_result() -> void:
 	back.focus_neighbor_top = _retry.get_path()
 
 
-# 画面構築はノード追加を伴うため一度だけ呼ぶ。
 func _build_pause() -> void:
-	_pause = _panel(_root, Vector2(440, 288), Vector2(400, 144))
-	var box: VBoxContainer = _column(_pause, 12)
-	_label(box, "ひとやすみ", 32).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label(box, "Esc / Start で探索を再開", 17, MUTED).horizontal_alignment = \
+	_pause = _panel(_root, Vector2(420, 258), Vector2(440, 204))
+	var box: VBoxContainer = _column(_pause, 12, 12)
+	_label(box, "ひとやすみ", 34).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label(box, "庭の時間も、ひと休み。", 16, MUTED).horizontal_alignment = \
+		HORIZONTAL_ALIGNMENT_CENTER
+	_label(box, "Esc / Start で探索を再開", 16, TEAL).horizontal_alignment = \
 		HORIZONTAL_ALIGNMENT_CENTER
 	_pause.visible = false
 
 
-# 以下の構築ヘルパーは呼び出しごとに別の表示要素を生成するため非冪等。
+func _build_effects() -> void:
+	_flash = _overlay(Color.TRANSPARENT)
+	_toast = _panel(_root, Vector2(415, 30), Vector2(450, 64))
+	_toast.add_theme_stylebox_override("panel", _style(PAPER, 30, 12))
+	var row: HBoxContainer = _row(_toast, 10)
+	_toast_icon = _icon(row, CRYSTAL, Vector2(38, 38))
+	_toast_label = _label(row, "", 16)
+	_toast_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_toast.visible = false
+
+
+# 構築ヘルパーは呼び出しごとに別の表示要素を生成するため非冪等。
 func _panel(parent: Node, position: Vector2, dimensions: Vector2) -> PanelContainer:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.position = position
 	panel.size = dimensions
-	panel.add_theme_stylebox_override("panel", _style(PAPER, 20, 18))
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(panel)
 	return panel
 
 
-func _column(parent: Node, inset: int) -> VBoxContainer:
+func _column(parent: Node, inset: int, separation: int = 8) -> VBoxContainer:
 	var margin: MarginContainer = MarginContainer.new()
 	for side: String in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, inset)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(margin)
 	var column: VBoxContainer = VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation", separation)
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(column)
 	return column
+
+
+func _row(parent: Node, separation: int) -> HBoxContainer:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", separation)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(row)
+	return row
 
 
 func _label(parent: Node, text: String, font_size: int, color: Color = INK) -> Label:
@@ -199,28 +426,73 @@ func _label(parent: Node, text: String, font_size: int, color: Color = INK) -> L
 	return label
 
 
+func _icon(parent: Node, texture: Texture2D, dimensions: Vector2) -> TextureRect:
+	var icon: TextureRect = TextureRect.new()
+	icon.texture = texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.custom_minimum_size = dimensions
+	icon.size = dimensions
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	parent.add_child(icon)
+	return icon
+
+
+func _spacer(parent: Node) -> void:
+	var spacer: Control = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(spacer)
+
+
+func _overlay(color: Color) -> ColorRect:
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = color
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(overlay)
+	return overlay
+
+
 func _button(parent: Node, text: String, color: Color) -> Button:
 	var button: Button = Button.new()
 	button.text = text
-	button.custom_minimum_size.y = 48
+	button.custom_minimum_size.y = 49
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_size_override("font_size", 18)
 	for state: String in ["normal", "hover", "pressed", "focus"]:
-		var fill: Color = color.lightened(0.12) if state == "hover" else color
-		var style: StyleBoxFlat = _style(fill, 12, 10)
+		var fill: Color = color.lightened(0.09) if state == "hover" else color
+		var style: StyleBoxFlat = _style(fill, 13, 10)
+		if state == "pressed":
+			style.bg_color = color.darkened(0.15)
 		if state == "focus":
 			style.bg_color = Color.TRANSPARENT
-			style.border_color = INK
-			style.set_border_width_all(3)
-			style.expand_margin_left = 4
-			style.expand_margin_right = 4
-			style.expand_margin_top = 4
-			style.expand_margin_bottom = 4
+			style.border_color = GOLD
+			style.set_border_width_all(2)
+			style.expand_margin_left = 3
+			style.expand_margin_right = 3
+			style.expand_margin_top = 3
+			style.expand_margin_bottom = 3
 		button.add_theme_stylebox_override(state, style)
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		button.add_theme_color_override(state, Color("fffaf0"))
+		button.add_theme_color_override(state, PAPER)
+	button.mouse_entered.connect(_button_motion.bind(button, 1.025))
+	button.mouse_exited.connect(_button_motion.bind(button, 1.0))
+	button.button_down.connect(_button_motion.bind(button, 0.97))
+	button.button_up.connect(_button_motion.bind(button, 1.0))
 	parent.add_child(button)
 	return button
+
+
+## ホバー・押下の入力ごとに短い拡縮を再生するため非冪等。
+func _button_motion(button: Button, amount: float) -> void:
+	if _button_tweens.has(button) and _button_tweens[button].is_valid():
+		_button_tweens[button].kill()
+	button.pivot_offset = button.size / 2.0
+	var tween: Tween = create_tween()
+	_button_tweens[button] = tween
+	tween.tween_property(button, "scale", Vector2.ONE * amount, 0.14).set_trans(Tween.TRANS_CUBIC)
 
 
 func _style(color: Color, radius: int, padding: int) -> StyleBoxFlat:
