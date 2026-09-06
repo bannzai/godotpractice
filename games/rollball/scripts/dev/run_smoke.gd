@@ -9,6 +9,10 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	if DirAccess.make_dir_recursive_absolute("res://tmp") != OK:
+		push_error("通常起動の撮影先を作成できない")
+		quit(1)
+		return
 	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	await create_timer(0.8).timeout
