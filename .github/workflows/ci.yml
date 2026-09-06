@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # 対象ゲームの決定。PR では変更のあったゲームだけ、共有物の変更と main への push では全ゲーム
+  # (判定は .github/scripts/changed-games.sh)
+  games:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      games: ${{ steps.pick.outputs.games }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - id: pick
+        run: bash .github/scripts/changed-games.sh "${{ github.event_name }}" "${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
+
+  lint:
+    needs: games
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        game: ${{ fromJSON(needs.games.outputs.games) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install gdtoolkit
+        run: pip install "gdtoolkit==4.*"
+      - name: gdlint
+        run: make -C games/${{ matrix.game }} lint
+
+  check-and-export:
+    needs: games
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        game: ${{ fromJSON(needs.games.outputs.games) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: godot
+        uses: ./.github/actions/setup-godot
+        with:
+          templates: >-
+            templates/linux_release.x86_64 templates/linux_debug.x86_64
+            templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe
+            templates/windows_release_x86_64_console.exe templates/windows_debug_x86_64_console.exe
+            templates/macos.zip
+            templates/web_nothreads_release.zip templates/web_nothreads_debug.zip
+          cache_key_suffix: desktop-web
+      - name: Import assets and boot check
+        run: make -C games/${{ matrix.game }} check GODOT="${{ steps.godot.outputs.godot }}"
+      - name: Selfcheck
+        run: make -C games/${{ matrix.game }} selfcheck GODOT="${{ steps.godot.outputs.godot }}"
+      - name: Export desktop builds
+        run: make -C games/${{ matrix.game }} build-all GODOT="${{ steps.godot.outputs.godot }}"
+      - name: Export web build
+        run: make -C games/${{ matrix.game }} build-web GODOT="${{ steps.godot.outputs.godot }}"
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.game }}-builds
+          path: |
+            games/${{ matrix.game }}/build/windows/
+            games/${{ matrix.game }}/build/macos/
+            games/${{ matrix.game }}/build/linux/
+            games/${{ matrix.game }}/build/web/
+          retention-days: 7
+
+  # 描画付きの検証。headless の check / selfcheck では見た目の崩れを検出できないため、Xvfb + Mesa llvmpipe
+  # (ソフトウェア GL) 上で代表画面の撮影と起動の録画を行い artifact に残す。PR を開いた agent は artifact を
+  # ダウンロードして PNG と mp4 を目視してから完了報告する (AGENTS.md「検証方法」)。
+  # 3D のゲームは llvmpipe の描画が遅いため timeout を長めに取る
+  screenshot-and-movie:
+    needs: games
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        game: ${{ fromJSON(needs.games.outputs.games) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: godot
+        uses: ./.github/actions/setup-godot
+        with:
+          # エディタバイナリで動かすため export templates は要らない (tpz からは version.txt だけ取り出す)
+          templates: ""
+          cache_key_suffix: editor-only
+      - name: Start Xvfb with software GL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb ffmpeg libgl1-mesa-dri \
+            libxcursor1 libxinerama1 libxrandr2 libxi6 libxext6 libxkbcommon0
+          nohup Xvfb :99 -screen 0 1280x720x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            [ -S /tmp/.X11-unix/X99 ] && break
+            sleep 1
+          done
+          [ -S /tmp/.X11-unix/X99 ] || { cat "$RUNNER_TEMP/xvfb.log"; exit 1; }
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+      - name: Screenshot
+        run: make -C games/${{ matrix.game }} screenshot GODOT="${{ steps.godot.outputs.godot }}"
+      - name: Movie
+        run: make -C games/${{ matrix.game }} movie GODOT="${{ steps.godot.outputs.godot }}"
+      - name: Upload screenshots and movie
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.game }}-screenshot-and-movie
+          path: |
+            games/${{ matrix.game }}/tmp/screenshot-*.png
+            games/${{ matrix.game }}/tmp/movie.mp4
+            games/${{ matrix.game }}/tmp/screenshot.log
+            games/${{ matrix.game }}/tmp/movie.log
+          if-no-files-found: warn
+          retention-days: 7

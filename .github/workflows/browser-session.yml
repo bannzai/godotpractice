@@ -1,0 +1,52 @@
+name: browser-session
+# webtunnel (bannzai/webtunnel) の caller workflow。GHA runner 上の Chromium で games/<game> の Web エクスポートを開き、
+# ローカルの agent-browser から Tailscale 経由で操作する (手順は ~/.claude/skills/webtunnel/SKILL.md)。
+# run-name は local/webtunnel CLI が run を特定するキーのためこの形式を維持する
+run-name: "session=${{ inputs.session }} duration=${{ inputs.duration_minutes }}m"
+on:
+  workflow_dispatch: # fork PR に Secrets を渡さないため workflow_dispatch のみ
+    # session / duration_minutes は local/webtunnel の up が常に送るため宣言必須
+    # （未定義の input を送ると dispatch が拒否される）
+    inputs:
+      session:
+        required: true
+        default: dev
+      duration_minutes:
+        required: true
+        default: "60"
+      start_url:
+        required: false
+        default: "" # 空なら dev サーバの URL を開く（session.yml 側の既定に合わせる）
+      record:
+        required: false
+        default: "true"
+      preview:
+        required: false
+        default: "true"
+      setup_script:
+        required: false
+        default: ".webtunnel/setup.sh"
+      # 開くゲーム (games/<game>)。local/webtunnel は送らないため、gh workflow run -f game=<slug> で指定する
+      game:
+        required: false
+        default: "platformer"
+jobs:
+  session:
+    permissions:
+      id-token: write
+      contents: read
+    uses: bannzai/webtunnel/.github/workflows/session.yml@f73f82c9b881aeec7e778342949c94f4006bfe35 # main
+    with:
+      session: ${{ inputs.session }}
+      duration_minutes: ${{ inputs.duration_minutes }}
+      start_url: ${{ inputs.start_url }}
+      record: ${{ inputs.record }}
+      preview: ${{ inputs.preview }}
+      setup_script: ${{ inputs.setup_script }}
+      # Godot の導入と Web エクスポートは .webtunnel/serve-game.sh (setup) と同スクリプトの serve (start) で行う
+      setup_command: bash .webtunnel/serve-game.sh setup ${{ inputs.game }}
+      start_command: bash .webtunnel/serve-game.sh serve ${{ inputs.game }}
+      port: "8000"
+    secrets:
+      TS_OIDC_CLIENT_ID: ${{ secrets.TS_OIDC_CLIENT_ID }}
+      TS_OIDC_AUDIENCE: ${{ secrets.TS_OIDC_AUDIENCE }}

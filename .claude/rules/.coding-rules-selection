@@ -1,0 +1,6 @@
+# propagate-coding-rules skill (castle) が同期するコーディングルールの選択。行単位。`!` 付きは除外
+coding-rules-godot.md
+coding-rules-assets-license.md
+coding-rules-github-actions-pin-to-sha.md
+coding-rules-single-source-info.md
+coding-rules-no-intermediate-representations.md

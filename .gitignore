@@ -1,0 +1,17 @@
+# Godot (各ゲームの games/<slug>/ 配下にも同じパターンが効く)
+.godot/
+*.translation
+
+# ビルド成果物
+build/
+
+# 作業用
+tmp/
+var/
+
+# Godot 管理外ディレクトリに生成された .import は不要
+documents/**/*.import
+build/**/*.import
+
+# macOS
+.DS_Store
