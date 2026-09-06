@@ -29,7 +29,7 @@ GODOT="/Applications/Godot.app/Contents/MacOS/Godot"
 | ローカル検証の一括実行 (CI と同じ内容) | `make test GAMES=<slug>` | exit 0 |
 | スクリーンショット (`scripts/dev/screenshot.gd` の `_capture_scenes()` が撮る代表画面。headless では見た目の崩れを検出できない) | `make screenshot GAMES=<slug>` | exit 0 かつ `tmp/screenshot-*.png` が生成される。PNG を目視してから完了報告する |
 | 起動の録画 (操作なしで起動〜メインシーン表示。起動直後の描画崩れ・真っ黒を検出する) | `make movie GAMES=<slug>` | exit 0 かつ `tmp/movie.mp4` が生成される (ffmpeg が必要) |
-| ゲームをエディタなしで起動 (手動確認) | `make run` (ブランチ `game/<slug>` 上。他のブランチでは `make run GAME=<slug>`) | ウィンドウが開きメインシーンが表示される。各ゲームはこの target で常に起動できる状態を保つ |
+| ゲームをエディタなしで起動 (手動確認) | `make <slug>-run` (例: `make shooter-run`。slug は `make list`)。ブランチ `game/<slug>` 上では `make run` でもよい | ウィンドウが開きメインシーンが表示される。各ゲームはこの target で常に起動できる状態を保つ |
 | デスクトップエクスポート | `make build-macos` / `build-windows` / `build-linux` / `build-all` (`GAMES=<slug>`) | exit 0 で `games/<slug>/build/<platform>/` に成果物が生成される |
 | Web エクスポート (動作確認専用) | `make build-web GAMES=<slug>` | exit 0 で `games/<slug>/build/web/index.html` が生成される |
 
