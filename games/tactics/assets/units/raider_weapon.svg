@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="160" viewBox="0 0 96 160"><defs>
+<linearGradient id="cloth" x2="1" y2="1"><stop stop-color="#80b9ac"/><stop offset="1" stop-color="#265651"/></linearGradient>
+<linearGradient id="steel" x2="1" y2="0"><stop stop-color="#aac4cd"/><stop offset=".45" stop-color="#f7efce"/><stop offset=".5" stop-color="#6a8c9e"/><stop offset="1" stop-color="#304d66"/></linearGradient>
+<linearGradient id="red" x2="1" y2="1"><stop stop-color="#e89d7d"/><stop offset="1" stop-color="#8c3f47"/></linearGradient>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#13293e"/><stop offset=".55" stop-color="#617f83"/><stop offset="1" stop-color="#e4bc86"/></linearGradient>
+<radialGradient id="sun"><stop stop-color="#fff7d9" stop-opacity=".75"/><stop offset="1" stop-color="#f6db95" stop-opacity="0"/></radialGradient>
+</defs><path d="M45 52 L45 150 54 150 54 52Z" fill="#a98558" stroke="#15283e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M47 34 Q27 44 8 26 Q-1 63 16 83 Q36 62 49 66 L53 65 Q78 71 87 83 Q99 52 87 25 Q69 46 54 35Z" fill="url(#steel)" stroke="#15283e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><path d="M49 27 L49 75" fill="none" stroke="#dbb66c" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/></svg>
