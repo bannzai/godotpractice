@@ -132,7 +132,7 @@ movie-play: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
 	rm -f $(LOG_DIR)/movie-play.avi
-	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/play-frame-%02d.png
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf "select='not(mod(n,60))'" -fps_mode vfr $(LOG_DIR)/play-frame-%02d.png
 	ffmpeg -loglevel error -y -sseof -1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/play-last.png
 
 # 通常のclose通知とGodot自身のフレーム指定終了を独立に確認する。

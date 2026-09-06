@@ -79,7 +79,9 @@ func _check_rhythm() -> void:
 	_check_judgments(state)
 	_check_charts(state)
 	_check_long_notes(state)
+	_check_frame_independence(state)
 	_check_roundtrip(state)
+	_check_clear_history(state)
 	_check_save_data(state)
 	state.free()
 
@@ -147,6 +149,7 @@ func _play_perfect(state: Node) -> void:
 
 
 func _prepare_short_chart(state: Node) -> void:
+	state.abort_song()
 	state.start_song()
 	state.offset_ms = 0
 	state.chart = {"bpm": 120.0, "offset": 0.0, "duration": 60.0, "notes": []}
@@ -166,6 +169,13 @@ func _check_long_notes(state: Node) -> void:
 	_check(state.notes[0].status == "holding", "ロング開始は保持状態")
 	state.press_lane(1, 2.5)
 	state.release_lane(1, 2.5)
+	var previous_score: int = state.score
+	var previous_notes: Array = state.notes.duplicate(true)
+	var previous_time: float = state.song_time
+	state.start_song()
+	_check(state.score == previous_score and state.notes == previous_notes,
+		"演奏中の重複開始でスコアとノーツの判定状態を保持する")
+	_check(is_equal_approx(state.song_time, previous_time), "重複開始で音声時計を巻き戻さない")
 	state.release_lane(0, 3.0)
 	_check(state.counts.Perfect == 2 and state.counts.Miss == 0, "終端まで保持で成功")
 	state.press_lane(0, 4.12)
@@ -194,7 +204,24 @@ func _check_long_notes(state: Node) -> void:
 	_check(state.combo == 0, "空打ちでコンボが切れる")
 
 
+func _check_frame_independence(state: Node) -> void:
+	var snapshots: Array[Dictionary] = []
+	for fine_steps: bool in [true, false]:
+		_prepare_short_chart(state)
+		state.press_lane(0, 2.0)
+		if fine_steps:
+			state.advance(2.7)
+		state.advance(3.0)
+		snapshots.append({"score": state.score, "combo": state.combo,
+			"max_combo": state.max_combo, "gauge": state.gauge,
+			"accuracy": state.accuracy, "counts": state.counts.duplicate()})
+	_check(snapshots[0] == snapshots[1], "細かい更新とフレーム飛びで判定結果が一致する")
+	_check(state.combo == 1 and state.counts.Miss == 1 and state.counts.Perfect == 1,
+		"別レーンの見逃しをロング終端より先に処理する")
+
+
 func _check_roundtrip(state: Node) -> void:
+	state.abort_song()
 	state.records = {}
 	state.offset_ms = 0
 	state.select_song(0)
@@ -217,6 +244,32 @@ func _check_roundtrip(state: Node) -> void:
 	state.start_song()
 	state.abort_song()
 	_check(state.screen == "select", "演奏を中断して選曲に戻れる")
+
+
+func _check_clear_history(state: Node) -> void:
+	state.select_song(1)
+	state.set_difficulty("easy")
+	state.start_song()
+	for note: Dictionary in state.notes:
+		state.press_lane(int(note.lane), Rules.note_time(note, state.chart) + 0.08)
+		state.release_lane(int(note.lane), Rules.end_time(note, state.chart) + 0.08)
+	state.advance(float(state.chart.duration))
+	var clear_score: int = state.score
+	_check(state.cleared, "全 Good でクリア履歴を作る")
+	state.start_song()
+	var hit_count := int(state.notes.size() * 0.8)
+	for index: int in range(hit_count):
+		var note: Dictionary = state.notes[index]
+		state.press_lane(int(note.lane), Rules.note_time(note, state.chart))
+		state.release_lane(int(note.lane), Rules.end_time(note, state.chart))
+	state.advance(float(state.chart.duration))
+	_check(state.score > clear_score and not state.cleared,
+		"終盤の連続 Miss で前のクリアより高スコアの失敗結果になる")
+	state.load_records()
+	var record: Dictionary = state.get_record(1, "easy")
+	_check(record.score == state.score and record.cleared,
+		"高スコアの失敗を保存しても過去のクリア履歴を保持する")
+	_check(not state.cleared, "クリア履歴は今回の失敗結果を変えない")
 
 
 func _check_save_data(state: Node) -> void:

@@ -71,6 +71,8 @@ func _change_screen(value: String) -> void:
 
 
 func start_song() -> void:
+	if screen == "play":
+		return
 	var path := "res://data/charts/%s_%s.json" % [songs[selected_song].id, difficulty]
 	var loaded: Variant = Rules.read_json(path)
 	if not loaded is Dictionary or not Rules.validate_chart(loaded):
@@ -102,12 +104,23 @@ func advance(audio_time: float) -> void:
 		return
 	# 音声ミックス間の小さな逆行を吸収し、フレーム飛びでも全ノーツを処理する。
 	song_time = maxf(song_time, audio_time - float(offset_ms) / 1000.0)
-	for note: Dictionary in notes:
+	var due: Array[Dictionary] = []
+	for index: int in range(notes.size()):
+		var note: Dictionary = notes[index]
 		if note.status == "pending":
-			if song_time > Rules.note_time(note, chart) + float(thresholds.good) + 0.000001:
-				_judge_note(note, "Miss")
+			var deadline: float = Rules.note_time(note, chart) + float(thresholds.good)
+			if song_time > deadline + 0.000001:
+				due.append({"note": note, "deadline": deadline, "index": index, "kind": "Miss"})
 		elif note.status == "holding" and song_time >= Rules.end_time(note, chart):
-			_judge_note(note, str(note.judgment))
+			due.append({"note": note, "deadline": Rules.end_time(note, chart),
+				"index": index, "kind": str(note.judgment)})
+	# 開始拍ではなく判定時刻で並べ、ロング中の Miss もフレーム間隔に依存させない。
+	due.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a.deadline == b.deadline:
+			return a.index < b.index
+		return a.deadline < b.deadline)
+	for event: Dictionary in due:
+		_judge_note(event.note, event.kind)
 	if audio_time >= float(chart.duration):
 		finish_song()
 
@@ -201,7 +214,7 @@ func _save_best() -> void:
 	var previous: Dictionary = records.get(key, {})
 	if previous.is_empty() or score > int(previous.score):
 		records[key] = {"score": score, "rank": rank, "accuracy": accuracy,
-			"max_combo": max_combo, "cleared": cleared}
+			"max_combo": max_combo, "cleared": cleared or bool(previous.get("cleared", false))}
 	elif cleared and not bool(previous.cleared):
 		previous.cleared = true
 	save_records()
