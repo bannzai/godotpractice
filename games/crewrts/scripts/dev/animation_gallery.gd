@@ -38,6 +38,8 @@ func capture(tree: SceneTree, main: Node, save: Callable) -> bool:
 		for column: int in range(MODELS.size()):
 			var actor: Node3D = load("res://assets/models/%s.tscn" % MODELS[column]).instantiate()
 			actor.position = Vector3((2 - column) * 4.1, 0, (1 - row) * 6.0)
+			# 傾いた装備や脚の先端も各行の見出しから離す。
+			actor.scale = Vector3.ONE * 0.82
 			stage.add_child(actor)
 			actors.append(actor)
 			var label := Label.new()
