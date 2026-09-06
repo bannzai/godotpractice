@@ -4,7 +4,7 @@
 
 ## 画像 (`assets/images/`)
 
-- **素材名**: 空の配達人のオリジナル画像 (`player.svg`, `walker.svg`, `shell.svg`, `coin.svg`, `power.svg`, `ground.svg`, `underground.svg`, `item_block.svg`, `cloud.svg`, `crystal.svg`, `goal.svg`, `logo.svg`)
+- **素材名**: 空の配達人のオリジナル画像 (`player.svg`, `walker.svg`, `shell.svg`, `coin.svg`, `power.svg`, `ground.svg`, `ground_fill.svg`, `underground.svg`, `underground_fill.svg`, `item_block.svg`, `cloud.svg`, `crystal.svg`, `goal.svg`, `logo.svg`)
 - **作者**: 本プロジェクトで制作
 - **入手 URL**: https://github.com/bannzai/godotpractice/blob/game/platformer/games/platformer/scripts/dev/generate_assets.py
 - **ライセンス**: 本プロジェクトのオリジナル生成素材。第三者素材は含まない

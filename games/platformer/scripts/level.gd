@@ -41,23 +41,25 @@ func _build_terrain() -> void:
 	tiles.tile_size = Vector2i(TILE, TILE)
 	tiles.add_physics_layer()
 	tiles.set_physics_layer_collision_layer(0, 1)
-	var source: TileSetAtlasSource = TileSetAtlasSource.new()
 	var file: String = "ground" if stage == 0 else "underground"
-	source.texture = load("res://assets/images/%s.svg" % file)
-	source.texture_region_size = Vector2i(TILE, TILE)
-	source.create_tile(Vector2i.ZERO)
-	tiles.add_source(source, 0)
-	var data: TileData = source.get_tile_data(Vector2i.ZERO, 0)
-	data.add_collision_polygon(0)
-	data.set_collision_polygon_points(0, 0, PackedVector2Array([
-		Vector2(-24, -24), Vector2(24, -24), Vector2(24, 24), Vector2(-24, 24)]))
+	for source_id: int in 2:
+		var source: TileSetAtlasSource = TileSetAtlasSource.new()
+		var suffix: String = "" if source_id == 0 else "_fill"
+		source.texture = load("res://assets/images/%s%s.svg" % [file, suffix])
+		source.texture_region_size = Vector2i(TILE, TILE)
+		source.create_tile(Vector2i.ZERO)
+		tiles.add_source(source, source_id)
+		var data: TileData = source.get_tile_data(Vector2i.ZERO, 0)
+		data.add_collision_polygon(0)
+		data.set_collision_polygon_points(0, 0, PackedVector2Array([
+			Vector2(-24, -24), Vector2(24, -24), Vector2(24, 24), Vector2(-24, 24)]))
 	terrain.tile_set = tiles
 	add_child(terrain)
 	for x: int in WIDTHS[stage]:
 		if is_gap(x):
 			continue
 		for y: int in range(13, 16):
-			terrain.set_cell(Vector2i(x, y), 0, Vector2i.ZERO)
+			terrain.set_cell(Vector2i(x, y), 0 if y == 13 else 1, Vector2i.ZERO)
 	for start: int in [28, 49, 73]:
 		for x: int in range(start, start + 4):
 			terrain.set_cell(Vector2i(x, 11), 0, Vector2i.ZERO)

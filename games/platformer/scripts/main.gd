@@ -2,8 +2,6 @@ class_name DeliveryGame
 extends Control
 ## 入力・音・画面遷移はイベントの消費として実行するため非冪等。
 
-const CLOUD: Texture2D = preload("res://assets/images/cloud.svg")
-const CRYSTAL: Texture2D = preload("res://assets/images/crystal.svg")
 const INK: Color = Color("153e4a")
 const CREAM: Color = Color("fff8e8")
 var route: DeliveryRoute
@@ -16,10 +14,12 @@ var bgm: AudioStreamPlayer
 var last_phase: String = ""
 var sky_time: float = 0.0
 var font: Font
+var backdrop: RouteBackdrop
 
 
 func _ready() -> void:
 	print("platformer boot")
+	get_tree().auto_accept_quit = false
 	session = get_node("/root/Session")
 	var variation: FontVariation = FontVariation.new()
 	variation.base_font = load("res://assets/fonts/NotoSansJP[wght].ttf")
@@ -29,6 +29,11 @@ func _ready() -> void:
 	game_theme.default_font = font
 	game_theme.default_font_size = 22
 	theme = game_theme
+	var background_layer: CanvasLayer = CanvasLayer.new()
+	background_layer.layer = -1
+	add_child(background_layer)
+	backdrop = RouteBackdrop.new()
+	background_layer.add_child(backdrop)
 	var layer: CanvasLayer = CanvasLayer.new()
 	add_child(layer)
 	ui = Control.new()
@@ -44,7 +49,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	sky_time += delta
-	queue_redraw()
+	backdrop.stage = route.stage if is_instance_valid(route) else 0
+	backdrop.camera_x = route.camera.position.x - 640 if is_instance_valid(route) else sky_time * 9
+	backdrop.queue_redraw()
 	if is_instance_valid(hud):
 		hud.text = "スコア  %06d     コイン  %02d     残機  %d     時間  %03d" % [
 			session.score, session.coins, session.lives, int(ceil(session.seconds))]
@@ -71,25 +78,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _draw() -> void:
-	var cave: bool = is_instance_valid(route) and route.stage == 1
-	draw_rect(Rect2(0, 0, 1280, 720), Color("142f4f") if cave else Color("bce5df"))
-	var offset: float = route.camera.position.x - 640 if is_instance_valid(route) else sky_time * 9
-	if cave:
-		for i: int in 22:
-			var x: float = fposmod(i * 139 - offset * 0.18, 1450) - 80
-			draw_colored_polygon(PackedVector2Array([
-				Vector2(x, 0), Vector2(x + 65, 170 + (i % 4) * 32), Vector2(x + 120, 0)]),
-				Color("203b60"))
-			draw_texture_rect(CRYSTAL, Rect2(x, 450 + (i % 3) * 25, 80, 120), false,
-				Color(0.4, 0.8, 1, 0.55))
-	else:
-		draw_circle(Vector2(1080, 158), 76, Color("fff4c5"))
-		for i: int in 8:
-			var x: float = fposmod(i * 340 - offset * 0.15, 1700) - 200
-			draw_circle(Vector2(x, 720), 290, Color("8dc6b0"))
-			draw_circle(Vector2(x + 180, 750), 260, Color("5eaa95"))
-			draw_texture_rect(CLOUD, Rect2(x, 130 + i % 3 * 48, 192, 80), false)
 
 
 func _clear_ui() -> void:
@@ -312,12 +300,25 @@ func _picture(parent: Node, file: String, rect: Rect2) -> void:
 	var picture: TextureRect = TextureRect.new()
 	picture.texture = load("res://assets/images/%s.svg" % file)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	picture.position = rect.position
 	picture.size = rect.size
 	parent.add_child(picture)
 
 
+func stop_audio() -> void:
+	for child: Node in get_children():
+		if child is AudioStreamPlayer:
+			child.stop()
+			child.stream = null
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		stop_audio()
+		await get_tree().create_timer(0.15).timeout
+		get_tree().quit()
+
+
 func _exit_tree() -> void:
-	if is_instance_valid(bgm):
-		bgm.stop()
-		bgm.stream = null
+	stop_audio()

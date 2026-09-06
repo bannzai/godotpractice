@@ -14,7 +14,14 @@ func _run() -> void:
 	session = root.get_node("Session")
 	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
-	game.start_run()
+	await _frames(3)
+	_send_key(KEY_ENTER, true)
+	await _frames(2)
+	_send_key(KEY_ENTER, false)
+	await _frames(2)
+	_check(session.phase == "playing", "キーボード Enter でタイトルから開始")
+	if session.phase != "playing":
+		game.start_run()
 	await _frames(5)
 	_check(game.route.player.is_on_floor(), "TileMap の地面に着地")
 	var start_x: float = game.route.player.position.x
@@ -35,6 +42,7 @@ func _run() -> void:
 	await _check_block_and_power()
 	await _check_enemy()
 	await _check_damage_and_restart()
+	await _check_pad_and_pause()
 	for stage_index: int in 2:
 		await _traverse(stage_index)
 	game._show_title()
@@ -151,6 +159,57 @@ func _check_damage_and_restart() -> void:
 	_check(session.phase == "playing" and session.lives == 3, "結果から新しい配達を始める")
 
 
+func _send_key(key: Key, pressed: bool) -> void:
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = key
+	event.keycode = key
+	event.pressed = pressed
+	Input.parse_input_event(event)
+
+
+func _pad_button(pressed: bool) -> void:
+	var event: InputEventJoypadButton = InputEventJoypadButton.new()
+	event.button_index = JOY_BUTTON_A
+	event.pressed = pressed
+	Input.parse_input_event(event)
+
+
+func _check_pad_and_pause() -> void:
+	game._show_title()
+	await _frames(3)
+	_pad_button(true)
+	await _frames(2)
+	_pad_button(false)
+	await _frames(2)
+	_check(session.phase == "playing", "パッド A ボタンでタイトルから開始")
+	if session.phase != "playing":
+		game.start_run()
+	await _frames(5)
+	var start_x: float = game.route.player.position.x
+	var motion: InputEventJoypadMotion = InputEventJoypadMotion.new()
+	motion.axis = JOY_AXIS_LEFT_X
+	motion.axis_value = 1.0
+	Input.parse_input_event(motion)
+	await _frames(20)
+	motion.axis_value = 0.0
+	Input.parse_input_event(motion)
+	_check(game.route.player.position.x > start_x + 40, "パッドのスティックで移動")
+	_send_key(KEY_ESCAPE, true)
+	await _frames(2)
+	_send_key(KEY_ESCAPE, false)
+	_check(session.phase == "paused", "Esc で一時停止")
+	var paused_seconds: float = session.seconds
+	var paused_position: Vector2 = game.route.player.position
+	await _frames(20)
+	_check(session.seconds == paused_seconds and game.route.player.position == paused_position,
+		"一時停止中は時間と物理位置が変化しない")
+	_pad_button(true)
+	await _frames(2)
+	_pad_button(false)
+	await _frames(2)
+	_check(session.phase == "playing", "パッド A ボタンで一時停止から再開")
+
+
 func _traverse(stage_index: int) -> void:
 	session.reset_run()
 	session.stage = stage_index
@@ -172,7 +231,7 @@ func _traverse(stage_index: int) -> void:
 					hazard = true
 		if player.is_on_floor() and hazard and held == 0:
 			Input.action_press("jump")
-			held = 12 if game.route.is_gap(column) else 30
+			held = 12
 		if held > 0:
 			held -= 1
 			if held == 0:

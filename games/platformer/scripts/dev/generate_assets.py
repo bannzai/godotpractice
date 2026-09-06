@@ -79,6 +79,18 @@ def images():
       <path d="M15 31l5-3 6 8-7 5z" fill="#477c97"/>
       <path d="M4 10h7M29 31h5" stroke="#699da7" stroke-width="2"/>
     ''')
+    svg("ground_fill", 48, 48, '''
+      <path d="M0 0h48v48H0z" fill="#a96d51"/>
+      <path d="M0 17h48v7L0 37z" fill="#bc825b"/>
+      <path d="M4 29h9v4H4zM28 38h12v5H28zM33 25h7v4h-7zM9 44h8v4H9z" fill="#805549"/>
+    ''')
+    svg("underground_fill", 48, 48, '''
+      <path d="M0 0h48v48H0z" fill="#304b68"/>
+      <path d="M0 24h48M23 0v24M11 24v24M37 24v24" stroke="#233d58" stroke-width="3"/>
+      <path d="M27 10l7-3 5 6-6 7z" fill="#397693"/>
+      <path d="M15 31l5-3 6 8-7 5z" fill="#477c97"/>
+      <path d="M4 10h7M29 31h5" stroke="#699da7" stroke-width="2"/>
+    ''')
     svg("item_block", 48, 48, '''
       <rect x="1" y="1" width="46" height="46" rx="7" fill="#b46f35" stroke="#f4d27a" stroke-width="2"/>
       <rect x="4" y="4" width="40" height="37" rx="5" fill="#efb64e"/>

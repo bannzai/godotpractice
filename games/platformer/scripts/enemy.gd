@@ -33,7 +33,7 @@ func _physics_process(delta: float) -> void:
 	age += delta
 	kick_grace = maxf(0.0, kick_grace - delta)
 	velocity.y = minf(velocity.y + 1700 * delta, 1000)
-	velocity.x = direction * (370 if mode == "sliding" else 65)
+	velocity.x = direction * (470 if mode == "sliding" else 65)
 	if mode == "resting":
 		velocity.x = 0
 	move_and_slide()
