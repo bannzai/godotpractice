@@ -6,6 +6,7 @@ var failed := false
 
 
 func _initialize() -> void:
+	preload("res://scripts/dev/logic_checks.gd").run(_check)
 	_check_scenes("res://scenes")
 	_check_assets_credited()
 

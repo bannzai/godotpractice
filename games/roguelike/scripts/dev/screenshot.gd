@@ -20,12 +20,23 @@ func _run() -> void:
 ## 撮影する画面の並び。雛形はメインシーン (タイトル) だけを撮る。失敗した撮影は _capture() が
 ## quit(1) 済みなので、false を受けたらそのまま抜ける。
 func _capture_scenes() -> bool:
-	var main_scene_path: String = ProjectSettings.get_setting("application/run/main_scene")
-	var main: Node = load(main_scene_path).instantiate()
+	var main: Node = load("res://scenes/main.tscn").instantiate()
+	root.get_node("Sound").set_muted(true)
+	root.get_node("RunState").save_enabled = false
 	root.add_child(main)
 	await create_timer(0.5).timeout
 	if not await _capture("tmp/screenshot-title.png"):
 		return false
+	main.start_new(609)
+	await create_timer(0.5).timeout
+	if not await _capture("tmp/screenshot-play.png"):
+		return false
+	root.get_node("RunState").retire()
+	await create_timer(0.5).timeout
+	if not await _capture("tmp/screenshot-result.png"):
+		return false
+	main.return_title()
+	await root.get_node("Sound").shutdown()
 	main.queue_free()
 	await process_frame
 	return true
