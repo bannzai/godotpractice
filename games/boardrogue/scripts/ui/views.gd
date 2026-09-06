@@ -269,7 +269,8 @@ static func _opponent(main: Control) -> void:
 	var enemy: Dictionary = Catalog.ENEMIES[battle.enemy_id]
 	UI.label(main.content, enemy.title, Rect2(989, 111, 252, 24), 16, UI.MUTED)
 	UI.label(main.content, enemy.name, Rect2(986, 141, 255, 42), 27, UI.GOLD)
-	main.enemy_actor = _actor(main.content, battle.enemy_id, Vector2(1107, 251), 0.61)
+	var portrait_scale: float = 0.54 if battle.enemy_id == "final" else 0.61
+	main.enemy_actor = _actor(main.content, battle.enemy_id, Vector2(1107, 251), portrait_scale)
 	UI.panel(main.content, Rect2(983, 334, 257, 97), Color("342f25"))
 	main.speech_label = UI.paragraph(main.content, main.speech, Rect2(995, 341, 230, 85), 18)
 	UI.label(
