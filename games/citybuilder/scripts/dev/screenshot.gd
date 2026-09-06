@@ -55,6 +55,7 @@ func _capture_scenes() -> void:
 	await _shot("title", 0.5)
 	_city.start_city()
 	_city.speed = 0
+	_main._refresh()
 	await _shot("initial-city", 0.5)
 	for month: int in range(3):
 		_city.next_month()

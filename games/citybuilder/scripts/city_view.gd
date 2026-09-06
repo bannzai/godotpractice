@@ -33,6 +33,7 @@ var _light: CanvasModulate
 var _clock: float = 0.0
 var _redraw_clock: float = 0.0
 var _shake: float = 0.0
+var _impact_pause: float = 0.0
 
 
 func _ready() -> void:
@@ -115,12 +116,19 @@ func burst(cell: Vector2i, demolish: bool = false) -> void:
 	tween.tween_callback(flash.queue_free)
 	if demolish:
 		_shake = 0.3
+		_impact_pause = 0.065
+		_viewport.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 # 見た目の時刻・移動を毎フレーム進める。ゲームの状態は変更しない。
 func _process(delta: float) -> void:
 	if _world == null:
 		return
+	if _impact_pause > 0.0:
+		_impact_pause = maxf(0.0, _impact_pause - delta)
+		if _impact_pause > 0.0:
+			return
+		_viewport.process_mode = Node.PROCESS_MODE_INHERIT
 	_clock += delta
 	_redraw_clock += delta
 	_shake = maxf(0, _shake - delta)

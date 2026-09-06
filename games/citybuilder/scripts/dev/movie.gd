@@ -15,6 +15,5 @@ func _run() -> void:
 	for frame: int in range(maxi(1, frames - 10)):
 		await process_frame
 	await root.get_node("Sound").shutdown()
-	main.queue_free()
-	await process_frame
+	# 描画ノードはツリー終了時に解放し、録画末尾に空画面を混ぜない。
 	quit()

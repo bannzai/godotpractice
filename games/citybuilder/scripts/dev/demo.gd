@@ -34,8 +34,7 @@ func _run() -> void:
 	_check(built_houses, "実マウスドラッグで道路沿いに住宅を追加")
 	_check(saw_clear, "通常の月次成長で600人を超えてクリア結果を表示")
 	_check(city.phase == "title", "結果からEnterでタイトルへ帰還")
-	main.queue_free()
-	await process_frame
+	# 描画ノードはツリー終了時に解放し、録画末尾をタイトルのまま保つ。
 	print("demo OK" if not failed else "demo FAIL")
 	quit(1 if failed else 0)
 
