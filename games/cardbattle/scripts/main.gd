@@ -5,8 +5,10 @@ extends Control
 const Catalog = preload("res://scripts/card_catalog.gd")
 const CardView = preload("res://scripts/card_view.gd")
 const Effect = preload("res://scripts/duel_effect.gd")
-const BACKGROUND = preload("res://assets/art/arena.svg")
-const FONT = preload("res://assets/fonts/NotoSansJP.ttf")
+const Backdrop = preload("res://scripts/starfield.gd")
+const Audio = preload("res://scripts/duel_audio.gd")
+const Actor = preload("res://scripts/card_actor.gd")
+const DUEL_THEME = preload("res://scenes/duel_theme.tres")
 const GOLD := Color("dfbc72")
 const TEAL := Color("58d6c0")
 const WHITE := Color("f3ead8")
@@ -19,8 +21,12 @@ var state: RefCounted:
 var screen: String = "title"
 var content: Control
 var effect: Control
-var bgm: AudioStreamPlayer
-var sounds: Array[AudioStreamPlayer] = []
+var audio: Node
+var backdrop: Control
+var transition: ColorRect
+var transition_tween: Tween
+var shake_tween: Tween
+var closing: bool = false
 var selected_zone: String = ""
 var selected_index: int = -1
 var inspected_id: String = ""
@@ -28,6 +34,7 @@ var hand_page: int = 0
 var audio_stopped: bool = false
 var busy: bool = false
 var auto_phase: bool = false
+var auto_actions_paused: bool = false
 var show_help: bool = false
 var cpu_time: float = 0.0
 var recent_messages: Array[String] = []
@@ -37,12 +44,11 @@ var display_life: Array[float] = [8000.0, 8000.0]
 
 func _ready() -> void:
 	print("cardbattle boot")
-	theme = Theme.new()
-	var font := FontVariation.new()
-	font.base_font = FONT
-	font.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 500}
-	theme.default_font = font
-	theme.default_font_size = 17
+	theme = DUEL_THEME
+	get_tree().auto_accept_quit = false
+	backdrop = Backdrop.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(backdrop)
 	content = Control.new()
 	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(content)
@@ -50,25 +56,29 @@ func _ready() -> void:
 	effect.theme = theme
 	effect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(effect)
-	bgm = AudioStreamPlayer.new()
-	bgm.volume_db = -15
-	add_child(bgm)
-	bgm.finished.connect(bgm.play)
-	# 最初のフレームで終了する起動検査で音声バックエンドの解放待ちを残さない。
-	get_tree().create_timer(0.1).timeout.connect(_start_music)
-	for index: int in range(4):
-		var sound := AudioStreamPlayer.new()
-		sound.volume_db = -10
-		add_child(sound)
-		sounds.append(sound)
+	effect.impact.connect(_impact)
+	audio = Audio.new()
+	add_child(audio)
+	transition = ColorRect.new()
+	transition.color = Color("07111f")
+	transition.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	transition.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(transition)
 	_render()
+	audio.set_scene("title")
+	_reveal_screen()
 
 
-func _start_music() -> void:
-	if audio_stopped or DisplayServer.get_name() == "headless":
-		return
-	bgm.stream = load("res://assets/audio/bgm.wav")
-	bgm.play()
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and not closing:
+		_shutdown()
+
+
+func _shutdown() -> void:
+	closing = true
+	busy = true
+	await audio.shutdown()
+	get_tree().quit()
 
 
 func _exit_tree() -> void:
@@ -77,15 +87,32 @@ func _exit_tree() -> void:
 
 func stop_audio() -> void:
 	audio_stopped = true
-	bgm.stop()
-	bgm.stream = null
-	for sound: AudioStreamPlayer in sounds:
-		sound.stop()
-		sound.stream = null
+	if is_instance_valid(audio):
+		audio.stop_audio()
 
 
-func _draw() -> void:
-	draw_texture_rect(BACKGROUND, Rect2(Vector2.ZERO, size), false)
+# 画面遷移ごとに開始する視覚演出なので非冪等。前の遷移は置き換える。
+func _reveal_screen() -> void:
+	if transition_tween:
+		transition_tween.kill()
+	transition.modulate.a = 1.0
+	content.modulate.a = 0.0
+	transition_tween = create_tween().set_parallel(true)
+	transition_tween.tween_property(transition, "modulate:a", 0.0, 0.38)
+	transition_tween.tween_property(content, "modulate:a", 1.0, 0.48)
+
+
+# 衝撃のたびに一時的な盤面移動とアニメーションの停止を開始するため非冪等。
+func _impact(strength: float, duration: float) -> void:
+	if shake_tween:
+		shake_tween.kill()
+	content.position = Vector2.ZERO
+	shake_tween = create_tween()
+	for offset: Vector2 in [Vector2(1, -0.5), Vector2(-0.7, 0.3), Vector2(0.4, -0.2), Vector2.ZERO]:
+		shake_tween.tween_property(content, "position", offset * strength, duration / 4.0)
+	for card: Node in content.get_children():
+		if card is CardView and is_instance_valid(card.actor):
+			card.actor.hit_stop(0.055)
 
 
 # 経過時間によるCPU操作と表示補間はフレームごとに進むため非冪等。
@@ -99,7 +126,10 @@ func _process(delta: float) -> void:
 		var label: Label = content.get_node_or_null("life%d" % player)
 		if label:
 			label.text = "%04d" % roundi(display_life[player])
-	if busy or show_help or state.winner != -1:
+		var bar: ProgressBar = content.get_node_or_null("life_bar%d" % player)
+		if bar:
+			bar.value = display_life[player]
+	if busy or show_help or auto_actions_paused or state.winner != -1:
 		return
 	cpu_time += delta
 	if state.turn_player == 1 and cpu_time > 0.8:
@@ -112,6 +142,9 @@ func _process(delta: float) -> void:
 
 # 入力イベントは押下ごとに操作を進めるため非冪等。
 func _input(event: InputEvent) -> void:
+	if closing or (busy and not event.is_action_pressed("duel_fullscreen")):
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("duel_confirm"):
 		var focused: Control = get_viewport().gui_get_focus_owner()
 		if focused is Button and not focused.disabled:
@@ -170,9 +203,13 @@ func start_duel(deck_index: int, seed_value: int = -1) -> void:
 	recent_messages.clear()
 	display_life = [8000.0, 8000.0]
 	_render()
+	audio.set_scene("duel")
+	_play_sound("transition")
+	_reveal_screen()
 
 
 func _render() -> void:
+	backdrop.duel = screen == "duel"
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	if focus and content.is_ancestor_of(focus):
 		last_focus = str(focus.name)
@@ -188,6 +225,10 @@ func _render() -> void:
 			_result()
 	if show_help:
 		_help()
+	if busy:
+		for child: Node in content.get_children():
+			if child is Button:
+				child.disabled = true
 	var next_focus: Control = content.get_node_or_null(NodePath(last_focus))
 	if next_focus is Button and not next_focus.disabled:
 		next_focus.grab_focus()
@@ -199,12 +240,13 @@ func _render() -> void:
 
 
 func _title() -> void:
-	_label("星を結び、勝利を刻む。", Rect2(82, 77, 800, 35), 22, TEAL)
-	_label("星環の決闘", Rect2(75, 130, 730, 110), 76, WHITE)
+	_art("title_keyart", Rect2(692, 20, 578, 578))
+	_art("logo", Rect2(82, 60, 64, 64))
+	_label("星を結び、勝利を刻む。", Rect2(160, 78, 520, 35), 20, TEAL)
+	_label("星環の決闘", Rect2(75, 144, 730, 100), 76, WHITE)
 	_label("四つの属性と、四十枚の可能性。", Rect2(84, 252, 650, 45), 26, GOLD)
 	_label("相手のライフを削りきる、あなたの一手を。\n二つのデッキから選んで、星の守り手に挑もう。", Rect2(86, 317, 650, 90), 20, MUTED)
-	_art("earth", Rect2(828, 120, 360, 270))
-	_art("fire", Rect2(747, 275, 265, 199))
+	_label("日輪と月影、二つの宿命。", Rect2(832, 575, 398, 32), 20, GOLD)
 	_button(
 		"deck0",
 		Catalog.deck_name(0) + "\n攻撃と強化で押し切る",
@@ -227,11 +269,13 @@ func _title() -> void:
 	_label(
 		"矢印 / 十字キー: 選択    Enter / A: 決定    F11 / START: 全画面", Rect2(85, 653, 1100, 28), 15, MUTED
 	)
-	_label("オリジナル図形・合成音源  /  日本語フォント: Noto Sans JP (OFL)", Rect2(85, 690, 1100, 22), 11, MUTED)
+	_label("オリジナルイラスト・音楽  /  日本語フォント: Noto Sans JP (OFL)", Rect2(85, 690, 1100, 22), 11, MUTED)
 
 
 func _duel() -> void:
 	_panel(Rect2(24, 18, 872, 97))
+	_life_bar(1, Rect2(43, 101, 257, 4), GOLD)
+	_life_bar(0, Rect2(599, 101, 257, 4), TEAL)
 	_label("星の守り手  /  CPU", Rect2(43, 29, 330, 25), 17, MUTED)
 	_label("あなた", Rect2(598, 29, 260, 25), 17, TEAL)
 	_label("%04d" % roundi(display_life[1]), Rect2(42, 50, 270, 50), 35, WHITE, "life1")
@@ -248,8 +292,7 @@ func _duel() -> void:
 	_zones(0, 353)
 	_spell_zones(1, 123)
 	_spell_zones(0, 493)
-	_label("%s → %s → %s → %s" % ["ドロー", "メイン", "バトル", "エンド"], Rect2(47, 309, 520, 27), 15, MUTED)
-	_label("現在: " + PHASE_NAMES[state.phase], Rect2(603, 306, 278, 34), 20, GOLD)
+	_phase_track()
 	_label("手札 %d 枚" % state.players[0].hand.size(), Rect2(38, 540, 200, 26), 14, TEAL)
 	_label(
 		(
@@ -336,7 +379,8 @@ func _hand() -> void:
 
 func _sidebar() -> void:
 	_panel(Rect2(921, 18, 335, 690))
-	_label("星環の決闘", Rect2(943, 34, 290, 41), 29, GOLD)
+	_art("logo", Rect2(942, 34, 37, 37))
+	_label("星環の決闘", Rect2(990, 34, 250, 41), 28, GOLD)
 	_label(
 		"山札 %d   墓地 %d" % [state.players[0].deck.size(), state.players[0].grave.size()],
 		Rect2(945, 87, 285, 28),
@@ -384,10 +428,11 @@ func _detail() -> void:
 		return
 	var card: Dictionary = Catalog.card(inspected_id)
 	_label(card.name, Rect2(944, 130, 290, 36), 24, WHITE, "detail_name")
-	var art_name: String = {"炎": "fire", "水": "water", "風": "wind", "土": "earth"}.get(
-		card.attribute, "wind"
-	)
-	_art(art_name, Rect2(948, 177, 280, 139), "detail_art")
+	var actor := Actor.new()
+	actor.name = "detail_art"
+	actor.position = Vector2(948, 172)
+	content.add_child(actor)
+	actor.setup(inspected_id, Vector2(280, 145))
 	var stats: String = "魔法" if card.type == "spell" else "罠・攻撃時に自動発動"
 	if card.type == "monster":
 		stats = "攻 %d   守 %d   /   ★%d・%s" % [card.attack, card.defense, card.level, card.attribute]
@@ -442,7 +487,7 @@ func _select(zone: String, index: int, id: String) -> void:
 
 func _inspect(id: String) -> void:
 	inspected_id = id
-	if screen == "duel" and not show_help:
+	if screen == "duel" and not show_help and not busy:
 		_detail()
 
 
@@ -493,8 +538,13 @@ func _perform(success: bool) -> void:
 	if recent_messages.size() > 8:
 		recent_messages.pop_front()
 	var events: Array = state.events.duplicate(true)
-	_render()
+	for child: Node in content.get_children():
+		if child is Button:
+			child.disabled = true
 	for event: Dictionary in events:
+		if event.type == "summon":
+			_render()
+		var actor_duration: float = _animate_card_event(event)
 		var kind: String = event.type
 		var player: int = event.get("player", 0)
 		var origin := Vector2(460, 414 if player == 0 else 226)
@@ -518,28 +568,35 @@ func _perform(success: bool) -> void:
 			"destroy": "破壊",
 			"damage": "ライフ減少",
 			"trap": "罠 発動",
-			"spell": "魔法 発動"
+			"spell": "魔法 発動",
+			"set": "罠をセット"
 		}
 		if names.has(kind):
 			var caption: String = names[kind]
-			if event.has("id") and not (kind == "draw" and player == 1):
+			if event.has("id") and not (kind in ["draw", "set"] and player == 1):
 				caption += "  " + Catalog.card(event.id).name
 			if event.has("amount"):
 				caption += "  %d" % event.amount
-			effect.play(kind, caption, origin, destination)
-			_play_sound(
-				kind if kind in ["draw", "summon", "attack", "destroy", "damage"] else "summon"
-			)
-			await get_tree().create_timer(0.48).timeout
+			var presentation_kind: String = kind
+			if kind == "spell" and event.id == "boost":
+				presentation_kind = "boost"
+				destination = Vector2(116 + state._strongest(player) * 170, origin.y)
+			effect.play(presentation_kind, caption, origin, destination)
+			_play_sound(presentation_kind if presentation_kind != "spell" else "summon")
+			await get_tree().create_timer(maxf(effect.duration(), actor_duration + 0.06)).timeout
 	busy = false
 	cpu_time = 0
 	if state.winner != -1:
 		screen = "result"
-		_play_sound("victory")
+		audio.set_scene("victory" if state.winner == 0 else "defeat")
+		_play_sound("victory" if state.winner == 0 else "damage")
+		_reveal_screen()
 	_render()
 
 
 func _result() -> void:
+	_art("cards/m11" if state.winner == 0 else "cards/m23", Rect2(-55, 155, 435, 435))
+	_art("logo", Rect2(1035, 225, 200, 200))
 	_panel(Rect2(268, 105, 744, 505))
 	_label("決闘終了", Rect2(320, 140, 640, 38), 23, TEAL)
 	_label("あなたの勝利" if state.winner == 0 else "あなたの敗北", Rect2(319, 208, 646, 90), 55, GOLD)
@@ -565,6 +622,8 @@ func _back_title() -> void:
 	screen = "title"
 	show_help = false
 	_render()
+	audio.set_scene("title")
+	_reveal_screen()
 
 
 func _page(direction: int) -> void:
@@ -630,11 +689,8 @@ func _show_grave() -> void:
 
 
 func _play_sound(kind: String) -> void:
-	for sound: AudioStreamPlayer in sounds:
-		if not sound.playing:
-			sound.stream = load("res://assets/audio/%s.wav" % kind)
-			sound.play()
-			return
+	if not audio_stopped:
+		audio.play_effect(kind)
 
 
 func _panel(rect: Rect2) -> void:
@@ -642,7 +698,9 @@ func _panel(rect: Rect2) -> void:
 	panel.position = rect.position
 	panel.size = rect.size
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_theme_stylebox_override("panel", _style(Color("102536"), Color("355263")))
+	panel.add_theme_stylebox_override(
+		"panel", _style(Color(0.04, 0.09, 0.14, 0.95), Color("355263"))
+	)
 	content.add_child(panel)
 
 
@@ -686,13 +744,11 @@ func _button(
 	button.size = rect.size
 	button.disabled = unavailable
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_font_size_override("font_size", 16)
-	button.add_theme_color_override("font_color", WHITE)
-	button.add_theme_stylebox_override("disabled", _style(Color("132b3a"), Color("294451")))
-	button.add_theme_stylebox_override("normal", _style(Color("19384a"), Color("537277")))
-	button.add_theme_stylebox_override("hover", _style(Color("245061"), TEAL))
-	button.add_theme_stylebox_override("focus", _style(Color(0, 0, 0, 0), GOLD))
-	button.add_theme_stylebox_override("pressed", _style(Color("346571"), WHITE))
+	button.pivot_offset = rect.size * 0.5
+	button.mouse_entered.connect(_button_motion.bind(button, Vector2.ONE * 1.025))
+	button.mouse_exited.connect(_button_motion.bind(button, Vector2.ONE))
+	button.button_down.connect(_button_motion.bind(button, Vector2.ONE * 0.975))
+	button.button_up.connect(_button_motion.bind(button, Vector2.ONE))
 	button.pressed.connect(action)
 	content.add_child(button)
 	return button
@@ -707,3 +763,80 @@ func _style(background: Color, border: Color) -> StyleBoxFlat:
 	box.content_margin_left = 8
 	box.content_margin_right = 8
 	return box
+
+
+func _life_bar(player: int, rect: Rect2, color: Color) -> void:
+	var bar := ProgressBar.new()
+	bar.name = "life_bar%d" % player
+	bar.position = rect.position
+	bar.size = rect.size
+	bar.max_value = 8000.0
+	bar.value = display_life[player]
+	bar.show_percentage = false
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_theme_stylebox_override("background", _style(Color("1b2b39"), Color.TRANSPARENT))
+	bar.add_theme_stylebox_override("fill", _style(color, Color.TRANSPARENT))
+	content.add_child(bar)
+	bar.size = rect.size
+	bar.set_deferred("size", rect.size)
+
+
+func _phase_track() -> void:
+	for index: int in PHASE_NAMES.size():
+		var phase: String = PHASE_NAMES.keys()[index]
+		var active: bool = state.phase == phase
+		var rect := Rect2(38 + index * 143, 308, 134, 30)
+		var panel := Panel.new()
+		panel.position = rect.position
+		panel.size = rect.size
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_theme_stylebox_override(
+			"panel",
+			_style(
+				Color("244747") if active else Color("0d1c2a"), GOLD if active else Color("293d48")
+			)
+		)
+		content.add_child(panel)
+		_label(
+			PHASE_NAMES[phase],
+			Rect2(rect.position + Vector2(25, 3), Vector2(105, 26)),
+			15,
+			GOLD if active else MUTED
+		)
+	_label("あなたの番" if state.turn_player == 0 else "相手の番", Rect2(670, 308, 211, 29), 18, TEAL)
+
+
+# 押下ごとの視覚フィードバックであり、現在の Tween を置き換えて重複を防ぐ。
+func _button_motion(button: Button, target: Vector2) -> void:
+	if button.has_meta("motion"):
+		var previous: Tween = button.get_meta("motion")
+		previous.kill()
+	var motion: Tween = button.create_tween()
+	motion.tween_property(button, "scale", target, 0.12).set_trans(Tween.TRANS_QUAD)
+	button.set_meta("motion", motion)
+
+
+# ルールが確定したイベントを表示中のカードに適用するため非冪等。
+func _animate_card_event(event: Dictionary) -> float:
+	var duration: float = 0.0
+	var player: int = event.get("player", 0)
+	var index: int = event.get("source", 0) if event.type == "attack" else event.get("target", 0)
+	var card: Control = content.get_node_or_null("monster%d_%d" % [player, index])
+	var action: String = {"summon": "summon", "attack": "attack", "destroy": "death"}.get(
+		event.type, ""
+	)
+	if card is CardView and not action.is_empty():
+		card.play_action(action)
+		duration = card.actor.animation_length(action)
+	if event.type == "attack" and event.get("target", -1) >= 0:
+		var target: Control = content.get_node_or_null("monster%d_%d" % [1 - player, event.target])
+		if target is CardView:
+			duration = maxf(duration, 0.28 + target.actor.animation_length("hit"))
+			get_tree().create_timer(0.28).timeout.connect(
+				func() -> void:
+					if is_instance_valid(target):
+						target.play_action("hit")
+			)
+	if event.type == "summon" and event.id in ["m11", "m23"]:
+		audio.set_scene("boss")
+	return duration

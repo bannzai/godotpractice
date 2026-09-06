@@ -16,7 +16,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint test screenshot movie movie-play check-shutdown run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -35,7 +35,7 @@ check: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import
+selfcheck: import check-shutdown
 	"$(GODOT)" --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
@@ -47,7 +47,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck check-shutdown
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -72,6 +72,27 @@ movie: import
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 実入力で探索・隊長戦・結果・タイトル復帰を26秒録画する。
+movie-play: import
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
+	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	grep -q 'プレイ録画 OK' $(LOG_DIR)/movie-play.log
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/movie-play-frame-%02d.png
+
+# 短時間の強制終了と再生中の通常終了を別々に検証し、リーク警告を除外しない。
+check-shutdown: import
+	@for frames in 1 8 40 150; do \
+	  "$(GODOT)" --headless --path . --fixed-fps 30 --quit-after $$frames > $(LOG_DIR)/quit-after-$$frames.log 2>&1 || exit $$?; \
+	  if grep -i -e WARNING -e ERROR -e 'resources still in use' $(LOG_DIR)/quit-after-$$frames.log; then exit 1; fi; \
+	done
+	"$(GODOT)" --headless --path . --script res://scripts/dev/shutdown.gd > $(LOG_DIR)/shutdown.log 2>&1
+	grep -q '通常終了要求' $(LOG_DIR)/shutdown.log
+	! grep -i -e WARNING -e ERROR -e 'resources still in use' $(LOG_DIR)/shutdown.log
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import

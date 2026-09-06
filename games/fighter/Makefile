@@ -16,11 +16,12 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint test screenshot movie movie-play shutdown-check run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
 	@mkdir -p $(LOG_DIR)
+	@touch $(LOG_DIR)/.gdignore
 	"$(GODOT)" --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
@@ -73,6 +74,41 @@ movie: import
 	awk '/max_volume:/ { found = 1; exit ($$5 > -55) ? 0 : 1 } END { if (!found) exit 1 }' $(LOG_DIR)/movie-audio.log
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 実キー入力でタイトル→選択→対戦→結果→タイトルを29秒録画する。
+# demo.gdだけで後半の時間を短縮する。通常99秒ルールの時間検証はselfcheckで行う。
+# 毎回同じ出力を置き換え、2秒間隔のPNG・一覧・末尾フレームを生成する。
+movie-play: import
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
+	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
+	grep -q '^fighter demo OK$$' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' -e 'ObjectDB instances were leaked' -e 'resources still in use' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -pix_fmt yuv420p -c:a aac $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffprobe -v error -select_streams v:0 -show_entries stream=avg_frame_rate,duration -of default=noprint_wrappers=1 $(LOG_DIR)/movie-play.mp4 > $(LOG_DIR)/movie-play-video.log
+	awk -F= '/avg_frame_rate=/ { fps = ($$2 == "30/1") } /duration=/ { duration = ($$2 >= 26 && $$2 <= 30) } END { exit !(fps && duration) }' $(LOG_DIR)/movie-play-video.log
+	ffmpeg -hide_banner -i $(LOG_DIR)/movie-play.mp4 -af volumedetect -vn -sn -dn -f null - > $(LOG_DIR)/movie-play-audio.log 2>&1
+	awk '/max_volume:/ { found = 1; exit ($$5 > -55 && $$5 <= 0) ? 0 : 1 } END { if (!found) exit 1 }' $(LOG_DIR)/movie-play-audio.log
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/movie-play-frame-%02d.png
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf 'fps=1/2,scale=320:180,tile=4x4:padding=4:margin=4:color=0x112631' -frames:v 1 $(LOG_DIR)/movie-play-frames.png
+	ffmpeg -loglevel error -y -ss 5.1 -i $(LOG_DIR)/movie-play.mp4 -t 1.2 -vf 'fps=10,scale=320:180,tile=4x3:padding=4:margin=4:color=0x112631' -frames:v 1 $(LOG_DIR)/movie-play-jump-frames.png
+	ffmpeg -loglevel error -y -ss 9.4 -i $(LOG_DIR)/movie-play.mp4 -t 1.2 -vf 'fps=10,scale=320:180,tile=4x3:padding=4:margin=4:color=0x112631' -frames:v 1 $(LOG_DIR)/movie-play-special-frames.png
+	ffmpeg -loglevel error -y -sseof -0.1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
+	ffmpeg -v error -i $(LOG_DIR)/movie-play-last.png -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
+	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 通常終了とエンジン側の--quit-after終了の両経路で、ログ全文の終了時リークを検査する。
+shutdown-check: import
+	FIGHTER_VERIFY_RUN=1 "$(GODOT)" --path . $(WINDOWED_FLAGS) > $(LOG_DIR)/shutdown-normal.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/shutdown-normal.log; \
+	tail -n 1 $(LOG_DIR)/shutdown-normal.log | grep -q '^exit=0$$'
+	grep -q '^fighter run OK$$' $(LOG_DIR)/shutdown-normal.log
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --fixed-fps 30 --quit-after 90 > $(LOG_DIR)/shutdown-quit-after.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/shutdown-quit-after.log; \
+	tail -n 1 $(LOG_DIR)/shutdown-quit-after.log | grep -q '^exit=0$$'
+	grep -q '^fighter boot$$' $(LOG_DIR)/shutdown-quit-after.log
+	! grep -i -e 'WARNING' -e 'ERROR' -e 'ObjectDB instances were leaked' -e 'resources still in use' $(LOG_DIR)/shutdown-normal.log $(LOG_DIR)/shutdown-quit-after.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import

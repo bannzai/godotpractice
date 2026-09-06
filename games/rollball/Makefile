@@ -6,6 +6,7 @@
 # 環境変数 GODOT で Linux バイナリを渡す。
 GODOT ?= /Applications/Godot.app/Contents/MacOS/Godot
 LOG_DIR := tmp
+RUN_ARGS ?=
 
 # 描画付きで起動する target (screenshot / movie) の共通オプション。headless では描画されないため付けない。
 # CI の Linux では Xvfb + llvmpipe 上で実行する
@@ -18,7 +19,7 @@ MOVIE_FRAMES ?= 150
 MOVIE_BASENAME ?= movie
 MOVIE_SCRIPT ?=
 
-.PHONY: import check selfcheck integration lint test screenshot movie movie-growth performance run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck integration lint test screenshot movie movie-play movie-growth shutdown-check performance run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -26,6 +27,7 @@ import:
 	"$(GODOT)" --headless --path . --import > $(LOG_DIR)/import.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/import.log; \
 	tail -n 1 $(LOG_DIR)/import.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/import.log
 
 # 起動検証。シーン・スクリプトがロードでき、メインシーンの _ready が走ることを boot 出力で確認する
 check: import
@@ -36,7 +38,7 @@ check: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import integration
+selfcheck: import integration shutdown-check
 	"$(GODOT)" --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
@@ -73,7 +75,7 @@ screenshot: import
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
 	rm -f $(LOG_DIR)/$(MOVIE_BASENAME).avi $(LOG_DIR)/$(MOVIE_BASENAME).mp4
-	"$(GODOT)" --path . $(WINDOWED_FLAGS) $(MOVIE_SCRIPT) --write-movie $(LOG_DIR)/$(MOVIE_BASENAME).avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/$(MOVIE_BASENAME).log 2>&1; \
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) $(MOVIE_SCRIPT) --write-movie $(LOG_DIR)/$(MOVIE_BASENAME).avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) -- --audio-stop-at-frame $(MOVIE_FRAMES) > $(LOG_DIR)/$(MOVIE_BASENAME).log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/$(MOVIE_BASENAME).log; \
 	tail -n 1 $(LOG_DIR)/$(MOVIE_BASENAME).log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/$(MOVIE_BASENAME).log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
@@ -82,9 +84,29 @@ movie: import
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/$(MOVIE_BASENAME).mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
-# 同じ物理・回収処理を通した成長の録画。通常の movie は起動〜タイトルを維持する。
+# 実キーとスティックの入力から25秒のプレイを録画する。
+movie-play: MOVIE_BASENAME = play
+movie-play: MOVIE_FRAMES = 840
+movie-play: MOVIE_SCRIPT = --script res://scripts/dev/demo.gd
+movie-play: movie
+	grep -q '^demo OK$$' $(LOG_DIR)/play.log
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/play.mp4 -vf fps=1/2,scale=384:216,tile=4x4 -frames:v 1 $(LOG_DIR)/play-frames.png
+	ffmpeg -loglevel error -y -sseof -1 -i $(LOG_DIR)/play.mp4 -frames:v 1 $(LOG_DIR)/play-last.png
+
+# 通常終了とフレーム指定終了を検証する。音声再生ありの経路は movie / movie-play で検証する。
+shutdown-check: import
+	"$(GODOT)" --headless --path . --fixed-fps 60 --script res://scripts/dev/shutdown.gd > $(LOG_DIR)/shutdown-normal.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/shutdown-normal.log
+	"$(GODOT)" --headless --path . --fixed-fps 60 --quit-after 60 > $(LOG_DIR)/shutdown-frames.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/shutdown-frames.log
+	grep -q '^shutdown OK$$' $(LOG_DIR)/shutdown-normal.log
+	grep -q '^exit=0$$' $(LOG_DIR)/shutdown-normal.log
+	grep -q '^exit=0$$' $(LOG_DIR)/shutdown-frames.log
+	! grep -i -e 'WARNING' -e 'ERROR' -e 'leaked' -e 'resources still in use' $(LOG_DIR)/shutdown-*.log
+
+# 既存の成長録画も実入力シナリオを共有する。
 movie-growth: MOVIE_BASENAME = growth
-movie-growth: MOVIE_FRAMES = 660
+movie-growth: MOVIE_FRAMES = 840
 movie-growth: MOVIE_SCRIPT = --script res://scripts/dev/demo.gd
 movie-growth: movie
 
@@ -98,7 +120,7 @@ performance: import
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
-	"$(GODOT)" --path .
+	"$(GODOT)" --path . $(RUN_ARGS)
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
 # 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要

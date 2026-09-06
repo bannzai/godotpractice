@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
+<defs>
+    <radialGradient id="back"><stop stop-color="#24445b"/><stop offset="1" stop-color="#081722"/></radialGradient>
+    <radialGradient id="aura"><stop stop-color="#7bbecf" stop-opacity=".45"/><stop offset="1" stop-color="#7bbecf" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2=".8"><stop stop-color="#dcffff"/><stop offset=".4" stop-color="#7bbecf"/><stop offset=".68" stop-color="#2d486f"/><stop offset="1" stop-color="#7bbecf"/></linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#488c99"/><stop offset=".55" stop-color="#234862"/><stop offset="1" stop-color="#0c202f"/></linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#eef8e4"/><stop offset=".45" stop-color="#c5dfd5"/><stop offset=".48" stop-color="#557589"/><stop offset="1" stop-color="#a0c4bf"/></linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3d9ad"/><stop offset=".55" stop-color="#d7ad84"/><stop offset="1" stop-color="#8e6965"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#ffffe1"/><stop offset=".3" stop-color="#dcffff"/><stop offset=".7" stop-color="#7bbecf"/><stop offset="1" stop-color="#2d486f"/></radialGradient>
+    </defs><path d="M137 112Q85 89 32 111L53 134 86 142 58 150 86 165 111 162 89 181 127 178 151 144Z" fill="url(#metal)" stroke="#101b2a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M187 115Q232 70 287 88L275 112 243 135 272 127 257 154 231 162 246 171 213 184 174 148Z" fill="url(#metal)" stroke="#101b2a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M47 115L127 143M65 132L129 153M266 97L200 140M264 116L197 153" fill="none" stroke="#d9f4e5" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
+</svg>

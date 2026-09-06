@@ -16,7 +16,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -75,6 +75,18 @@ movie: import
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
 	"$(GODOT)" --path .
+
+# 実入力を時刻ごとに投入した26秒のプレイ。起動だけの movie と別の検証成果物にする。
+movie-play: import
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
+	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
+	grep -q '^プレイ録画 OK:' $(LOG_DIR)/movie-play.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	rm -f $(LOG_DIR)/movie-play.avi
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf "fps=1/2,scale=320:180,tile=4x4" -frames:v 1 $(LOG_DIR)/movie-play-frames.png
+	ffmpeg -loglevel error -y -sseof -1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
 # 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要

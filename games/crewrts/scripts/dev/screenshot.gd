@@ -4,6 +4,7 @@ extends SceneTree
 ## ゲーム固有の状態作り (画面遷移・スコアの投入・操作の再現等) は _capture_scenes() に足す。
 ## autoload は --script 起動でも root から取得できる。
 
+const Gallery = preload("res://scripts/dev/animation_gallery.gd")
 
 func _initialize() -> void:
 	# BGM の autoload やゲーム側の SE が撮影中に鳴らないよう Master バスをミュートする
@@ -13,8 +14,7 @@ func _initialize() -> void:
 
 ## 時間経過と物理で画面を進めるため、同じ実行中に重ねて呼び出さない。
 func _run() -> void:
-	if await _capture_scenes():
-		quit(0)
+	quit(0 if await _capture_scenes() else 1)
 
 
 ## 撮影する画面の並び。雛形はメインシーン (タイトル) だけを撮る。失敗した撮影は _capture() が
@@ -29,9 +29,11 @@ func _capture_scenes() -> bool:
 	await create_timer(0.5).timeout
 	if not await _capture("tmp/screenshot-play.png"):
 		return false
-	if not await _capture_actions(main):
-		return false
-	if not await _capture_results(main):
+	for capture: Callable in [_capture_actions, _capture_results, _capture_effects]:
+		if not await capture.call(main):
+			return false
+	var gallery: RefCounted = Gallery.new()
+	if not await gallery.capture(self, main, _capture):
 		return false
 	main.stop_audio()
 	await create_timer(0.15).timeout
@@ -46,17 +48,26 @@ func _capture_actions(main: Node) -> bool:
 	var point: Vector3 = model.cargo[0].position
 	model.throw_at(point)
 	model.throw_at(point)
-	model.step(0.24, Vector3.ZERO)
-	main.world.sync(model, 0.24, point)
-	main.hud.refresh(model)
-	if not await _capture("tmp/screenshot-throw.png"):
-		return false
+	main._consume_events()
+	main.world.sync(model, 0.0, point)
+	for frame: Dictionary in [
+		{"delta": 0.0, "file": "throw-start"}, {"delta": 0.24, "file": "throw"},
+		{"delta": 0.32, "file": "throw-end"},
+	]:
+		model.step(frame.delta, Vector3.ZERO)
+		main.world.sync(model, frame.delta, point)
+		main.hud.refresh(model)
+		if not await _capture("tmp/screenshot-%s.png" % frame.file):
+			return false
 	model.step(1.0, Vector3.ZERO)
 	model.whistle()
+	main._consume_events()
 	main.world.whistle_time = 1.0
 	main.world.sync(model, 0.45, point)
+	await create_timer(0.2).timeout
 	if not await _capture("tmp/screenshot-whistle.png"):
 		return false
+	await create_timer(0.7).timeout
 	model.throw_at(point)
 	model.throw_at(point)
 	model.step(1.5, Vector3.ZERO)
@@ -69,9 +80,12 @@ func _capture_actions(main: Node) -> bool:
 	for index: int in range(6):
 		model.throw_at(model.enemies[0].position)
 	model.step(0.8, Vector3.ZERO)
+	main._consume_events()
 	main.world.set_camera(model, 0, 0, true)
 	main.world.sync(model, 0.2, model.enemies[0].position)
+	main.effects.sync(model, 0.3, main.world.camera)
 	main.hud.refresh(model)
+	await create_timer(0.2).timeout
 	if not await _capture("tmp/screenshot-combat.png"):
 		return false
 	return true
@@ -82,15 +96,63 @@ func _capture_results(main: Node) -> bool:
 	model.collected = model.goal
 	model.step(0.01, Vector3.ZERO)
 	main.hud.refresh(model)
+	await create_timer(0.75).timeout
 	if not await _capture("tmp/screenshot-clear.png"):
 		return false
-	model.start_day()
+	main.start_day()
 	model.remaining = 0.01
 	model.step(0.02, Vector3.ZERO)
+	main.world.sync(model, 0.02, model.leader)
 	main.hud.refresh(model)
+	await create_timer(0.75).timeout
 	if not await _capture("tmp/screenshot-failed.png"):
 		return false
 	return true
+
+
+func _capture_effects(main: Node) -> bool:
+	main.start_day()
+	var model: Node = main.model
+	model.leader = Vector3(-8, 0, -4)
+	main.world.set_camera(model, 0, 0, true)
+	main.world.sync(model, 0.0, model.enemies[0].position)
+	main.hud.refresh(model)
+	await create_timer(0.7).timeout
+	for index: int in range(8):
+		model.throw_at(model.enemies[0].position)
+	model.step(2.0, Vector3.ZERO)
+	main._consume_events()
+	main.world.sync(model, 0.2, model.enemies[0].position)
+	main.effects.sync(model, 0.3, main.world.camera)
+	main.hud.refresh(model)
+	await create_timer(0.24).timeout
+	if not await _capture("tmp/screenshot-defeat.png"):
+		return false
+	main.start_day()
+	model.leader = Vector3(-8, 0, -4)
+	model.crew[0].state = "idle"
+	model.crew[0].position = model.enemies[0].position
+	main.effects.reset(model)
+	main.world.sync(model, 0.0, model.enemies[0].position)
+	main.world.set_camera(model, 0, 0, true)
+	model.step(1.45, Vector3.ZERO)
+	main._consume_events()
+	main.world.sync(model, 0.1, model.enemies[0].position)
+	main.effects.sync(model, 0.3, main.world.camera)
+	main.hud.refresh(model)
+	await create_timer(0.2).timeout
+	if not await _capture("tmp/screenshot-lost.png"):
+		return false
+	main.start_day()
+	model.throw_at(model.cargo[0].position)
+	model.throw_at(model.cargo[0].position)
+	model.step(12.0, Vector3.ZERO)
+	main._consume_events()
+	main.world.sync(model, 0.2, model.base_position)
+	main.effects.sync(model, 0.3, main.world.camera)
+	main.hud.refresh(model)
+	await create_timer(0.3).timeout
+	return await _capture("tmp/screenshot-delivery.png")
 
 
 func _capture(path: String) -> bool:

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
+<defs>
+    <radialGradient id="back"><stop stop-color="#3e3140"/><stop offset="1" stop-color="#081722"/></radialGradient>
+    <radialGradient id="aura"><stop stop-color="#d79a55" stop-opacity=".45"/><stop offset="1" stop-color="#d79a55" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2=".8"><stop stop-color="#fff1ae"/><stop offset=".4" stop-color="#d79a55"/><stop offset=".68" stop-color="#6f3342"/><stop offset="1" stop-color="#d79a55"/></linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#b35e60"/><stop offset=".55" stop-color="#592c42"/><stop offset="1" stop-color="#0c202f"/></linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#eef8e4"/><stop offset=".45" stop-color="#c5dfd5"/><stop offset=".48" stop-color="#557589"/><stop offset="1" stop-color="#a0c4bf"/></linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3d9ad"/><stop offset=".55" stop-color="#d7ad84"/><stop offset="1" stop-color="#8e6965"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#ffffe1"/><stop offset=".3" stop-color="#fff1ae"/><stop offset=".7" stop-color="#d79a55"/><stop offset="1" stop-color="#6f3342"/></radialGradient>
+    </defs><path d="M153 128Q112 156 139 187 156 207 121 218 171 230 187 204L192 161 222 147 230 123 205 102 186 118Z" fill="url(#metal)" stroke="#101b2a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M160 146Q143 177 164 189L171 208 184 198 177 178 187 151Z" fill="#e8c492" stroke="#101b2a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M169 151L152 125 159 115 181 134 197 133 201 145M194 165L214 175 227 197 244 198 237 209 214 207 197 189 180 186Z" fill="#aa6b54" stroke="#edc88a" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" /><path d="M178 138l9 6m-14 4 8 6m-15 5 9 7M199 119l7 8 8-7" fill="none" stroke="#f4cd8b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" /><path d="M53 173l2.0 6.0 6.0 2.0 -6.0 2.0 -2.0 6.0 -2.0 -6.0 -6.0 -2.0 6.0 -2.0Z" fill="#edc88a" stroke="none" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+</svg>

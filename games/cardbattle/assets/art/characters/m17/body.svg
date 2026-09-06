@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240">
+<defs>
+    <radialGradient id="back"><stop stop-color="#24445b"/><stop offset="1" stop-color="#081722"/></radialGradient>
+    <radialGradient id="aura"><stop stop-color="#7bbecf" stop-opacity=".45"/><stop offset="1" stop-color="#7bbecf" stop-opacity="0"/></radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2=".8"><stop stop-color="#dcffff"/><stop offset=".4" stop-color="#7bbecf"/><stop offset=".68" stop-color="#2d486f"/><stop offset="1" stop-color="#7bbecf"/></linearGradient>
+    <linearGradient id="cloth" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#488c99"/><stop offset=".55" stop-color="#234862"/><stop offset="1" stop-color="#0c202f"/></linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#eef8e4"/><stop offset=".45" stop-color="#c5dfd5"/><stop offset=".48" stop-color="#557589"/><stop offset="1" stop-color="#a0c4bf"/></linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f3d9ad"/><stop offset=".55" stop-color="#d7ad84"/><stop offset="1" stop-color="#8e6965"/></linearGradient>
+    <radialGradient id="orb"><stop stop-color="#ffffe1"/><stop offset=".3" stop-color="#dcffff"/><stop offset=".7" stop-color="#7bbecf"/><stop offset="1" stop-color="#2d486f"/></radialGradient>
+    </defs><path d="M127 137L129 185 155 215 183 198 201 153 185 109 150 99Z" fill="url(#cloth)" stroke="#a8eeeb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" /><path d="M142 155L152 195 169 203 187 168 171 151Z" fill="#8fb9c0" stroke="#101b2a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M144 153l8 9 7-8m2 17 7 9 7-10m-32-40 5 6 6-5M157 207l-9 12m14-9-1 12m19-21 4 15m-1-15 8 10" fill="none" stroke="#a8eeeb" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" /><path d="M70 63l1.5 4.5 4.5 1.5 -4.5 1.5 -1.5 4.5 -1.5 -4.5 -4.5 -1.5 4.5 -1.5Z" fill="#a8eeeb" stroke="none" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" /><path d="M245 46l2.0 6.0 6.0 2.0 -6.0 2.0 -2.0 6.0 -2.0 -6.0 -6.0 -2.0 6.0 -2.0Z" fill="#a8eeeb" stroke="none" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" />
+</svg>

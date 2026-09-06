@@ -5,7 +5,7 @@ extends Node
 
 # 実フレームを待って撮影・終了する一回限りの検証なので非冪等。
 func _ready() -> void:
-	await get_tree().process_frame
+	await get_tree().create_timer(0.7).timeout
 	await RenderingServer.frame_post_draw
 	var state: Node = get_node("/root/RunState")
 	var image: Image = get_viewport().get_texture().get_image()
@@ -19,8 +19,7 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	print("runcheck OK")
-	for child: Node in get_parent().get_children():
-		if child is AudioStreamPlayer:
-			child.stop()
-	await get_tree().create_timer(0.2).timeout
+	get_parent().audio.shutdown()
+	await get_tree().process_frame
+	await get_tree().process_frame
 	get_tree().quit(0)

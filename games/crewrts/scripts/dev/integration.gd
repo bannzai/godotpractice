@@ -24,6 +24,7 @@ func _run() -> void:
 	await _check_keyboard()
 	await _check_gamepad()
 	await _check_mouse()
+	await _check_animation_flow()
 	await _check_result_loop()
 	main.show_title()
 	await _frames(2)
@@ -180,6 +181,38 @@ func _check_fullscreen() -> void:
 	await _tap_key(KEY_F11)
 	await create_timer(0.8).timeout
 	_check(DisplayServer.window_get_mode() == original, "F11 の再押下で元の表示モードへ戻る")
+
+
+func _check_animation_flow() -> void:
+	main.start_day()
+	await _frames(3)
+	_key(KEY_W, true)
+	await _frames(6)
+	_check(main.world.leader_mesh.animation_player.current_animation == "walk",
+		"移動入力から隊長の歩行アニメーションへ接続")
+	_key(KEY_W, false)
+	await _tap_key(KEY_SHIFT)
+	await _tap_key(KEY_ESCAPE)
+	var actor: Node3D = main.world.leader_mesh
+	var position: float = actor.animation_player.current_animation_position
+	var remaining: float = actor._action_time
+	await _frames(8)
+	_check(is_equal_approx(actor.animation_player.current_animation_position, position),
+		"休憩中は部位アニメーションが止まる")
+	_check(is_equal_approx(actor._action_time, remaining), "休憩中は一回演出の残り時間も止まる")
+	await _tap_key(KEY_ESCAPE)
+	await _frames(5)
+	_check(actor._action_time < remaining, "再開すると一回演出が続きから動く")
+	# 残り時間の差に頼ると、短時間の再出発で前日の姿勢とエフェクトが残る。
+	main.start_day()
+	main.world.notify_action("whistle")
+	main.world.whistle_time = 1.0
+	main.start_day()
+	await _frames(3)
+	_check(actor._action.is_empty() and main.world.whistle_time == 0.0,
+		"短時間の再出発でも隊長の一回演出をリセット")
+	_check(main.world.crew_meshes.size() == model.crew.size()
+		and main.world._retired.is_empty(), "再出発時に前日の隊員表示を残さない")
 
 
 func _check_result_loop() -> void:

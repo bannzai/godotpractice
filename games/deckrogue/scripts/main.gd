@@ -2,13 +2,24 @@ extends Control
 ## 状態は Run が所有し、ここには描画と操作の進行だけを置く。
 
 const UI := preload("res://scripts/ui.gd")
+const Actor := preload("res://scripts/actor.gd")
+const Effects := preload("res://scripts/effects.gd")
+const Backdrop := preload("res://scripts/backdrop.gd")
 const Catalog := preload("res://scripts/card_catalog.gd")
 
 var screen: Control
 var overlay: Control
 var particles: Control
 var card_nodes: Array[Button] = []
-var enemy_art: TextureRect
+var enemy_art: Node2D
+var hero_art: Node2D
+var effects_layer: Control
+var backdrop: Control
+var displayed_phase: String = ""
+var health_label: Label
+var health_bar: ProgressBar
+var displayed_hp: int = -1
+var closing: bool = false
 var busy: bool = false
 var modal: String = ""
 var first_focus: Button
@@ -17,10 +28,8 @@ var animation: Tween
 
 func _ready() -> void:
 	print("deckrogue boot")
-	var game_theme := Theme.new()
-	game_theme.default_font = load("res://assets/fonts/ZenOldMincho-Regular.ttf")
-	game_theme.default_font_size = 22
-	theme = game_theme
+	theme = preload("res://assets/ui/pilgrimage.tres")
+	get_tree().auto_accept_quit = false
 	Run.changed.connect(_on_changed)
 	Run.effect.connect(_effect)
 	_render()
@@ -47,7 +56,20 @@ func _render(draw_cards: bool = true) -> void:
 	card_nodes.clear()
 	first_focus = null
 	enemy_art = null
-	UI.art(screen, "background", Rect2(0, 0, 1280, 720))
+	hero_art = null
+	if not is_instance_valid(backdrop):
+		backdrop = Backdrop.new()
+		backdrop.z_index = -10
+		add_child(backdrop)
+	backdrop.setup("boss" if Run.phase == "battle" and Run.current_kind == "boss" else Run.phase)
+	if not is_instance_valid(effects_layer):
+		effects_layer = Effects.new()
+		effects_layer.z_index = 20
+		add_child(effects_layer)
+	elif displayed_phase != Run.phase:
+		for effect: Node in effects_layer.get_children():
+			effects_layer.remove_child(effect)
+			effect.queue_free()
 	match Run.phase:
 		"title": _title()
 		"map": _map()
@@ -64,26 +86,44 @@ func _render(draw_cards: bool = true) -> void:
 	if Run.phase == "battle":
 		Sound.track("boss" if Run.current_kind == "boss" else "battle")
 	else:
-		Sound.track("map")
+		var track_name: String = "map"
+		if Run.phase == "title":
+			track_name = "title"
+		elif Run.phase == "result":
+			track_name = "victory" if Run.won else "result"
+		Sound.track(track_name)
+	if displayed_phase != Run.phase:
+		_transition()
+	displayed_phase = Run.phase
 
 
 func _title() -> void:
-	UI.panel(screen, Rect2(64, 92, 630, 524), Color("18383dee"), UI.GOLD)
-	UI.label(screen, "八つの夜を越え、消えかけた灯を空へ。", Rect2(102, 129, 560, 36), 22, UI.GOLD)
-	UI.label(screen, "燈火の巡礼", Rect2(96, 185, 570, 96), 68)
-	UI.label(screen, "カードを紡ぐ、ひとりの旅", Rect2(104, 285, 540, 42), 28)
-	UI.label(screen, "進む道を選び、敵の意図を読み、灯を守る。\n集めたカードと遺物が、あなたの戦い方になる。",
-		Rect2(104, 362, 555, 78), 21, UI.MUTED)
-	first_focus = UI.button(screen, "巡礼をはじめる　→", Rect2(104, 493, 380, 60), _start, true)
-	UI.art(screen, "hero", Rect2(789, 192, 310, 388))
-	UI.label(screen, "一幕完結  ·  分岐する八階層", Rect2(770, 570, 430, 40), 22, UI.GOLD)
+	var keyart: TextureRect = UI.art(screen, "title_keyart", Rect2(360, -70, 1000, 800))
+	var fade := ShaderMaterial.new()
+	fade.shader = preload("res://assets/shaders/keyart.gdshader")
+	keyart.material = fade
+	UI.panel(screen, Rect2(48, 69, 586, 566), Color("101c2cf0"), Color("687371"))
+	UI.art(screen, "logo_mark", Rect2(86, 91, 68, 68))
+	UI.label(screen, "八つの夜を越え、灯を空へ。", Rect2(171, 108, 410, 40), 21, UI.GOLD)
+	UI.label(screen, "燈火の巡礼", Rect2(83, 184, 529, 98), 70)
+	UI.label(screen, "カードを紡ぐ、ひとりの旅", Rect2(92, 293, 514, 42), 27, UI.GOLD)
+	UI.label(screen, "進む道を選び、敵の意図を読み、灯を守る。\n一枚の選択が、夜明けまでの道になる。",
+		Rect2(92, 376, 510, 74), 20, UI.MUTED)
+	first_focus = UI.button(screen, "巡礼をはじめる　→", Rect2(92, 492, 414, 63), _start, true)
+	UI.button(screen, "終了", Rect2(523, 492, 72, 63), _request_quit)
+	UI.label(screen, "一幕完結　／　分岐する八階層", Rect2(94, 578, 470, 30), 17, UI.MUTED)
 
 
 func _hud() -> void:
-	UI.panel(screen, Rect2(24, 18, 1232, 64), Color("102a31f5"), Color("536963"))
-	UI.label(screen, "燈火の巡礼", Rect2(46, 26, 190, 46), 25, UI.GOLD)
-	UI.label(screen, "体力  %d / %d" % [Run.hp, Run.max_hp], Rect2(262, 26, 205, 46), 24)
-	UI.label(screen, "第 %d / 8 層" % maxi(1, Run.floor_index + 1), Rect2(489, 26, 154, 46), 22)
+	UI.panel(screen, Rect2(24, 18, 1232, 64), Color("101c2cf5"), Color("536963"))
+	UI.art(screen, "logo_mark", Rect2(36, 25, 43, 43))
+	UI.label(screen, "燈火の巡礼", Rect2(87, 29, 178, 40), 23, UI.GOLD)
+	health_label = UI.label(screen, "", Rect2(284, 21, 194, 32), 20)
+	health_bar = UI.meter(screen, Rect2(284, 61, 177, 5), Run.max_hp, Run.hp, UI.RUST)
+	var previous: int = Run.hp if displayed_hp < 0 else displayed_hp
+	UI.count(health_label, previous, Run.hp, "体力  %d / " + str(Run.max_hp))
+	displayed_hp = Run.hp
+	UI.label(screen, "第 %02d / 08 層" % maxi(1, Run.floor_index + 1), Rect2(499, 29, 165, 36), 21)
 	UI.button(screen, "デッキ %d [D]" % Run.deck.size(), Rect2(771, 30, 190, 42), _open_deck)
 	UI.button(screen, "地図 [M]", Rect2(975, 30, 128, 42), _open_map)
 	UI.button(screen, "音 切替", Rect2(1117, 30, 116, 42), _toggle_audio)
@@ -105,7 +145,9 @@ func _map() -> void:
 	_draw_route(screen, true)
 	UI.panel(screen, Rect2(58, 524, 1164, 140), Color("16363deb"), Color("64716a"))
 	UI.label(screen, "携えた遺物", Rect2(80, 539, 300, 36), 24, UI.GOLD)
-	UI.label(screen, _relic_text(), Rect2(80, 581, 1110, 72), 19)
+	UI.label(screen, _relic_text(), Rect2(80, 581, 968, 72), 18)
+	for index: int in range(Run.relics.size()):
+		UI.art(screen, "relic_" + Run.relics[index], Rect2(1060 + index * 49, 543, 46, 46))
 
 
 func _draw_route(parent: Control, interactive: bool) -> void:
@@ -124,7 +166,10 @@ func _draw_route(parent: Control, interactive: bool) -> void:
 				caption = "✓ " + caption
 			var button: Button = UI.button(parent, caption, Rect2(x, y, 126, 64),
 				_choose_node.bind(choice), active)
-			button.add_theme_font_size_override("font_size", 19)
+			button.icon = load("res://assets/art/route_" + str(node.kind) + ".svg")
+			button.expand_icon = true
+			button.add_theme_constant_override("icon_max_width", 25)
+			button.add_theme_font_size_override("font_size", 16)
 			button.disabled = not active
 			if row_index <= Run.floor_index:
 				button.modulate = Color(0.65, 0.75, 0.7, 0.65)
@@ -137,24 +182,25 @@ func _draw_route(parent: Control, interactive: bool) -> void:
 func _battle(draw_cards: bool) -> void:
 	UI.label(screen, "第 %d ターン" % Run.turn, Rect2(54, 100, 300, 38), 26, UI.GOLD)
 	UI.label(screen, "弱体：与ダメージ−25%　脆弱：被ダメージ＋50%", Rect2(54, 145, 640, 32), 17, UI.MUTED)
-	UI.art(screen, "hero", Rect2(139, 172, 190, 240))
+	hero_art = _actor("hero", Rect2(103, 155, 254, 264))
 	UI.label(screen, "灯守", Rect2(146, 400, 200, 34), 24)
 	UI.label(screen, "防御 %d  /  力 %d" % [Run.block, Run.strength],
-		Rect2(84, 440, 340, 30), 19, UI.GOLD)
+		Rect2(84, 446, 340, 28), 19, UI.GOLD)
 	UI.label(screen, _status_text(Run.weak, Run.vulnerable),
 		Rect2(64, 188, 350, 32), 17, UI.RUST)
 	UI.panel(screen, Rect2(749, 100, 438, 62), Color("402f32"), UI.RUST)
 	UI.label(screen, "次の行動　" + Run.intent_text(), Rect2(771, 110, 395, 44), 23)
-	enemy_art = UI.art(screen, _enemy_asset(), Rect2(844, 167, 200, 250))
+	enemy_art = _actor(_enemy_asset(), Rect2(808, 145, 282, 278))
 	UI.label(screen, str(Run.enemy.name), Rect2(820, 394, 380, 38), 25)
 	UI.label(screen, "体力 %d / %d   防御 %d" % [Run.enemy.hp, Run.enemy.max_hp, Run.enemy.block],
-		Rect2(786, 437, 422, 30), 20, UI.GOLD)
+		Rect2(786, 446, 422, 28), 20, UI.GOLD)
+	UI.meter(screen, Rect2(805, 439, 265, 5), Run.enemy.max_hp, Run.enemy.hp, UI.RUST)
 	UI.label(screen, _status_text(Run.enemy.weak, Run.enemy.vulnerable),
 		Rect2(804, 173, 410, 32), 17, UI.RUST)
-	UI.panel(screen, Rect2(479, 229, 254, 133), Color("16383eee"), Color("70837b"))
-	UI.label(screen, "エネルギー　%d / 3" % Run.energy, Rect2(498, 246, 228, 40), 24, UI.GOLD)
+	UI.art(screen, "icon_energy", Rect2(563, 202, 86, 86))
+	UI.label(screen, "エネルギー　%d / 3" % Run.energy, Rect2(498, 280, 228, 40), 24, UI.GOLD)
 	UI.label(screen, "山札 %d  捨て札 %d  廃棄 %d" % [Run.draw_pile.size(),
-		Run.discard_pile.size(), Run.exhaust_pile.size()], Rect2(496, 300, 235, 30), 17)
+		Run.discard_pile.size(), Run.exhaust_pile.size()], Rect2(496, 327, 235, 30), 17)
 	var message_label: Label = UI.label(screen, Run.message,
 		Rect2(407, 380, 380, 72), 18, UI.MUTED)
 	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -197,10 +243,9 @@ func _card(parent: Node, id: String, rect: Rect2, callback: Callable) -> Button:
 	button.add_theme_stylebox_override("disabled", UI.box(Color("aca899"), Color("687b76")))
 	UI.label(button, str(data.cost), Rect2(12, 3, 32, 34), 27, UI.INK)
 	UI.label(button, str(data.name), Rect2(45, 6, rect.size.x - 52, 34), 17, UI.INK)
-	UI.art(button, "icon_attack" if is_attack else ("icon_relic" if is_power else "icon_block"),
-		Rect2(rect.size.x / 2 - 18, 40, 36, 36))
+	UI.art(button, "card_" + id, Rect2(10, 40, rect.size.x - 20, 49))
 	var description: Label = UI.label(button, Catalog.card_text(id),
-		Rect2(12, 79, rect.size.x - 24, rect.size.y - 108), 14, UI.INK)
+		Rect2(12, 93, rect.size.x - 24, rect.size.y - 120), 14, UI.INK)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var category: String = Catalog.TYPES[data.type]
 	UI.label(button, category + " · " + str(data.rarity),
@@ -226,7 +271,8 @@ func _rest() -> void:
 	UI.label(screen, "消えない焚火", Rect2(98, 154, 720, 70), 46)
 	UI.label(screen, "火に手をかざす。長い夜にも、休息はある。\n体力を回復して、次の道へ進もう。",
 		Rect2(104, 267, 680, 90), 25)
-	UI.art(screen, "icon_energy", Rect2(880, 235, 190, 190))
+	hero_art = _actor("hero", Rect2(873, 173, 260, 320))
+	effects_layer.burst("heal", Vector2(994, 380), 0)
 	first_focus = UI.button(screen, "休息して回復する", Rect2(104, 472, 458, 68), _rest_action, true)
 
 
@@ -234,7 +280,7 @@ func _event() -> void:
 	UI.label(screen, "道端の小さな祠", Rect2(98, 154, 760, 70), 46)
 	UI.label(screen, "古い巡礼者が残した贈り物。\n遺物は、この旅が終わるまで力を貸してくれる。",
 		Rect2(104, 267, 740, 90), 24)
-	UI.art(screen, "icon_relic", Rect2(927, 250, 146, 146))
+	hero_art = _actor("npc_keeper", Rect2(870, 166, 280, 350))
 	first_focus = UI.button(screen, "贈り物を受け取る", Rect2(104, 472, 458, 68), _event_action, true)
 
 
@@ -243,8 +289,14 @@ func _result() -> void:
 	UI.label(screen, "夜明けに、灯は届いた。" if Run.won else "灯は、また誰かの手へ。",
 		Rect2(239, 194, 840, 74), 42, UI.GOLD)
 	UI.label(screen, "巡礼達成" if Run.won else "巡礼の終わり", Rect2(242, 300, 750, 46), 30)
-	UI.label(screen, "到達 %d 階層　 ·　 デッキ %d 枚　 ·　 遺物 %d 個" %
-		[Run.floor_index + 1, Run.deck.size(), Run.relics.size()], Rect2(242, 369, 765, 45), 23)
+	UI.art(screen, "logo_mark", Rect2(945, 272, 94, 94))
+	var metrics: Array[int] = [Run.floor_index + 1, Run.deck.size(), Run.relics.size()]
+	var captions: Array[String] = ["到達した階層", "携えたカード", "集めた遺物"]
+	for index: int in range(metrics.size()):
+		var x: float = 245 + index * 251
+		var number: Label = UI.label(screen, "0", Rect2(x, 363, 100, 57), 38, UI.GOLD)
+		UI.count(number, 0, metrics[index], "%02d")
+		UI.label(screen, captions[index], Rect2(x, 423, 223, 30), 17, UI.MUTED)
 	first_focus = UI.button(screen, "もう一度 巡礼する", Rect2(243, 486, 367, 65), _start, true)
 	UI.button(screen, "タイトルへ", Rect2(650, 486, 355, 65), _return_title)
 
@@ -273,7 +325,7 @@ func _enemy_asset() -> String:
 		return "boss"
 	var ids: Array = Catalog.ENEMIES.keys()
 	var index: int = ids.find(Run.enemy.id)
-	return ["enemy_moth", "enemy_sentinel", "enemy_wisp"][maxi(0, index) % 3]
+	return ["enemy_moth", "enemy_sentinel", "enemy_brute"][maxi(0, index) % 3]
 
 
 # ボタン入力はゲームを一歩進めるため、イベントにつき一度だけ実行する。
@@ -297,10 +349,27 @@ func _choose_reward(index: int) -> void:
 
 
 func _rest_action() -> void:
+	if busy:
+		return
+	busy = true
+	var previous: int = Run.hp
 	Run.rest()
+	effects_layer.burst("heal", Vector2(987, 340), Run.hp - previous)
+	Sound.play("heal")
+	await get_tree().create_timer(0.8).timeout
+	busy = false
+	_render()
 
 
 func _event_action() -> void:
+	if busy:
+		return
+	busy = true
+	hero_art.play_action("move")
+	effects_layer.burst("power", Vector2(999, 331), 0)
+	Sound.play("power")
+	await get_tree().create_timer(0.8).timeout
+	busy = false
 	Run.resolve_event()
 
 
@@ -314,7 +383,7 @@ func _draw_card_animation(button: Button, index: int) -> void:
 	button.position = Vector2(100, 100)
 	button.scale = Vector2(0.25, 0.25)
 	button.modulate.a = 0.0
-	var tween: Tween = create_tween().set_parallel(true)
+	var tween: Tween = button.create_tween().set_parallel(true)
 	tween.tween_property(button, "position", destination, 0.25).set_delay(index * 0.04)
 	tween.tween_property(button, "scale", Vector2.ONE, 0.25).set_delay(index * 0.04)
 	tween.tween_property(button, "modulate:a", 1.0, 0.20).set_delay(index * 0.04)
@@ -329,6 +398,7 @@ func _play_card(index: int) -> void:
 	var id: String = Run.hand[index]
 	var source: Vector2 = card_nodes[index].global_position
 	Sound.play("card")
+	hero_art.play_action("attack" if Catalog.CARDS[id].type == "attack" else "move")
 	var flight: Button = _card(particles, id, Rect2(source, Vector2(174, 184)), Callable())
 	flight.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	animation = create_tween().set_parallel(true)
@@ -336,7 +406,11 @@ func _play_card(index: int) -> void:
 	animation.tween_property(flight, "scale", Vector2(0.7, 0.7), 0.20)
 	await animation.finished
 	Run.play_card(index)
-	await get_tree().create_timer(0.38).timeout
+	if Run.enemy.hp <= 0:
+		enemy_art.play_action("death")
+		effects_layer.burst("death", Vector2(947, 302))
+		Sound.play("death")
+	await get_tree().create_timer(1.16 if Run.enemy.hp <= 0 else 0.6).timeout
 	busy = false
 	_render(int(Catalog.CARDS[id].effects.get("draw", 0)) > 0)
 
@@ -358,33 +432,76 @@ func _end_turn() -> void:
 		animation.tween_property(card, "modulate:a", 0.0, 0.2)
 	if not card_nodes.is_empty():
 		await animation.finished
+	enemy_art.play_action("attack" if Run.enemy.intent.kind == "attack" else "move")
+	await get_tree().create_timer(0.15).timeout
 	Run.end_turn()
-	await get_tree().create_timer(0.25).timeout
+	if Run.hp <= 0:
+		hero_art.play_action("death")
+		effects_layer.burst("death", Vector2(248, 302))
+		Sound.play("death")
+	await get_tree().create_timer(1.16 if Run.hp <= 0 else 0.6).timeout
 	busy = false
 	_render()
 
 
+# 効果シグナル一回につき、一つの視聴覚演出を発火する。
 func _effect(kind: String, amount: int) -> void:
-	if not is_instance_valid(particles):
+	if not is_instance_valid(effects_layer) or not busy:
 		return
-	if kind not in ["attack", "hurt", "block"]:
+	if kind not in ["attack", "hurt", "block", "heal", "power"]:
 		return
-	var is_block: bool = kind == "block"
-	Sound.play("block" if is_block else "attack")
-	var x: float = 904 if kind == "attack" else 260
-	var value: String = "+%d 防御" % amount if is_block else "−%d" % amount
-	var number: Label = UI.label(particles, value, Rect2(x, 260, 245, 72), 48,
-		UI.GOLD if is_block else UI.PAPER)
-	number.z_index = 10
-	number.add_theme_color_override("font_outline_color", UI.INK)
-	number.add_theme_constant_override("outline_size", 6)
-	var tween: Tween = create_tween().set_parallel(true)
-	tween.tween_property(number, "position:y", 201.0, 0.43)
-	tween.tween_property(number, "modulate:a", 0.0, 0.50)
+	Sound.play("attack" if kind == "hurt" else kind)
+	var point := Vector2(947, 298) if kind == "attack" else Vector2(250, 298)
+	effects_layer.burst(kind, point, amount)
 	if kind == "attack" and is_instance_valid(enemy_art):
-		enemy_art.modulate = Color(2.0, 0.7, 0.5)
-		tween.tween_property(enemy_art, "modulate", Color.WHITE, 0.20)
-		tween.tween_property(enemy_art, "position:x", 859.0, 0.06)
+		enemy_art.play_action("hurt")
+	elif kind == "hurt" and is_instance_valid(hero_art):
+		hero_art.play_action("hurt")
+	if kind in ["attack", "hurt"]:
+		var shake: Tween = screen.create_tween()
+		shake.tween_property(screen, "position", Vector2(5, -2), 0.045)
+		shake.tween_property(screen, "position", Vector2(-4, 1), 0.045)
+		shake.tween_property(screen, "position", Vector2.ZERO, 0.07)
+	if is_instance_valid(health_label):
+		UI.count(health_label, displayed_hp, Run.hp, "体力  %d / " + str(Run.max_hp))
+		health_bar.value = Run.hp
+		displayed_hp = Run.hp
+
+
+func _actor(id: String, rect: Rect2) -> Node2D:
+	var actor := Actor.new()
+	screen.add_child(actor)
+	actor.setup(id, rect)
+	return actor
+
+
+# 画面遷移の表示一回分。Tween は表示ノードに所有させ、作り直し時に破棄する。
+func _transition() -> void:
+	if not displayed_phase.is_empty():
+		Sound.play("transition")
+	screen.modulate.a = 0.0
+	screen.position.y = 14
+	var tween: Tween = screen.create_tween().set_parallel(true)
+	tween.tween_property(screen, "modulate:a", 1.0, 0.32)
+	tween.tween_property(screen, "position:y", 0.0, 0.32).set_trans(Tween.TRANS_CUBIC)
+	if Run.phase == "reward":
+		effects_layer.burst("reward", Vector2(640, 342))
+	elif Run.phase == "result" and Run.won:
+		effects_layer.burst("victory", Vector2(640, 280))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_request_quit()
+
+
+func _request_quit() -> void:
+	if closing:
+		return
+	closing = true
+	busy = true
+	await Sound.shutdown()
+	get_tree().quit()
 
 
 func _open_deck() -> void:
@@ -424,6 +541,7 @@ func _open_modal(kind: String) -> void:
 	modal = kind
 	screen.process_mode = Node.PROCESS_MODE_DISABLED
 	screen.hide()
+	effects_layer.hide()
 	overlay = Control.new()
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -437,6 +555,8 @@ func _close_modal() -> void:
 	if is_instance_valid(screen):
 		screen.process_mode = Node.PROCESS_MODE_INHERIT
 		screen.show()
+	if is_instance_valid(effects_layer):
+		effects_layer.show()
 	if is_instance_valid(overlay):
 		remove_child(overlay)
 		overlay.queue_free()

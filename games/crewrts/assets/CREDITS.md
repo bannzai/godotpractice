@@ -14,14 +14,14 @@
 
 ## 音声 (`assets/audio/`)
 
-- **素材名**: 庭の伴奏と回収隊の操作音 (`garden.wav`, `whistle.wav`, `throw.wav`, `delivery.wav`, `defeat.wav`, `lost.wav`)
-- **作者**: 本プロジェクトで新規作成（Codex によるコード生成）
+- **素材名**: 庭の伴奏と回収隊の操作音 (`title.wav`, `garden.wav`, `battle.wav`, `clear.wav`, `failed.wav`, `whistle.wav`, `throw.wav`, `delivery.wav`, `defeat.wav`, `lost.wav`, `hit.wav`, `switch.wav`)
+- **作者**: 本プロジェクトで新規作成（Codexによるコード生成）
 - **入手 URL**: https://github.com/bannzai/godotpractice
-- **ライセンス**: 外部素材未使用の独自生成物。第三者ライセンス条件なし。CC0 等の別ライセンスは付与していない。
+- **ライセンス**: 外部素材未使用の独自生成物。CC0等の別ライセンスは付与していない。
 - **クレジット表記**: **不要**
-- **改変**: 新規生成。PCM 16-bit / 22050 Hz。伴奏はステレオ 16 秒、効果音はモノラル。
-- **備考**: 再生成: python3 scripts/dev/generate_audio.py。外部の録音・サンプル・旋律を取り込まず、正弦波の倍音・包絡線・音高列から生成した。伴奏の残響をループ先頭へ折り返して接続。OpenAI の利用条件上、適用法の範囲で出力の権利は利用者に帰属: https://openai.com/policies/terms-of-use/ 。第三者著作物の利用許諾や著作権の成立を保証するものではない。
-- **生成**: Python 3 標準ライブラリ math / wave、生成コードは Codex / プロンプトの要点: 穏やかな庭に合う木琴風のループ伴奏、呼び寄せ、投擲、納品、敵撃破、隊員喪失を区別できる短い音。既存曲や作品の再現を求めず数式で合成。
+- **改変**: 第2ラウンドで全曲と効果音を刷新。PCM 16-bit / 22050Hz。曲はステレオ、効果音はモノラル。
+- **備考**: 再生成はpython3 scripts/dev/generate_audio.py。外部サンプルと既存曲を使用しない。OpenAIと利用者との関係では適用法の範囲で出力の権利は利用者に帰属: https://openai.com/policies/terms-of-use/
+- **生成**: Python 3 標準ライブラリ / Codex / プロンプトの要点: 庭に合う木琴・弦・リード・ベース・ノイズ打楽器を合成。タイトル・庭・戦闘・成功・失敗で旋律、速さ、音色を変える。操作と出来事を区別する7種の効果音。
 
 ## 立体造形（ゲーム内で生成）
 
@@ -35,3 +35,25 @@
 - **生成指示の要点**: 青緑・オレンジ・アイボリーを中心に、小さなロボットとエネルギー結晶を温かい庭に配置するオリジナル RTS。既存作品の再現は行わない。
 - **生成理由**: キャラクターと庭の形・配色を揃え、ゲームの状態を立体形状から読み取れるようにするため。
 - **利用規約上の帰属**: OpenAI と利用者の関係では、適用法の範囲で出力の権利は利用者に帰属。https://openai.com/policies/terms-of-use/
+
+## 第2ラウンドの立体造形 (`assets/models/`)
+
+- **素材名**: 独立モデルと部位アニメーション (`captain.tscn`, `striker.tscn`, `porter.tscn`, `beetle.tscn`, `thorn_beetle.tscn`, `crystal_light.tscn`, `crystal_medium.tscn`, `crystal_heavy.tscn`, `base.tscn`)
+- **作者**: 本プロジェクトで新規作成（Codexによるコード生成）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 外部素材未使用の独自生成物。CC0等の別ライセンスは付与していない。
+- **クレジット表記**: **不要**
+- **改変**: Godotのプリミティブから新規作成。第三者モデルの取り込みなし。
+- **備考**: 造形コードはscripts/visuals。OpenAIと利用者との関係では適用法の範囲で出力の権利は利用者に帰属: https://openai.com/policies/terms-of-use/
+- **生成**: Godot 4.7 / GDScript / Codex / プロンプトの要点: 隊長・朱のハンマー装甲・青の運搬装備・甲虫・トゲ甲虫を固有の輪郭に。重量ごとに結晶を分け、基地を庭の作業場にする。元作品の再現は行わない。
+
+## 第2ラウンドの画面素材 (`assets/ui/`)
+
+- **素材名**: 庭のロゴ・キーアート・操作アイコン・テーマ (`logo-mark.svg`, `title-garden.svg`, `crystal.svg`, `sun.svg`, `crew-red.svg`, `crew-blue.svg`, `whistle.svg`, `garden-theme.tres`)
+- **作者**: 本プロジェクトで新規作成（Codexによるコード生成）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 外部画像未使用の独自生成物。CC0等の別ライセンスは付与していない。
+- **クレジット表記**: **不要**
+- **改変**: SVGとGodot Themeを新規作成。第三者画像の取り込みなし。
+- **備考**: 既存のM PLUS Rounded 1cをThemeから参照。OpenAIと利用者との関係では適用法の範囲で出力の権利は利用者に帰属: https://openai.com/policies/terms-of-use/
+- **生成**: SVG / Godot Theme / Codex / プロンプトの要点: 温かなクリームと濃緑、朱と青で庭と回収隊を描く。人物と操作アイコンを分離し、ゲームモデルの装備に合わせる。

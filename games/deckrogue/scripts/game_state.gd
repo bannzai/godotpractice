@@ -306,15 +306,19 @@ func _apply_effect(key: String, amount: int) -> void:
 		"draw":
 			_draw(amount)
 		"heal":
+			var previous: int = hp
 			hp = mini(max_hp, hp + amount)
+			effect.emit("heal", hp - previous)
 		"energy":
 			energy += amount
 		"weak", "vulnerable":
 			enemy[key] += amount
 		"strength":
 			strength += amount
+			effect.emit("power", amount)
 		"armor":
 			armor += amount
+			effect.emit("power", amount)
 		"draw_bonus":
 			draw_bonus += amount
 

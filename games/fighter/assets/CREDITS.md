@@ -15,14 +15,14 @@
 
 ## 音声 (`assets/audio/`)
 
-- **素材名**: 燈環闘技の打撃音・防御音・特殊攻撃音・競技場曲 (`hit.wav`, `guard.wav`, `special.wav`, `arena.wav`)
+- **素材名**: 燈環闘技の打撃音・防御音・特殊攻撃音・競技場曲 (`hit.wav`, `guard.wav`, `special.wav`, `arena.wav`, `title.wav`, `final.wav`, `result.wav`, `confirm.wav`, `ko.wav`)
 - **作者**: 本プロジェクトで Codex を用いて独自制作
 - **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/scripts/dev/generate_audio.py
 - **ライセンス**: 独自制作素材（外部素材の流用なし）
 - **クレジット表記**: **不要**
 - **改変**: なし
 - **備考**: scripts/dev/generate_audio.py で同一データに再生成可能。第三者の録音、楽曲、音色サンプルは使用していない。
-- **生成**: Python 標準ライブラリによる数学的音声合成 / プロンプトの要点: 固定乱数と正弦波で金属打撃・防御・上昇音を合成。BGM は独自の 120 BPM、8 小節、16 秒の反復演奏。
+- **生成**: Python 標準ライブラリによる数学的音声合成 / プロンプトの要点: 固定乱数ノイズのドラム、倍音・FM・非整数倍の共鳴による独自のベース・ブラス・ベル・パッドを合成。タイトル96 BPM、対戦128 BPM、最終ラウンド160 BPM、結果112 BPMで音色・旋律・ドラムパターンを分けた。
 
 ## フォント (`assets/fonts/`)
 
@@ -41,3 +41,23 @@ SVG と音声合成スクリプトは Codex が本プロジェクト用に生成
 確認日: 2026-09-06
 
 https://openai.com/policies/terms-of-use/
+
+## 第2ラウンドの舞台・UI・演出 (`assets/stage/`, `assets/ui/`, `assets/effects/`)
+
+- **素材名**: 多層の黄昏闘技場 (`sky.svg`, `city.svg`, `arena.svg`, `haze.svg`)、打撃と防御と飛び道具 (`spark.svg`, `impact.svg`, `guard.svg`, `wave-teal.svg`, `wave-amber.svg`)、ロゴとHUD (`title-logo.svg`, `health-frame.svg`, `round-medal.svg`, `fighter-theme.tres`)、画面周縁の陰影 (`vignette.gdshader`)
+- **作者**: 本プロジェクトでCodexを用いて独自制作
+- **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/scripts/dev/generate_stage.py
+- **ライセンス**: 独自制作素材。ロゴの文字輪郭は同梱Noto Sans JP（OFL-1.1）に由来する図版。フォントの利用条件と全文は上記フォント欄を参照。
+- **クレジット表記**: 独自図案は不要。フォントの著作権表示とOFL全文は配布物へ同梱。
+- **改変**: 同梱フォントの文字をfontToolsでSVGの輪郭に変換。フォントファイルは変更なし。
+- **生成**: CodexによるSVG/Python/GDScript/シェーダのソース作成。青緑・琥珀・濃紺の独自の都市闘技場、発光粒子、キャラごとに形が異なる燈波。画像生成サービスや第三者の図案は使用せず、同じスクリプトから同一SVGを再生成できる。
+
+## 第2ラウンドの闘士 (`assets/characters/`)
+
+- **素材名**: 蒼と燈の独立スプライトシートとアニメーション定義 (`teal-sheet.svg`, `amber-sheet.svg`, `teal-frames.tres`, `amber-frames.tres`)、被弾の明滅 (`fighter-flash.gdshader`)、上記の `portrait-teal.svg`, `portrait-amber.svg` の改訂
+- **作者**: 本プロジェクトでCodexを用いて独自制作
+- **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/scripts/dev/generate_characters.py
+- **ライセンス**: 独自制作素材（外部素材の流用なし）。上記の独自制作素材の生成条件に従う。
+- **クレジット表記**: 不要
+- **改変**: 第1ラウンドの共通デザインを、顔・服装・体格・装備の異なる2人へ描き直した。
+- **生成**: PythonによるSVG作画。蒼のスカーフと軽装、燈の大型籠手・肩鎧を別のパスで描く。キャラごとに22動作×8フレームを出力。原作の図案・画像・ロゴは使用していない。

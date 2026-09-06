@@ -1,0 +1,717 @@
+[gd_scene load_steps=27 format=3]
+
+[ext_resource type="Script" path="res://scripts/visuals/toy_visual.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_cream"]
+albedo_color = Color(1.0, 0.9451, 0.80784, 1)
+roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="Mat_ink"]
+albedo_color = Color(0.20392, 0.30196, 0.31373, 1)
+roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.90588, 0.68627, 0.27843, 1)
+roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="Mat_coral"]
+albedo_color = Color(0.84706, 0.47059, 0.37647, 1)
+roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="Mat_teal"]
+albedo_color = Color(0.34118, 0.61569, 0.58824, 1)
+roughness = 0.72
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.73333, 0.51765, 0.35686, 1)
+roughness = 0.72
+
+[sub_resource type="BoxMesh" id="Mesh_1"]
+material = SubResource("Mat_wood")
+size = Vector3(0.68, 0.16, 0.92)
+
+[sub_resource type="BoxMesh" id="Mesh_2"]
+material = SubResource("Mat_coral")
+size = Vector3(0.54, 0.47, 0.34)
+
+[sub_resource type="BoxMesh" id="Mesh_3"]
+material = SubResource("Mat_cream")
+size = Vector3(0.36, 0.22, 0.025)
+
+[sub_resource type="BoxMesh" id="Mesh_4"]
+material = SubResource("Mat_teal")
+size = Vector3(0.67, 0.1, 0.49)
+
+[sub_resource type="CylinderMesh" id="Mesh_5"]
+material = SubResource("Mat_coral")
+top_radius = 0.24
+bottom_radius = 0.24
+height = 0.4
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_6"]
+material = SubResource("Mat_gold")
+top_radius = 0.2
+bottom_radius = 0.2
+height = 0.035
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_7"]
+material = SubResource("Mat_teal")
+top_radius = 0.11
+bottom_radius = 0.085
+height = 0.2
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_8"]
+material = SubResource("Mat_ink")
+top_radius = 0.155
+bottom_radius = 0.155
+height = 0.065
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_9"]
+material = SubResource("Mat_ink")
+top_radius = 0.155
+bottom_radius = 0.155
+height = 0.065
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_10"]
+material = SubResource("Mat_ink")
+top_radius = 0.155
+bottom_radius = 0.155
+height = 0.065
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="Mesh_11"]
+material = SubResource("Mat_ink")
+top_radius = 0.155
+bottom_radius = 0.155
+height = 0.065
+radial_segments = 12
+
+[sub_resource type="Animation" id="Anim_RESET"]
+resource_name = "RESET"
+length = 0.001
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(1, 1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Anim_idle"]
+resource_name = "idle"
+length = 2.8
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.014, 0), Vector3(0, 0, 0), Vector3(0, 0.008, 0), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(1, 1, 1), Vector3(1.014, 0.988, 1.014), Vector3(1, 1, 1), Vector3(0.99, 1.016, 0.99), Vector3(1, 1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.02), Vector3(0, 0, 0.025), Vector3(0, 0, 0.01), Vector3(0, 0, -0.018), Vector3(0, 0, -0.02)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.028), Vector3(0, 0, 0), Vector3(0, 0, -0.0245), Vector3(0, 0, 0)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.104, 0, 0), Vector3(0, 0, 0), Vector3(-0.091, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.08, 0, 0), Vector3(0, 0, 0), Vector3(-0.07, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.7, 1.4, 2.1, 2.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.08, 0, 0), Vector3(0, 0, 0), Vector3(-0.07, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Anim_move"]
+resource_name = "move"
+length = 0.65
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.04, 0), Vector3(0, 0, 0), Vector3(0, 0.04, 0), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(1, 1, 1), Vector3(0.97, 1.05, 0.97), Vector3(1, 1, 1), Vector3(0.97, 1.05, 0.97), Vector3(1, 1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.075), Vector3(0, 0, 0.02), Vector3(0, 0, 0.075), Vector3(0, 0, -0.02), Vector3(0, 0, -0.075)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.077), Vector3(0, 0, 0), Vector3(0, 0, 0.077), Vector3(0, 0, 0), Vector3(0, 0, -0.077)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(-0.286, 0, 0), Vector3(0, 0, 0), Vector3(0.286, 0, 0), Vector3(0, 0, 0), Vector3(-0.286, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(-0.22, 0, 0), Vector3(0, 0, 0), Vector3(0.22, 0, 0), Vector3(0, 0, 0), Vector3(-0.22, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.1625, 0.325, 0.4875, 0.65),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(-0.22, 0, 0), Vector3(0, 0, 0), Vector3(0.22, 0, 0), Vector3(0, 0, 0), Vector3(-0.22, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Anim_collect"]
+resource_name = "collect"
+length = 0.6
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.13, 0), Vector3(0, 0.18, 0), Vector3(0, 0.04, 0), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(1, 1, 1), Vector3(0.86, 1.18, 0.86), Vector3(1.15, 0.87, 1.15), Vector3(0.96, 1.06, 0.96), Vector3(1, 1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, -0.16, -0.12), Vector3(0, 0.2, 0.13), Vector3(0, 0, -0.05), Vector3(0, 0, 0)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, -0.182), Vector3(0, 0, 0.154), Vector3(0, 0, -0.0525), Vector3(0, 0, 0)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.676, 0, 0), Vector3(0.572, 0, 0), Vector3(-0.195, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.52, 0, 0), Vector3(0.44, 0, 0), Vector3(-0.15, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.15, 0.3, 0.45, 0.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.52, 0, 0), Vector3(0.44, 0, 0), Vector3(-0.15, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Anim_bump"]
+resource_name = "bump"
+length = 0.42
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, -0.04), Vector3(0, 0.03, 0), Vector3(0, 0, 0.02), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(1, 1, 1), Vector3(1.16, 0.78, 1.08), Vector3(0.95, 1.08, 0.96), Vector3(1.03, 0.98, 1.03), Vector3(1, 1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.14, 0, -0.2), Vector3(-0.05, 0, 0.15), Vector3(0, 0, -0.06), Vector3(0, 0, 0)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, -0.14), Vector3(0, 0, 0.0805), Vector3(0, 0, -0.035), Vector3(0, 0, 0)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.52, 0, 0), Vector3(0.299, 0, 0), Vector3(-0.13, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.4, 0, 0), Vector3(0.23, 0, 0), Vector3(-0.1, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.105, 0.21, 0.315, 0.42),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(-0.4, 0, 0), Vector3(0.23, 0, 0), Vector3(-0.1, 0, 0), Vector3(0, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Anim_celebrate"]
+resource_name = "celebrate"
+length = 1.1
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.14, 0), Vector3(0, 0, 0), Vector3(0, 0.1, 0), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(1, 1, 1), Vector3(0.92, 1.13, 0.92), Vector3(1.06, 0.93, 1.06), Vector3(0.94, 1.1, 0.94), Vector3(1, 1, 1)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, -0.05), Vector3(0, 0.15, 0.12), Vector3(0, 0, -0.05), Vector3(0, -0.15, -0.12), Vector3(0, 0, -0.05)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0.0875), Vector3(0, 0, -0.175), Vector3(0, 0, 0.0875), Vector3(0, 0, -0.175), Vector3(0, 0, 0.0875)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0.325, 0, 0), Vector3(-0.65, 0, 0), Vector3(0.325, 0, 0), Vector3(-0.65, 0, 0), Vector3(0.325, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0.25, 0, 0), Vector3(-0.5, 0, 0), Vector3(0.25, 0, 0), Vector3(-0.5, 0, 0), Vector3(0.25, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.275, 0.55, 0.825, 1.1),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0.25, 0, 0), Vector3(-0.5, 0, 0), Vector3(0.25, 0, 0), Vector3(-0.5, 0, 0), Vector3(0.25, 0, 0)]
+}
+
+[sub_resource type="Animation" id="Anim_lost"]
+resource_name = "lost"
+length = 0.8
+loop_mode = 0
+tracks/0/type = "value"
+tracks/0/path = NodePath("Pivot:position")
+tracks/0/interp = 1
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0.06, 0), Vector3(0, 0, 0), Vector3(0, 0, 0), Vector3(0, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/path = NodePath("Pivot:scale")
+tracks/1/interp = 1
+tracks/1/enabled = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(1, 1, 1), Vector3(0.95, 1.08, 0.95), Vector3(1.08, 0.86, 1.08), Vector3(1.06, 0.9, 1.06), Vector3(1.06, 0.9, 1.06)]
+}
+tracks/2/type = "value"
+tracks/2/path = NodePath("Pivot:rotation")
+tracks/2/interp = 1
+tracks/2/enabled = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.18), Vector3(0.16, 0, -0.12), Vector3(0.12, 0, -0.13), Vector3(0.12, 0, -0.13)]
+}
+tracks/3/type = "value"
+tracks/3/path = NodePath("Pivot/Cab:rotation")
+tracks/3/interp = 1
+tracks/3/enabled = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0, 0, 0.07), Vector3(0, 0, -0.1225), Vector3(0, 0, -0.098), Vector3(0, 0, -0.098)]
+}
+tracks/4/type = "value"
+tracks/4/path = NodePath("Pivot/Chimney:rotation")
+tracks/4/interp = 1
+tracks/4/enabled = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.26, 0, 0), Vector3(-0.455, 0, 0), Vector3(-0.364, 0, 0), Vector3(-0.364, 0, 0)]
+}
+tracks/5/type = "value"
+tracks/5/path = NodePath("Pivot/LeftWheels:rotation")
+tracks/5/interp = 1
+tracks/5/enabled = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.2, 0, 0), Vector3(-0.35, 0, 0), Vector3(-0.28, 0, 0), Vector3(-0.28, 0, 0)]
+}
+tracks/6/type = "value"
+tracks/6/path = NodePath("Pivot/RightWheels:rotation")
+tracks/6/interp = 1
+tracks/6/enabled = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector3(0, 0, 0), Vector3(0.2, 0, 0), Vector3(-0.35, 0, 0), Vector3(-0.28, 0, 0), Vector3(-0.28, 0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="Library"]
+_data = {
+&"RESET": SubResource("Anim_RESET"),
+&"idle": SubResource("Anim_idle"),
+&"move": SubResource("Anim_move"),
+&"collect": SubResource("Anim_collect"),
+&"bump": SubResource("Anim_bump"),
+&"celebrate": SubResource("Anim_celebrate"),
+&"lost": SubResource("Anim_lost")
+}
+
+[node name="Train" type="Node3D"]
+script = ExtResource("1_script")
+
+
+[node name="Pivot" type="Node3D" parent="."]
+
+
+[node name="Chassis" type="MeshInstance3D" parent="Pivot"]
+position = Vector3(0, 0.2, 0)
+mesh = SubResource("Mesh_1")
+cast_shadow = 0
+
+[node name="Cab" type="Node3D" parent="Pivot"]
+position = Vector3(0, 0.47, -0.22)
+
+
+[node name="Cabin" type="MeshInstance3D" parent="Pivot/Cab"]
+position = Vector3(0, 0, 0)
+mesh = SubResource("Mesh_2")
+cast_shadow = 0
+
+[node name="Window" type="MeshInstance3D" parent="Pivot/Cab"]
+position = Vector3(0, 0.065, 0.183)
+mesh = SubResource("Mesh_3")
+cast_shadow = 0
+
+[node name="Roof" type="MeshInstance3D" parent="Pivot/Cab"]
+position = Vector3(0, 0.27, 0)
+mesh = SubResource("Mesh_4")
+cast_shadow = 0
+
+[node name="Boiler" type="MeshInstance3D" parent="Pivot"]
+position = Vector3(0, 0.42, 0.24)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_5")
+cast_shadow = 0
+
+[node name="BoilerFront" type="MeshInstance3D" parent="Pivot"]
+position = Vector3(0, 0.42, 0.455)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_6")
+cast_shadow = 0
+
+[node name="Chimney" type="Node3D" parent="Pivot"]
+position = Vector3(0, 0.6, 0.24)
+
+
+[node name="Stack" type="MeshInstance3D" parent="Pivot/Chimney"]
+position = Vector3(0, 0.075, 0)
+mesh = SubResource("Mesh_7")
+cast_shadow = 0
+
+[node name="LeftWheels" type="Node3D" parent="Pivot"]
+position = Vector3(-0.35, 0.17, 0)
+
+
+[node name="WheelBack28" type="MeshInstance3D" parent="Pivot/LeftWheels"]
+position = Vector3(0, 0, -0.28)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_8")
+cast_shadow = 0
+
+[node name="Wheel28" type="MeshInstance3D" parent="Pivot/LeftWheels"]
+position = Vector3(0, 0, 0.28)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_9")
+cast_shadow = 0
+
+[node name="RightWheels" type="Node3D" parent="Pivot"]
+position = Vector3(0.35, 0.17, 0)
+
+
+[node name="WheelBack28" type="MeshInstance3D" parent="Pivot/RightWheels"]
+position = Vector3(0, 0, -0.28)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_10")
+cast_shadow = 0
+
+[node name="Wheel28" type="MeshInstance3D" parent="Pivot/RightWheels"]
+position = Vector3(0, 0, 0.28)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_11")
+cast_shadow = 0
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+&"": SubResource("Library")
+}

@@ -16,7 +16,7 @@ func _run() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	state = root.get_node("RunState")
-	await process_frame
+	await create_timer(0.7).timeout
 	_check(state.phase == "title", "タイトルから開始")
 	await _key(KEY_ENTER)
 	_check(state.phase == "playing", "Enter で開始")
@@ -42,8 +42,7 @@ func _run() -> void:
 	Input.parse_input_event(axis)
 	_check(state.player_pos.x < origin.x - 10, "左スティックで左移動")
 	state.gain_xp(12)
-	await process_frame
-	await process_frame
+	await create_timer(0.7).timeout
 	_check(state.phase == "upgrade", "経験値で強化選択")
 	var first: Control = root.gui_get_focus_owner()
 	await _pad(JOY_BUTTON_DPAD_RIGHT)
@@ -52,20 +51,21 @@ func _run() -> void:
 	_check(state.phase == "playing", "A で強化決定")
 	state.invulnerable = 0.0
 	state.take_damage(1000)
-	await process_frame
-	await process_frame
+	await create_timer(0.7).timeout
 	_check(state.phase == "result" and not state.won, "敗北結果へ遷移")
 	await _pad(JOY_BUTTON_A)
 	_check(state.phase == "playing" and state.level == 1, "A で初期状態へ再開")
 	state.elapsed = 599.99
-	await create_timer(0.1).timeout
+	await create_timer(0.8).timeout
 	_check(state.phase == "result" and state.won, "時間満了でクリア結果")
 	await _key(KEY_RIGHT)
 	await _key(KEY_ENTER)
 	_check(state.phase == "title", "結果からタイトルへ戻る")
 	await _check_mouse_and_multiple_levels()
 	await _check_fullscreen()
+	main.audio.shutdown()
 	main.queue_free()
+	await process_frame
 	await process_frame
 	if not failed:
 		print("inputcheck OK")
@@ -84,11 +84,10 @@ func _check_mouse_and_multiple_levels() -> void:
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = false
 	Input.parse_input_event(click)
-	await process_frame
+	await create_timer(0.7).timeout
 	_check(state.phase == "playing", "マウスで開始")
 	state.gain_xp(60)
-	await process_frame
-	await process_frame
+	await create_timer(0.7).timeout
 	for _index: int in range(3):
 		_check(state.phase == "upgrade", "蓄積経験値による連続強化")
 		await _key(KEY_ENTER)
@@ -117,8 +116,7 @@ func _key(code: Key, hold: float = 0.03) -> void:
 	event.physical_keycode = code
 	event.pressed = false
 	Input.parse_input_event(event)
-	await process_frame
-	await process_frame
+	await create_timer(0.7).timeout
 
 
 func _pad(code: JoyButton) -> void:
@@ -131,8 +129,7 @@ func _pad(code: JoyButton) -> void:
 	event.button_index = code
 	event.pressed = false
 	Input.parse_input_event(event)
-	await process_frame
-	await process_frame
+	await create_timer(0.7).timeout
 
 
 func _check(condition: bool, label: String) -> void:

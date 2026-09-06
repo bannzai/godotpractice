@@ -3,6 +3,8 @@ extends Node3D
 
 const WorldView = preload("res://scripts/world.gd")
 const HudView = preload("res://scripts/hud.gd")
+const EffectsView = preload("res://scripts/effects.gd")
+const AudioDirector = preload("res://scripts/audio_director.gd")
 const UI_FONT = preload("res://assets/fonts/MPLUSRounded1c-Regular.ttf")
 
 var model: Node
@@ -14,8 +16,9 @@ var paused: bool = false
 var mouse_aim: bool = false
 var pointer_position := Vector2.ZERO
 var throw_cooldown: float = 0.0
-var music: AudioStreamPlayer
-var sounds: Dictionary = {}
+var effects: Node3D
+var audio: Node
+var impact_time: float = 0.0
 var closing: bool = false
 
 
@@ -28,22 +31,33 @@ func _ready() -> void:
 	world = WorldView.new()
 	add_child(world)
 	world.setup(model, UI_FONT)
+	effects = EffectsView.new()
+	add_child(effects)
+	effects.font = UI_FONT
+	effects.reset(model)
 	hud = HudView.new()
 	add_child(hud)
 	hud.setup(UI_FONT)
 	hud.start_requested.connect(start_day)
 	hud.title_requested.connect(show_title)
-	_setup_audio()
+	audio = AudioDirector.new()
+	add_child(audio)
+	audio.setup()
+	effects.hit_presented.connect(func() -> void: audio.play_event("hit"))
 	world.set_camera(model, yaw, 0.0, true)
 	print("crewrts boot")
 
 
 func start_day() -> void:
 	model.start_day()
+	world.reset_view(model)
 	paused = false
 	yaw = 0.0
 	mouse_aim = false
 	throw_cooldown = 0.0
+	impact_time = 0.0
+	effects.reset(model)
+	effects.set_paused(false)
 	hud.set_paused(false)
 	world.set_camera(model, yaw, 0.0, true)
 
@@ -69,6 +83,7 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause") and model.phase == "playing":
 		paused = not paused
 		hud.set_paused(paused)
+		effects.set_paused(paused)
 		get_viewport().set_input_as_handled()
 
 
@@ -82,6 +97,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		model.dismiss()
 	if event.is_action_pressed("switch_kind"):
 		model.selected_kind = 1 - model.selected_kind
+		audio.play_event("switch")
 	if event.is_action_pressed("throw") and throw_cooldown <= 0:
 		model.throw_at(aim)
 		throw_cooldown = 0.18
@@ -91,7 +107,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	if model == null:
 		return
-	if model.phase == "playing" and not paused:
+	impact_time = maxf(0.0, impact_time - delta)
+	if model.phase == "playing" and not paused and impact_time <= 0.0:
 		yaw -= Input.get_axis("camera_left", "camera_right") * delta * 1.8
 		var input: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 		var movement := Vector3(input.x, 0, input.y).rotated(Vector3.UP, yaw)
@@ -106,7 +123,9 @@ func _physics_process(delta: float) -> void:
 		_consume_events()
 	world.set_camera(model, yaw, delta)
 	world.sync(model, 0.0 if paused else delta, aim)
+	effects.sync(model, 0.0 if paused else delta, world.camera)
 	hud.refresh(model)
+	audio.update_state(model)
 
 
 func _update_aim() -> void:
@@ -135,42 +154,23 @@ func _update_aim() -> void:
 			aim = enemy.position
 
 
-## 音声ノードを作成しBGMを開始するため初期化時に一度だけ呼ぶ。
-func _setup_audio() -> void:
-	music = AudioStreamPlayer.new()
-	var loop: AudioStreamWAV = load("res://assets/audio/garden.wav")
-	loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	loop.loop_end = 352800
-	music.stream = loop
-	music.volume_db = -12
-	add_child(music)
-	# headless は音を出せず、起動直後終了時のWAV再生リークも避ける。
-	if DisplayServer.get_name() != "headless":
-		music.play()
-	for key: String in ["whistle", "throw", "delivery", "defeat", "lost"]:
-		var player := AudioStreamPlayer.new()
-		player.stream = load("res://assets/audio/%s.wav" % key)
-		player.volume_db = -9
-		player.max_polyphony = 4
-		add_child(player)
-		sounds[key] = player
-
-
 ## イベントは一度だけ鳴らして消費する。
 func _consume_events() -> void:
 	for event: String in model.events:
-		if sounds.has(event):
-			sounds[event].play()
+		audio.play_event(event)
+		world.notify_action(event)
+		effects.notify_event(event, model)
+		hud.notify_event(event)
 		if event == "whistle":
 			world.whistle_time = 1.0
+		if event == "defeat" or event == "lost":
+			impact_time = 0.06
 	model.events.clear()
 
 
 func stop_audio() -> void:
-	if is_instance_valid(music):
-		music.stop()
-	for player: AudioStreamPlayer in sounds.values():
-		player.stop()
+	if is_instance_valid(audio):
+		audio.stop_audio()
 
 
 func _exit_tree() -> void:
