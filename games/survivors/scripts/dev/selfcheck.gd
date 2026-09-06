@@ -82,6 +82,7 @@ func _check_gameplay() -> void:
 	_check_damage_and_retry(state)
 	_check_growth(state)
 	_check_combat_and_items(state)
+	_check_crowded_effects(state)
 	_check_finale(state)
 	state.free()
 
@@ -144,8 +145,14 @@ func _check_growth(state: Node) -> void:
 	state.gain_xp(Rules.xp_needed(1))
 	_check(state.phase == "upgrade" and state.level == 2, "経験値でレベルアップして停止")
 	_check(state.choices.size() == 3, "選択肢が 3 個")
-	_check(state.choices[0] != state.choices[1] and state.choices[1] != state.choices[2]
-		and state.choices[0] != state.choices[2], "候補に重複なし")
+	_check(
+		(
+			state.choices[0] != state.choices[1]
+			and state.choices[1] != state.choices[2]
+			and state.choices[0] != state.choices[2]
+		),
+		"候補に重複なし"
+	)
 	var time: float = state.elapsed
 	state.step(0.05, Vector2.RIGHT)
 	_check(state.elapsed == time, "強化選択中は時間が止まる")
@@ -228,3 +235,16 @@ func _check_finale(state: Node) -> void:
 	_check(state.elapsed == Rules.DURATION, "結果の生存時間は 10 分")
 	state.start_run(42)
 	_check(not state.boss_spawned and not state.won, "再開で最終強敵・勝敗を初期化")
+
+
+func _check_crowded_effects(state: Node) -> void:
+	state.start_run(42)
+	state.weapons.pulse = 3
+	for i: int in range(60):
+		state.spawn_enemy(0, Vector2.from_angle(i * TAU / 60) * 120)
+	state.step(0.01, Vector2.ZERO)
+	var has_pulse: bool = false
+	for effect: Dictionary in state.effects:
+		if effect.kind == "pulse":
+			has_pulse = true
+	_check(state.kills >= 60 and has_pulse, "密集した敵を一括撃破しても範囲演出が残る")

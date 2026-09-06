@@ -47,10 +47,12 @@ func _ready() -> void:
 	for cue: String in ["attack", "hurt", "level", "pickup"]:
 		sounds[cue] = load("res://assets/audio/%s.wav" % cue)
 	music = AudioStreamPlayer.new()
-	music.stream = load("res://assets/audio/bgm.wav")
+	var melody: AudioStreamWAV = load("res://assets/audio/bgm.wav")
+	melody.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	melody.loop_end = roundi(melody.get_length() * melody.mix_rate)
+	music.stream = melody
 	music.volume_db = -12.0
 	add_child(music)
-	music.finished.connect(music.play)
 	if audio_enabled:
 		music.play()
 	for i: int in range(8):
@@ -128,7 +130,7 @@ func _refresh_screen() -> void:
 		"upgrade":
 			for i: int in range(state.choices.size()):
 				_button(
-					"この力を選ぶ", Rect2(170 + i * 322, 480, 292, 56), _choose_upgrade.bind(i), i == 0
+					"この力を選ぶ", Rect2(170 + i * 322, 480, 276, 56), _choose_upgrade.bind(i), i == 0
 				)
 		"paused":
 			_button("探索を続ける", Rect2(470, 354, 340, 58), state.toggle_pause, true)
@@ -292,7 +294,10 @@ func _draw_effects() -> void:
 						Color(0.77, 0.94, 0.7, alpha)
 					)
 			"pulse", "level", "magnet":
-				draw_arc(point, 20 + effect.age * 250, 0, TAU, 64, Color(0.5, 0.94, 0.84, alpha), 4)
+				var radius: float = 20 + effect.age * 250
+				if effect.kind == "pulse":
+					radius = state.pulse_radius() * minf(1.0, effect.age / 0.5)
+				draw_arc(point, radius, 0, TAU, 64, Color(0.5, 0.94, 0.84, alpha), 4)
 		if not effect.text.is_empty():
 			_text(
 				effect.text,

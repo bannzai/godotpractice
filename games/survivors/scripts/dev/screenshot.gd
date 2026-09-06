@@ -50,12 +50,23 @@ func _capture_scenes() -> bool:
 	main.queue_redraw()
 	if not await _capture("upgrade"):
 		return false
-	state.finish_run(false)
+	return await _capture_endings()
+
+
+func _capture_endings() -> bool:
+	state.choose_upgrade(0)
+	state.take_damage(1000)
 	main.call("_refresh_screen")
 	main.queue_redraw()
 	if not await _capture("defeat"):
 		return false
 	state.start_run(77)
+	state.elapsed = 575.0
+	state.spawn_enemy(3, Vector2(200, -30))
+	main.call("_refresh_screen")
+	main.queue_redraw()
+	if not await _capture("boss"):
+		return false
 	state.elapsed = 600.0
 	state.kills = 1306
 	state.level = 32
