@@ -3,6 +3,7 @@ extends Node
 
 signal sound_requested(cue: String)
 signal phase_changed
+signal effect_requested(at: Vector2, kind: String, caption: String)
 
 const Rules = preload("res://scripts/game_rules.gd")
 
@@ -35,6 +36,7 @@ var _bolt_cooldown: float = 0.0
 var _orbit_cooldown: float = 0.0
 var _pulse_cooldown: float = 0.0
 var _supply_cooldown: float = 18.0
+var _next_enemy_id: int = 0
 
 
 func start_run(seed_value: int = 0) -> void:
@@ -100,9 +102,7 @@ func step(delta: float, movement: Vector2) -> void:
 		finish_run(true)
 		return
 	player_pos += movement.limit_length() * move_speed * dt
-	player_pos = player_pos.clamp(
-		Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT
-	)
+	player_pos = player_pos.clamp(Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT)
 	invulnerable = maxf(0.0, invulnerable - dt)
 	orbit_angle = fmod(orbit_angle + dt * 2.8, TAU)
 	_advance_effects(dt)
@@ -118,10 +118,20 @@ func step(delta: float, movement: Vector2) -> void:
 # スポーンは一体を追加するイベントなので非冪等。
 func spawn_enemy(kind: int, at: Vector2) -> void:
 	var stats: Dictionary = Rules.enemy_stats(kind)
-	enemies.append({
-		"pos": at, "hp": float(stats.hp), "kind": kind,
-		"radius": float(stats.radius), "flash": 0.0,
-	})
+	_next_enemy_id += 1
+	(
+		enemies
+		. append(
+			{
+				"id": _next_enemy_id,
+				"pos": at,
+				"hp": float(stats.hp),
+				"kind": kind,
+				"radius": float(stats.radius),
+				"flash": 0.0,
+			}
+		)
+	)
 
 
 # 経験値の獲得は一回の拾得ごとに加算するため非冪等。
@@ -153,13 +163,17 @@ func choose_upgrade(index: int) -> void:
 		weapons[id] = mini(int(weapons[id]) + 1, 3)
 	else:
 		match id:
-			"power": damage_bonus += 0.15
-			"tempo": attack_speed += 0.08
-			"speed": move_speed = minf(350.0, move_speed + 12.0)
+			"power":
+				damage_bonus += 0.15
+			"tempo":
+				attack_speed += 0.08
+			"speed":
+				move_speed = minf(350.0, move_speed + 12.0)
 			"health":
 				max_hp += 20.0
 				hp = minf(max_hp, hp + 35.0)
-			"reach": pickup_radius = minf(220.0, pickup_radius + 18.0)
+			"reach":
+				pickup_radius = minf(220.0, pickup_radius + 18.0)
 	choices.clear()
 	_set_phase("playing")
 	_check_level_up()
@@ -216,14 +230,20 @@ func _spawn_wave(dt: float) -> void:
 	if elapsed >= 570.0 and not boss_spawned:
 		boss_spawned = true
 		spawn_enemy(3, _spawn_position())
+		_add_effect(player_pos, "boss", "夜の主が目覚めた")
+		sound_requested.emit("boss")
 	_supply_cooldown -= dt
 	if _supply_cooldown <= 0.0:
 		_supply_cooldown = 25.0
 		for kind: String in ["heal", "magnet"]:
 			var at: Vector2 = player_pos + Vector2.from_angle(_random.randf() * TAU) * 120.0
-			items.append({"pos": at.clamp(
-				Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT
-			), "kind": kind})
+			items.append(
+				{
+					"pos":
+					at.clamp(Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT),
+					"kind": kind
+				}
+			)
 
 
 func _spawn_position() -> Vector2:
@@ -285,8 +305,14 @@ func _fire_bolts() -> void:
 	var direction: Vector2 = (target - player_pos).normalized()
 	for index: int in range(int(weapons.bolt)):
 		var angle: float = (float(index) - float(int(weapons.bolt) - 1) / 2.0) * 0.14
-		projectiles.append({"pos": player_pos, "velocity": direction.rotated(angle) * 660.0,
-			"life": 1.3, "damage": (24.0 + float(weapons.bolt) * 9.0) * damage_bonus})
+		projectiles.append(
+			{
+				"pos": player_pos,
+				"velocity": direction.rotated(angle) * 660.0,
+				"life": 1.3,
+				"damage": (24.0 + float(weapons.bolt) * 9.0) * damage_bonus
+			}
+		)
 	sound_requested.emit("attack")
 
 
@@ -307,8 +333,9 @@ func _move_projectiles(dt: float) -> void:
 		if not consumed:
 			for enemy_index: int in range(enemies.size() - 1, -1, -1):
 				var enemy: Dictionary = enemies[enemy_index]
-				if Vector2(projectile.pos).distance_squared_to(Vector2(enemy.pos)) < pow(
-					float(enemy.radius) + 9.0, 2
+				if (
+					Vector2(projectile.pos).distance_squared_to(Vector2(enemy.pos))
+					< pow(float(enemy.radius) + 9.0, 2)
 				):
 					_hit_enemy(enemy_index, float(projectile.damage))
 					consumed = true
@@ -344,14 +371,15 @@ func _collect_drops(dt: float) -> void:
 		if Vector2(item.pos).distance_squared_to(player_pos) > 34.0 * 34.0:
 			continue
 		if str(item.kind) == "heal":
+			var healed: float = minf(30.0, max_hp - hp)
 			hp = minf(max_hp, hp + 30.0)
-			_add_effect(player_pos, "heal", "+30 HP")
+			_add_effect(player_pos, "heal", "+%d HP" % int(healed))
 		else:
 			for gem: Dictionary in gems:
 				if Vector2(gem.pos).distance_squared_to(player_pos) <= 900.0 * 900.0:
 					gem["magnet"] = true
 			_add_effect(player_pos, "magnet", "吸い寄せ")
-		sound_requested.emit("pickup")
+		sound_requested.emit(str(item.kind))
 		items.remove_at(index)
 	for index: int in range(gems.size() - 1, -1, -1):
 		var gem: Dictionary = gems[index]
@@ -370,6 +398,7 @@ func _add_effect(at: Vector2, kind: String, text: String) -> void:
 	if effects.size() >= 120:
 		effects.remove_at(0)
 	effects.append({"pos": at, "kind": kind, "text": text, "age": 0.0})
+	effect_requested.emit(at, kind, text)
 
 
 func _advance_effects(dt: float) -> void:
