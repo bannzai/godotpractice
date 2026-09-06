@@ -16,7 +16,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck integration lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -41,12 +41,20 @@ selfcheck: import
 	tail -n 1 $(LOG_DIR)/selfcheck.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/selfcheck.log
 
+# 実シーン上の入力・衝突・成長・勝敗を通常フレームで検証する
+integration: import
+	"$(GODOT)" --headless --path . --fixed-fps 60 --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/integration.log; \
+	tail -n 1 $(LOG_DIR)/integration.log | grep -q '^exit=0$$'
+	grep -q '^integration OK$$' $(LOG_DIR)/integration.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/integration.log
+
 # GDScript の lint (gdtoolkit の gdlint。設定は ./gdlintrc)
 lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
