@@ -38,7 +38,15 @@ GODOT="/Applications/Godot.app/Contents/MacOS/Godot"
 - エクスポートには Godot 4.7 の export templates が必要。macOS ローカルでは `~/Library/Application Support/Godot/export_templates/4.7.stable/` に展開する (導入は godot-development skill の `install-export-templates.sh`)。CI (`.github/workflows/ci.yml`) は tpz から必要なテンプレートだけを取り出してキャッシュする
 - `gdlint` は gdtoolkit (`pipx install "gdtoolkit==4.*"`) で入る。設定は各ゲームの `gdlintrc`
 - CI は PR で変更のあったゲームだけを matrix で検証する (共有物の変更と main への push では全ゲーム。判定は `.github/scripts/changed-games.sh`)。`screenshot-and-movie` job は Xvfb + llvmpipe 上で `make screenshot` と `make movie` を実行し、PNG と mp4 を artifact `<slug>-screenshot-and-movie` に残す。PR を開いた agent は `gh run download <run ID> -n <slug>-screenshot-and-movie -D tmp/artifact` でダウンロードし、PNG と mp4 (`ffmpeg -sseof -1 -i tmp/artifact/movie.mp4 -frames:v 1 tmp/artifact/movie-last.png` で末尾のフレームを静止画にする) を目視してから完了報告する
-- webtunnel (GHA runner 上の Chromium を Tailscale 経由で操作) で Web エクスポートを開く caller workflow は `.github/workflows/browser-session.yml` (ゲームは `-f game=<slug>`)。成立の前提 (Secrets の登録・webtunnel 側のソフトウェア WebGL 対応) は PROJECT.md「未検証事項・リスク」を参照し、揃うまでは CI の artifact とローカルの `make screenshot` / `make movie` で動作確認する
+- webtunnel (GHA runner 上の Chromium を Tailscale 経由でローカルの agent-browser から操作) で、自分のブランチの Web エクスポートを開いて操作・撮影・録画できる。手順は webtunnel skill (`~/.agents/skills/webtunnel/SKILL.md`。Godot 固有の起動判定と座標の写し方は同 skill の `references/godot-web-export.md`) に従い、セッション名はゲームの slug、ブランチは `--ref` で自分の作業ブランチを指定する (caller workflow `.github/workflows/browser-session.yml` がセッション名を slug として `games/<slug>` を Web エクスポートして配信する):
+
+  ```bash
+  WEBTUNNEL_REPO=bannzai/godotpractice bash ~/.agents/skills/webtunnel/scripts/webtunnel-cli.sh up <slug> --software-webgl --ref game/<slug> --wait
+  bash ~/.agents/skills/webtunnel/scripts/webtunnel-cli.sh cdp <slug>   # 以降 agent-browser --cdp http://<tailscale IP>:9222 で操作
+  WEBTUNNEL_REPO=bannzai/godotpractice bash ~/.agents/skills/webtunnel/scripts/webtunnel-cli.sh down <slug>
+  ```
+
+  runner の Chromium のビューポートは 1280x656 で 16:9 でないため、ゲーム座標をクリック座標へ写す (同 references)。Web 版で確認できるのは Web 版の挙動で、フルスクリーン切替・ゲームパッド等のデスクトップ固有の確認は CI の artifact とローカルの `make screenshot` / `make movie` で行う。public リポジトリのため録画 artifact は公開される前提で使う
 - Godot の立ち上げ・検証・export templates・ハマりどころは godot-development skill を参照する。ローカルは `~/.agents/skills/godot-development/SKILL.md`、ローカルに無い時は https://github.com/bannzai/castle/blob/main/home/.agents/skills/godot-development/SKILL.md と https://github.com/bannzai/castle/blob/main/home/.agents/skills/godot-development/references/pitfalls.md を読む
 - 素材の検索・生成・クレジット記録は game-asset-search skill (`~/.agents/skills/game-asset-search/SKILL.md`) を使う。Codex から skill のスクリプトを実行する時は `${CLAUDE_SKILL_DIR}` を `~/.agents/skills/<skill 名>/` に読み替える
 

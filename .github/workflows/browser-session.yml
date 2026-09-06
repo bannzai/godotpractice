@@ -32,10 +32,11 @@ on:
       software_webgl:
         required: false
         default: "true"
-      # 開くゲーム (games/<game>)。local/webtunnel は送らないため、gh workflow run -f game=<slug> で指定する
+      # 開くゲーム (games/<game>)。空ならセッション名を slug として使う (local/webtunnel up は game を送らないため、
+      # `up <slug> --software-webgl --ref game/<slug>` でそのゲームが開く)。別名にしたい時だけ gh workflow run -f game=<slug>
       game:
         required: false
-        default: "platformer"
+        default: ""
 jobs:
   session:
     permissions:
@@ -51,8 +52,8 @@ jobs:
       setup_script: ${{ inputs.setup_script }}
       software_webgl: "true"
       # Godot の導入と Web エクスポートは .webtunnel/serve-game.sh (setup) と同スクリプトの serve (start) で行う
-      setup_command: bash .webtunnel/serve-game.sh setup ${{ inputs.game }}
-      start_command: bash .webtunnel/serve-game.sh serve ${{ inputs.game }}
+      setup_command: bash .webtunnel/serve-game.sh setup ${{ inputs.game != '' && inputs.game || inputs.session }}
+      start_command: bash .webtunnel/serve-game.sh serve ${{ inputs.game != '' && inputs.game || inputs.session }}
       port: "8000"
     secrets:
       TS_OIDC_CLIENT_ID: ${{ secrets.TS_OIDC_CLIENT_ID }}
