@@ -32,6 +32,8 @@ func _run() -> void:
 			key(KEY_ENTER, false)
 			key(KEY_UP, true)
 		if state.phase == "racing":
+			# 他のGUI検証へフォーカスが移っても、保持入力を実イベントで再送する。
+			axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
 			_moved = _moved or state.racers[0].speed > 8.0
 			var local_time: float = float(frame) / 30.0
 			var drift_active: bool = _update_drift_attempt(state)
@@ -41,6 +43,9 @@ func _run() -> void:
 			axis(JOY_AXIS_LEFT_X, turn)
 			key(KEY_SPACE, drift_active)
 			key(KEY_E, frame % 90 == 0)
+		if frame % 60 == 0 and not state.racers.is_empty():
+			print("録画経過 %.1f秒: レース %.1f秒 / 距離 %.1f / 速度 %.1f" % [
+				frame / 30.0, state.elapsed, state.racers[0].progress, state.racers[0].speed])
 		await process_frame
 	release_all()
 	await _main.prepare_shutdown()

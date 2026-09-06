@@ -154,9 +154,9 @@ func _build_race() -> void:
 	_panel(race, Rect2(30, 27, 172, 126))
 	place = _label(race, "1 位", Vector2(54, 28), 56, MINT)
 	lap = _label(race, "1 / 3 周", Vector2(57, 108), 21)
-	_panel(race, Rect2(475, 28, 330, 58))
+	_panel(race, Rect2(475, 28, 330, 98))
 	timer = _label(race, "", Vector2(507, 38), 24)
-	lap_timer = _label(race, "", Vector2(505, 91), 19, INK)
+	lap_timer = _label(race, "", Vector2(505, 87), 19, MINT)
 	_panel(race, Rect2(1018, 28, 232, 113))
 	item_icon = _image(race, "res://assets/items/turbo.svg", Rect2(1032, 44, 66, 66))
 	item = _label(race, "", Vector2(1103, 48), 19)
@@ -171,9 +171,13 @@ func _build_race() -> void:
 	_label(race, "km/h", Vector2(1163, 600), 21, MINT)
 	_label(race, "Space / X ドリフト", Vector2(1038, 650), 17)
 	center = _label(race, "", Vector2(400, 230), 86)
+	center.add_theme_color_override("font_outline_color", INK)
+	center.add_theme_constant_override("outline_size", 5)
 	center.size = Vector2(480, 160)
 	center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	notice = _label(race, "", Vector2(300, 475), 31, MINT)
+	notice.add_theme_color_override("font_outline_color", INK)
+	notice.add_theme_constant_override("outline_size", 4)
 	notice.size.x = 680
 	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
