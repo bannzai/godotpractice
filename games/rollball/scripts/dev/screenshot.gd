@@ -1,42 +1,89 @@
 extends SceneTree
-## 実際の描画で代表画面を撮影する (headless では描画されないため、Makefile の screenshot target が
-## --headless なしで起動する)。撮影した PNG は tmp/screenshot-<名前>.png に保存し、失敗したら quit(1) で終わる。
-## ゲーム固有の状態作り (画面遷移・スコアの投入・操作の再現等) は _capture_scenes() に足す。
-## autoload は --script 起動でも root から取得できる。
+## 描画完了後に代表画面を保存する。経過時間を進めるため、撮影は順番に実行する。
+
+var game: Node3D
+var state: Node
 
 
 func _initialize() -> void:
-	# BGM の autoload やゲーム側の SE が撮影中に鳴らないよう Master バスをミュートする
-	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), true)
+	AudioServer.set_bus_mute(0, true)
 	_run.call_deferred()
 
 
-## 時間経過と物理で画面を進めるため、同じ実行中に重ねて呼び出さない。
 func _run() -> void:
 	if await _capture_scenes():
+		print("screenshot OK")
 		quit(0)
 
 
-## 撮影する画面の並び。雛形はメインシーン (タイトル) だけを撮る。失敗した撮影は _capture() が
-## quit(1) 済みなので、false を受けたらそのまま抜ける。
 func _capture_scenes() -> bool:
-	var main_scene_path: String = ProjectSettings.get_setting("application/run/main_scene")
-	var main: Node = load(main_scene_path).instantiate()
-	root.add_child(main)
+	game = load("res://scenes/main.tscn").instantiate()
+	root.add_child(game)
+	state = root.get_node("RunState")
 	await create_timer(0.5).timeout
-	if not await _capture("tmp/screenshot-title.png"):
+	if not await _capture("title"):
 		return false
-	main.queue_free()
+	game.start_run()
+	await create_timer(0.3).timeout
+	if not await _capture("play"):
+		return false
+	return await _capture_growth()
+
+
+func _capture_growth() -> bool:
+	game.demo_mode = true
+	var frames: int = 0
+	while state.collected < 12 and frames < 1800:
+		await physics_frame
+		frames += 1
+	game.demo_mode = false
+	if state.collected < 12:
+		push_error("撮影用の通常操作で巻き込みが進まない")
+		quit(1)
+		return false
+	game.set_physics_process(false)
+	game.effect_time = 0.6
+	if not await _capture("growth"):
+		return false
+	game.set_physics_process(true)
+	game.demo_mode = true
+	while state.phase == "playing" and frames < 7200:
+		await physics_frame
+		frames += 1
+	if state.phase != "won":
+		push_error("撮影用の通常操作で目標へ到達しない")
+		quit(1)
+		return false
+	await create_timer(0.2).timeout
+	if not await _capture("clear"):
+		return false
+	return await _capture_timeout()
+
+
+func _capture_timeout() -> bool:
+	game.demo_mode = false
+	game.start_run()
+	state.tick(state.TIME_LIMIT)
+	await physics_frame
+	game.hud.show_mode("lost")
+	if not await _capture("timeout"):
+		return false
+	game.show_title()
+	await process_frame
+	game.queue_free()
 	await process_frame
 	return true
 
 
-func _capture(path: String) -> bool:
-	await process_frame
-	await process_frame
-	var status: Error = root.get_viewport().get_texture().get_image().save_png(path)
+func _capture(label: String) -> bool:
+	# フォントアトラス更新直後の文字欠けを避け、複数の描画完了を待つ。
+	for _frame: int in range(3):
+		await process_frame
+		await RenderingServer.frame_post_draw
+	var path: String = "res://tmp/screenshot-%s.png" % label
+	var status: Error = root.get_texture().get_image().save_png(path)
 	if status != OK:
-		push_error("スクリーンショット保存失敗: %s (%s)" % [path, error_string(status)])
+		push_error("撮影失敗: %s" % error_string(status))
 		quit(1)
 		return false
 	print("screenshot: " + path)
