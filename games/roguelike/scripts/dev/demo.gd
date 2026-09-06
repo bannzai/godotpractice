@@ -39,7 +39,7 @@ func _run_demo() -> void:
 	_check(_saw_result, "デモ中に自然な敗北で結果へ遷移した")
 	_check(run.status == "title" and main.current_screen == "title", "デモがタイトルで終了した")
 	await root.get_node("Sound").shutdown()
-	main.queue_free()
+	# 最後の録画フレームまで画面を保ち、SceneTree の終了時に解放する。
 	if failures.is_empty():
 		print("demo OK: 実入力で探索・道具使用・戦闘・敗北・タイトル復帰")
 	quit(0 if failures.is_empty() else 1)
