@@ -135,6 +135,13 @@ func _animations() -> void:
 
 func _capture(name: String, delay: float = 0.42) -> void:
 	await create_timer(delay).timeout
+	# 無敵時間の点滅で主人公が隠れたフレームは避け、実際に表示された瞬間を撮る。
+	if state.mode == "play" and main.world.is_physics_processing() \
+		and main.world.hero.position.x >= 0 and name not in ["room-scroll", "dungeon-fade"]:
+		for attempt: int in range(20):
+			if main.world.hero.visible:
+				break
+			await physics_frame
 	await RenderingServer.frame_post_draw
 	var path: String = "res://tmp/screenshot-%s.png" % name
 	var status: Error = root.get_texture().get_image().save_png(path)

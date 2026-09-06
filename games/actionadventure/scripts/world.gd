@@ -76,8 +76,6 @@ func setup(main: Node) -> void:
 	hero = Actor.new()
 	hero.setup("hero")
 	actors.add_child(hero)
-	effects = preload("res://scripts/effects.gd").new()
-	add_child(effects)
 	ambient = CanvasModulate.new()
 	add_child(ambient)
 	var gradient := Gradient.new()
@@ -116,7 +114,9 @@ func objective() -> String:
 # 部屋の変更は移動イベント。前景は作り直し、開封済み報酬は再配置しない。
 func enter_room(index: int, spawn: Vector2, animate: bool = true) -> void:
 	if animate and DisplayServer.get_name() != "headless":
-		old_image = ImageTexture.create_from_image(get_viewport().get_texture().get_image())
+		var screen: Image = get_viewport().get_texture().get_image()
+		var world_rect := Rect2i(64, 128, 1152, 512)
+		old_image = ImageTexture.create_from_image(screen.get_region(world_rect))
 	transition = 0.38 if animate else 0.0
 	slide_dir = 1.0 if index >= state.room else -1.0
 	state.room = index
@@ -134,6 +134,11 @@ func enter_room(index: int, spawn: Vector2, animate: bool = true) -> void:
 		enemy.queue_free()
 	enemies.clear()
 	props.clear()
+	if is_instance_valid(effects):
+		remove_child(effects)
+		effects.queue_free()
+	effects = preload("res://scripts/effects.gd").new()
+	add_child(effects)
 	hero.dead = false
 	hero.sprite.play("idle")
 	hero.position = spawn
@@ -640,8 +645,8 @@ func _draw() -> void:
 		if state.room == 6:
 			draw_rect(Rect2(0, 0, 1280, 720), Color(0.025, 0.05, 0.08, transition / 0.38))
 		else:
-			draw_texture_rect(old_image, Rect2(-slide_dir * (1.0 - transition / 0.38) * 1280, 0,
-				1280, 720), false, Color(1, 1, 1, transition / 0.38))
+			draw_texture_rect(old_image, Rect2(64 - slide_dir * (1.0 - transition / 0.38) * 1152, 128,
+				1152, 512), false, Color(1, 1, 1, transition / 0.38))
 
 
 func _draw_architecture() -> void:
@@ -678,8 +683,8 @@ func _draw_enemy_signals() -> void:
 			if fmod(enemy.timer, cycle) < 1:
 				draw_line(enemy.position, enemy.position + enemy.velocity.normalized() * 260,
 					Color(1, 0.4, 0.3, 0.3), 90)
-			draw_rect(Rect2(440, 105, 400, 12), Color("162b3b"))
-			draw_rect(Rect2(440, 105, 400 * maxf(enemy.hp, 0) / 16.0, 12),
+			draw_rect(Rect2(440, 142, 400, 12), Color("162b3b"))
+			draw_rect(Rect2(440, 142, 400 * maxf(enemy.hp, 0) / 16.0, 12),
 				Color("ea9879") if enemy.hp <= 8 else GOLD)
 
 
