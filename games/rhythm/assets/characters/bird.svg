@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="240" viewBox="0 0 200 240">
+    <ellipse cx="100" cy="224" rx="70" ry="10" fill="#101a30" opacity=".32"/>
+    <g stroke="#27364d" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M60 121 Q17 100 26 162 L58 180 M141 120 Q187 107 174 167 L142 181" fill="#79c8bf"/>
+    <path d="M72 195 L67 220 L45 221 M120 195 L129 220 L149 222" fill="none" stroke="#f4b86c" stroke-width="9"/>
+    <path d="M65 80 Q37 112 48 161 Q49 198 99 204 Q152 203 156 165 Q163 110 136 83Z" fill="#84d3c3"/>
+    <path d="M72 136 Q99 118 128 138 L135 176 Q100 192 63 175Z" fill="#fff0ce" stroke="none"/>
+    <path d="M86 34 Q63 8 72 3 Q91 6 104 31 Q109 4 127 13 L119 43" fill="#84d3c3"/>
+    <path d="M49 71 Q53 34 98 33 Q144 32 152 73 Q160 112 123 127 Q86 142 59 114Z" fill="#84d3c3"/>
+    <ellipse cx="74" cy="79" rx="17" ry="23" fill="#fff0ce" stroke="none"/>
+    <ellipse cx="124" cy="79" rx="17" ry="23" fill="#fff0ce" stroke="none"/>
+    <path d="M69 79 Q75 72 81 79 M117 79 Q123 72 129 79" fill="none" stroke-width="4"/>
+    <path d="M92 89 L110 89 L102 104Z" fill="#f4b86c" stroke-width="3"/>
+    <path d="M42 68 Q44 24 98 24 Q154 25 158 68" fill="none" stroke="#7a83bc" stroke-width="11"/>
+    <rect x="33" y="65" width="18" height="35" rx="8" fill="#f08379"/>
+    <rect x="150" y="65" width="18" height="35" rx="8" fill="#f08379"/>
+    <path d="M61 127 L91 141 L83 152 L55 138 M92 141 L124 127 L131 139 L99 154" fill="#7a83bc" stroke-width="3"/>
+    <rect x="23" y="158" width="157" height="43" rx="9" fill="#344961"/>
+    <rect x="32" y="171" width="139" height="21" rx="3" fill="#fff0ce" stroke="none"/>
+    <path d="M47 171 V191 M65 171 V191 M83 171 V191 M102 171 V191 M120 171 V191 M138 171 V191 M155 171 V191" stroke-width="2"/>
+    <path d="M46 173 V182 M65 173 V182 M102 173 V182 M119 173 V182 M137 173 V182" stroke-width="7"/>
+    <circle cx="158" cy="165" r="3" fill="#f08379" stroke="none"/>
+    <path d="M48 142 Q31 145 45 163 L64 162 M151 142 Q172 150 153 163 L135 162" fill="#84d3c3"/>
+    </g></svg>

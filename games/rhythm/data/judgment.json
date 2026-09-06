@@ -1,0 +1,21 @@
+{
+  "perfect": 0.055,
+  "good": 0.12,
+  "perfect_weight": 1.0,
+  "good_weight": 0.6,
+  "initial_gauge": 0.5,
+  "clear_gauge": 0.6,
+  "perfect_gain": 0.022,
+  "good_gain": 0.012,
+  "miss_loss": 0.08,
+  "ghost_loss": 0.025,
+  "ghost_score_loss": 1000,
+  "max_score": 1000000,
+  "ranks": {
+    "S": 0.98,
+    "A": 0.9,
+    "B": 0.8,
+    "C": 0.7,
+    "D": 0
+  }
+}

@@ -27,3 +27,34 @@ window/stretch/aspect="keep"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[autoload]
+
+RhythmState="*res://scripts/rhythm_state.gd"
+
+[input]
+
+hit_coral={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":70), Object(InputEventJoypadButton,"button_index":2)]
+}
+hit_mint={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":74), Object(InputEventJoypadButton,"button_index":1)]
+}
+fullscreen={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194342)]
+}
+ui_cancel={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194305), Object(InputEventJoypadButton,"button_index":6)]
+}
+ui_accept={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194309), Object(InputEventKey,"physical_keycode":32), Object(InputEventJoypadButton,"button_index":0)]
+}
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=false
