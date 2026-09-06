@@ -32,9 +32,13 @@ SVGはアイコンと輪郭の明確なキーアートに向く。TextureRectの
 
 ## macOS環境の知見
 
-Godotのheadless起動も、既定ログとeditor_settingsへの書き込みがsandbox外になる。全コマンドにゲーム内tmpへの絶対log-fileを指定し、exportにはskillのprepare-sandbox-godot.shで作ったself-containedなコピーを利用した。元のGodot.appやシステム設定は変更していない。
+Godotのheadless起動も、既定ログとeditor_settingsへの書き込みがsandbox外になる。全コマンドにゲーム内tmpへの絶対log-fileを指定し、headlessの検証にはskillのprepare-sandbox-godot.shで作ったself-containedなコピーを利用した。最終のexportと描画付き検証は、sandbox外での実行許可を得て既存のGodot.appを使った。元のGodot.appやシステム設定は変更していない。
 
 描画付き起動はsandbox内でexit 134となり、ログは残らなかった。描画許可を付けた同じコマンドで起動・撮影できた。Tailscaleの事前確認もsandbox内ではCLIが異常終了し、読み取り権限を付けた確認では既存接続が応答した。コマンドの失敗だけでサービスが停止していると判断しない。
+
+描画計測はM4 Max、1280×720、GL Compatibility、V-Sync無効、画面内に敵6体の条件で行った。300フレームの平均は約162fps、フレーム時間の中央値5.611ms、95パーセンタイル8.239ms。16.667msを超えたフレームは2回で、最大65.31msだった。島は16メッシュ・22,674頂点、シーン全体は195メッシュ・30,806頂点。HUDのStyleBox・アイコンの再生成と同じmouse_modeの再設定を避けた。平均値だけで全フレームや他端末の性能を保証しない。
+
+Linux CIのPNG15枚と起動動画の末尾を取得・目視し、ローカルと同じ画面構成を確認した。CIの撮影ログには仮想画面ドライバのV-Sync変更非対応警告が1件ずつ出た。ゲームのERRORや終了時のリーク警告はなく、ローカルの検証ログにはこのドライバ警告も出ていない。
 
 ## skill・共有ツールへの提案
 
