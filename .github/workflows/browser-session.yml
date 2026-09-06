@@ -26,16 +26,23 @@ on:
       setup_script:
         required: false
         default: ".webtunnel/setup.sh"
-      # 開くゲーム (games/<game>)。local/webtunnel は送らないため、gh workflow run -f game=<slug> で指定する
+      # Godot の Web エクスポートは WebGL2 が要るため、runner の Chromium を SwiftShader で起動する
+      # (webtunnel PROJECT.md「ソフトウェア WebGL（SwiftShader）」)。local/webtunnel up --software-webgl が送る。
+      # 宣言は残すが、本 repo は Godot 専用のため session.yml へは常に "true" を渡す
+      software_webgl:
+        required: false
+        default: "true"
+      # 開くゲーム (games/<game>)。空ならセッション名を slug として使う (local/webtunnel up は game を送らないため、
+      # `up <slug> --software-webgl --ref game/<slug>` でそのゲームが開く)。別名にしたい時だけ gh workflow run -f game=<slug>
       game:
         required: false
-        default: "platformer"
+        default: ""
 jobs:
   session:
     permissions:
       id-token: write
       contents: read
-    uses: bannzai/webtunnel/.github/workflows/session.yml@f73f82c9b881aeec7e778342949c94f4006bfe35 # main
+    uses: bannzai/webtunnel/.github/workflows/session.yml@6959eab46b70f6dac76611f5c87c1c9e25d5e803 # main
     with:
       session: ${{ inputs.session }}
       duration_minutes: ${{ inputs.duration_minutes }}
@@ -43,9 +50,10 @@ jobs:
       record: ${{ inputs.record }}
       preview: ${{ inputs.preview }}
       setup_script: ${{ inputs.setup_script }}
+      software_webgl: "true"
       # Godot の導入と Web エクスポートは .webtunnel/serve-game.sh (setup) と同スクリプトの serve (start) で行う
-      setup_command: bash .webtunnel/serve-game.sh setup ${{ inputs.game }}
-      start_command: bash .webtunnel/serve-game.sh serve ${{ inputs.game }}
+      setup_command: bash .webtunnel/serve-game.sh setup ${{ inputs.game != '' && inputs.game || inputs.session }}
+      start_command: bash .webtunnel/serve-game.sh serve ${{ inputs.game != '' && inputs.game || inputs.session }}
       port: "8000"
     secrets:
       TS_OIDC_CLIENT_ID: ${{ secrets.TS_OIDC_CLIENT_ID }}

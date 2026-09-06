@@ -58,7 +58,7 @@
 
 ## 未検証事項・リスク
 
-- **webtunnel 経由の動作確認**は 2 つの前提が揃うまで成立しない。(1) 本リポジトリの Secrets `TS_OIDC_CLIENT_ID` / `TS_OIDC_AUDIENCE` (OIDC subject が immutable ID 形式のため新規発行が要る。ユーザー作業 #11)。(2) runner の Chromium で WebGL 2 を有効にする webtunnel 側の起動オプション ( https://github.com/bannzai/webtunnel/issues/22 )。揃うまでは CI の `screenshot-and-movie` artifact とローカルの `make screenshot` / `make movie` で動作確認する。caller workflow `browser-session.yml` と `.webtunnel/serve-game.sh` は前提が揃ったら実セッションで検証する (未検証)
+- **webtunnel 経由の動作確認**は 2026-09-06 に実セッションで成立を確認した (Secrets の登録と webtunnel の `software_webgl` input https://github.com/bannzai/webtunnel/issues/22 の両方が揃った)。runner の Chromium は SwiftShader (`ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))`) で WebGL 2 が有効になり、Godot 既定シェルの起動判定 (`#status` の消滅) が true、ビューポートは 1280x656 (ゲーム座標のスケール 0.911)。手順は [AGENTS.md](../AGENTS.md)「検証方法」。SwiftShader は CPU 描画のため fps に依存する検証には向かない
 - **CI の変更ゲーム判定** (`.github/scripts/changed-games.sh`) は、`games/` だけを変えた PR で初めて絞り込みが働く。共有物を含む最初の PR では全ゲームが対象になるため、絞り込みの動作は最初のゲーム PR で確認する
 - **3D ゲーム (rollball / crewrts) の llvmpipe 描画**は遅い。`screenshot-and-movie` job の timeout を 45 分にしてあるが、シーンが重くなったら `MOVIE_FRAMES` を減らすか撮影対象を絞る
 - **Codex (GPT-6 Astra) のレート制限**: 5 時間あたりのメッセージ枠が小さく、9 worktree を同時に走らせると枠を早く消費する。作業者の起動は枠の残量を見て段階的に行う
