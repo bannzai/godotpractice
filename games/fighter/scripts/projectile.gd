@@ -2,6 +2,10 @@ class_name FighterProjectile
 extends Area2D
 ## 飛び道具の移動・命中は時間と入力を消費するため非冪等。1発につき命中は1回。
 
+const WAVES: Array[Texture2D] = [
+	preload("res://assets/effects/wave-teal.svg"), preload("res://assets/effects/wave-amber.svg")
+]
+
 var target: Node2D
 var source: Node2D
 var direction: float = 1.0
@@ -41,12 +45,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, 33.0, Color(tint, 0.12))
-	draw_circle(Vector2.ZERO, 24.0, Color(tint, 0.32))
-	draw_circle(Vector2.ZERO, 14.0, tint)
-	draw_circle(Vector2(direction * 6.0, -2.0), 8.0, Color("f0fffc"))
-	for i: int in range(3):
-		var offset: float = float(i) * 9.0
-		draw_line(Vector2(-direction * (20.0 + offset), -10.0 + offset),
-			Vector2(-direction * (60.0 + offset), -10.0 + offset), Color(tint, 0.6), 3.0)
-	draw_arc(Vector2.ZERO, 28.0, age * 9.0, age * 9.0 + 4.2, 20, tint, 2.0)
+	var texture: Texture2D = WAVES[0]
+	if is_instance_valid(source) and source.character_index == 1:
+		texture = WAVES[1]
+	var pulse: float = 1.0 + sin(age * 23.0) * 0.07
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(direction, pulse))
+	draw_texture_rect(texture, Rect2(-66, -40, 132, 80), false)
+	draw_set_transform(Vector2.ZERO)
