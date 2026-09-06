@@ -17,7 +17,7 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck lint test screenshot movie movie-play check-shutdown integration run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -49,7 +49,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck
+test: lint check selfcheck integration check-shutdown
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -60,6 +60,8 @@ screenshot: import
 	tail -n 1 $(LOG_DIR)/screenshot.log | grep -q '^exit=0$$'
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/screenshot.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 	ls $(LOG_DIR)/screenshot-*.png
+	ffmpeg -loglevel error -y -pattern_type glob -i '$(LOG_DIR)/screenshot-characters-*.png' -vf 'scale=384:216,tile=3x6:padding=4:margin=4:color=0x182b25' -frames:v 1 $(LOG_DIR)/characters-contact.png
+	python3 scripts/dev/evidence.py
 
 # 操作を伴わない起動〜メインシーン表示を Movie Maker モードで録画して mp4 にする (起動直後の描画崩れ・真っ黒を
 # 検出する。headless は dummy レンダラで落ちるため描画付きで起動する)。真っ黒な動画を成功と誤認しないよう、
@@ -74,6 +76,32 @@ movie: import
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 26 秒の実入力プレイを録画し、2 秒間隔と末尾の静止画を残す。
+movie-play: import
+	"$(GODOT)" --log-file "$(ENGINE_LOG)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1
+	! grep -i -e WARNING -e ERROR $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	grep -q 'プレイ録画 OK' $(LOG_DIR)/movie-play.log
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/movie-play-frame-%02d.png
+	ffmpeg -loglevel error -y -sseof -0.1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 $(LOG_DIR)/movie-play-last.png
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf 'fps=1/2,scale=320:-1,tile=4x4:padding=4:margin=4:color=0x182b25' -frames:v 1 $(LOG_DIR)/movie-play-contact.png
+
+# 既存のセーブに触れず、実入力による状態変化を検証する。
+integration: import
+	"$(GODOT)" --log-file "$(ENGINE_LOG)" --headless --path . --script res://scripts/dev/integration.gd > $(LOG_DIR)/integration.log 2>&1
+	grep -q '^integration OK$$' $(LOG_DIR)/integration.log
+	! grep -i -e WARNING -e ERROR $(LOG_DIR)/integration.log
+
+# 強制終了と通常のウィンドウ終了を別々に確認する。音声リークは除外しない。
+check-shutdown: import
+	@for frames in 1 8 40 150; do \
+	  "$(GODOT)" --log-file "$(ENGINE_LOG)" --headless --path . --fixed-fps 30 --quit-after $$frames > $(LOG_DIR)/quit-after-$$frames.log 2>&1 || exit $$?; \
+	  if grep -i -e WARNING -e ERROR -e 'resources still in use' $(LOG_DIR)/quit-after-$$frames.log; then exit 1; fi; \
+	done
+	"$(GODOT)" --log-file "$(ENGINE_LOG)" --headless --path . --script res://scripts/dev/shutdown.gd > $(LOG_DIR)/shutdown.log 2>&1
+	grep -q '通常終了要求' $(LOG_DIR)/shutdown.log
+	! grep -i -e WARNING -e ERROR -e 'resources still in use' $(LOG_DIR)/shutdown.log
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
