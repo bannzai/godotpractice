@@ -15,8 +15,10 @@ WINDOWED_FLAGS := --audio-driver Dummy --rendering-driver opengl3 --resolution 1
 WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpReliable'
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
+MOVIE_BASENAME ?= movie
+MOVIE_SCRIPT ?=
 
-.PHONY: import check selfcheck integration lint test screenshot movie run build-macos build-windows build-linux build-web build-all clean
+.PHONY: import check selfcheck integration lint test screenshot movie movie-growth performance run build-macos build-windows build-linux build-web build-all clean
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -34,7 +36,7 @@ check: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/check.log
 
 # シーンのロードと素材のクレジット記録の検証 (headless)。ゲームのロジック検証もここに足す
-selfcheck: import
+selfcheck: import integration
 	"$(GODOT)" --headless --path . --script res://scripts/dev/selfcheck.gd > $(LOG_DIR)/selfcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/selfcheck.log; \
 	grep -q '^selfcheck OK$$' $(LOG_DIR)/selfcheck.log
@@ -54,7 +56,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck integration
+test: lint check selfcheck
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する
@@ -70,15 +72,29 @@ screenshot: import
 # 検出する。headless は dummy レンダラで落ちるため描画付きで起動する)。真っ黒な動画を成功と誤認しないよう、
 # 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
 movie: import
-	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
-	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
-	echo "exit=$$?" >> $(LOG_DIR)/movie.log; \
-	tail -n 1 $(LOG_DIR)/movie.log | grep -q '^exit=0$$'
-	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
-	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
-	rm -f $(LOG_DIR)/movie.avi
-	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
+	rm -f $(LOG_DIR)/$(MOVIE_BASENAME).avi $(LOG_DIR)/$(MOVIE_BASENAME).mp4
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) $(MOVIE_SCRIPT) --write-movie $(LOG_DIR)/$(MOVIE_BASENAME).avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) > $(LOG_DIR)/$(MOVIE_BASENAME).log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/$(MOVIE_BASENAME).log; \
+	tail -n 1 $(LOG_DIR)/$(MOVIE_BASENAME).log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/$(MOVIE_BASENAME).log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	ffmpeg -loglevel error -y -i $(LOG_DIR)/$(MOVIE_BASENAME).avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/$(MOVIE_BASENAME).mp4
+	rm -f $(LOG_DIR)/$(MOVIE_BASENAME).avi
+	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/$(MOVIE_BASENAME).mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+
+# 同じ物理・回収処理を通した成長の録画。通常の movie は起動〜タイトルを維持する。
+movie-growth: MOVIE_BASENAME = growth
+movie-growth: MOVIE_FRAMES = 660
+movie-growth: MOVIE_SCRIPT = --script res://scripts/dev/demo.gd
+movie-growth: movie
+
+# 描画付きの実時間計測。ソフトウェア描画の CI ではなく、ローカル実機で実行する。
+performance: import
+	"$(GODOT)" --path . $(WINDOWED_FLAGS) --disable-vsync --max-fps 0 --script res://scripts/dev/performance.gd > $(LOG_DIR)/performance.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/performance.log; \
+	tail -n 1 $(LOG_DIR)/performance.log | grep -q '^exit=0$$'
+	grep -q '^performance OK$$' $(LOG_DIR)/performance.log
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/performance.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run:

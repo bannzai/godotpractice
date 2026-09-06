@@ -64,7 +64,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("mute"):
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
 	if event.is_action_pressed("confirm") and RunState.phase != "playing":
-		start_run()
+		var focused: Control = get_viewport().gui_get_focus_owner()
+		if focused is Button:
+			focused.pressed.emit()
+		else:
+			start_run()
+		get_viewport().set_input_as_handled()
 	if event.is_action_pressed("cancel"):
 		show_title()
 
@@ -280,8 +285,14 @@ func _update_camera(delta: float, snap: bool = false) -> void:
 	var target: Vector3 = ball.position + offset.rotated(Vector3.UP, yaw)
 	target.x = clampf(target.x, -13.6, 13.6)
 	target.z = clampf(target.z, -13.6, 13.6)
-	camera.position = target if snap else camera.position.lerp(target, 1.0 - exp(-delta * 7.0))
-	camera.look_at(ball.position + Vector3.UP * RunState.diameter * 0.2)
+	var focus: Vector3 = ball.position + Vector3.UP * RunState.diameter * 0.2
+	target = target if snap else camera.position.lerp(target, 1.0 - exp(-delta * 7.0))
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(focus, target, 1)
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if not hit.is_empty():
+		target = Vector3(hit.position) + (focus - Vector3(hit.position)).normalized() * 0.3
+	camera.position = target
+	camera.look_at(focus)
 
 
 func _play_sound(kind: String) -> void:

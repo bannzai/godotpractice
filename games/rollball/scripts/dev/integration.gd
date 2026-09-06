@@ -24,6 +24,7 @@ func _run() -> void:
 	_check(initial_items >= 100, "ステージに 100 個以上の物体")
 	_check(state.phase == "playing", "タイトルからゲーム開始")
 	await _check_input()
+	await _check_camera_occlusion()
 	game.start_run()
 	await _check_attachment_and_bump(initial_items)
 	game.start_run()
@@ -34,6 +35,7 @@ func _run() -> void:
 	_check(game.items.get_child_count() == initial_items, "タイトルで配置を復元")
 	game.start_run()
 	await _check_timeout()
+	await _check_result_menu()
 	game.start_run()
 	_check(state.phase == "playing" and state.collected == 0, "失敗後に再挑戦")
 	_check(state.remaining == state.TIME_LIMIT, "再挑戦時の制限時間")
@@ -56,6 +58,8 @@ func _check_input() -> void:
 	await _frames(24)
 	Input.action_release("move_forward")
 	_check(game.ball.position.z < initial_position.z - 0.2, "前進入力で物理移動")
+	await _check_arrow_key(KEY_LEFT, -1.0)
+	await _check_arrow_key(KEY_RIGHT, 1.0)
 	var initial_yaw: float = game.yaw
 	Input.action_press("camera_right")
 	await _frames(20)
@@ -71,6 +75,62 @@ func _check_input() -> void:
 	stick.axis_value = 0.0
 	Input.parse_input_event(stick)
 	_check(game.ball.position.z < initial_position.z - 0.2, "ゲームパッドイベントで物理移動")
+
+
+# 実キーの割当を通し、アクション名だけの試験では見つからない設定ミスを検出する。
+func _check_arrow_key(key: Key, direction: float) -> void:
+	game.start_run()
+	var initial_x: float = game.ball.position.x
+	var event: InputEventKey = InputEventKey.new()
+	event.keycode = key
+	event.physical_keycode = key
+	event.pressed = true
+	Input.parse_input_event(event)
+	await _frames(24)
+	event.pressed = false
+	Input.parse_input_event(event)
+	_check((game.ball.position.x - initial_x) * direction > 0.2,
+		"%s キーで指定方向へ移動" % OS.get_keycode_string(key))
+
+
+# 棚の背後に玉を置き、追従カメラの視線が実際の物理形状を横切らないことを確認する。
+func _check_camera_occlusion() -> void:
+	game.start_run()
+	game.set_physics_process(false)
+	game.ball.position = Vector3(-9.5, 0.42, -14.0)
+	await physics_frame
+	game._update_camera(1.0, true)
+	var focus: Vector3 = game.ball.position + Vector3.UP * state.diameter * 0.2
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(
+		focus, game.camera.position, 1
+	)
+	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(query)
+	_check(hit.is_empty(), "棚の背後でも玉とカメラの間に家具を挟まない")
+	_check(game.camera.position.distance_to(focus) > state.diameter * 0.5,
+		"遮蔽を避けたカメラは玉の内部に入らない")
+	game.set_physics_process(true)
+
+
+# 結果画面のフォーカス移動と決定まで実際のゲームパッドイベントで確認する。
+func _check_result_menu() -> void:
+	await _joy_button(JOY_BUTTON_DPAD_DOWN)
+	var focused: Control = root.gui_get_focus_owner()
+	_check(focused is Button and focused.text == "タイトルへ戻る", "十字キーで戻るボタンを選択")
+	await _joy_button(JOY_BUTTON_A)
+	_check(state.phase == "title", "選択中の戻るボタンを A で決定するとタイトルへ復帰")
+	_check(state.collected == 0, "結果画面から戻ると取得状態を初期化")
+
+
+# 押下と解放を対にして送信し、次の試験へ入力状態を持ち越さない。
+func _joy_button(button: JoyButton) -> void:
+	var event: InputEventJoypadButton = InputEventJoypadButton.new()
+	event.button_index = button
+	event.pressed = true
+	Input.parse_input_event(event)
+	await _frames(2)
+	event.pressed = false
+	Input.parse_input_event(event)
+	await _frames(2)
 
 
 # 自動操作は通常の移動・接触を使い、検証に必要な付着物が揃うまで進める。

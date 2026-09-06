@@ -76,8 +76,10 @@ func _capture_timeout() -> bool:
 
 
 func _capture(label: String) -> bool:
-	await process_frame
-	await RenderingServer.frame_post_draw
+	# フォントアトラス更新直後の文字欠けを避け、複数の描画完了を待つ。
+	for _frame: int in range(3):
+		await process_frame
+		await RenderingServer.frame_post_draw
 	var path: String = "res://tmp/screenshot-%s.png" % label
 	var status: Error = root.get_texture().get_image().save_png(path)
 	if status != OK:
