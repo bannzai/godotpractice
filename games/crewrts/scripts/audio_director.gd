@@ -11,6 +11,9 @@ var current_track: String = ""
 var music_players: Array[AudioStreamPlayer] = []
 var sounds: Dictionary = {}
 var _streams: Dictionary = {}
+## 読み込んだ全 WAV への弱参照。stop_audio() で自前の参照を捨てた後も音声スレッドの AudioStreamPlayback が
+## 音源を保持するため、実際に解放されたかを is_released() で観測する
+var _stream_refs: Array[WeakRef] = []
 var _active_player: int = 0
 var _fade: Tween
 var _initialized: bool = false
@@ -36,6 +39,7 @@ func setup() -> void:
 		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
 		_streams[key] = stream
+		_stream_refs.append(weakref(stream))
 	for index: int in range(2):
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -50.0
@@ -44,6 +48,7 @@ func setup() -> void:
 	for key: String in EFFECT_KEYS:
 		var player := AudioStreamPlayer.new()
 		player.stream = load("res://assets/audio/%s.wav" % key)
+		_stream_refs.append(weakref(player.stream))
 		player.volume_db = -10.0 if key != "hit" else -17.0
 		player.max_polyphony = 4
 		add_child(player)
@@ -111,6 +116,16 @@ func stop_audio() -> void:
 		player.stop()
 		player.stream = null
 	_streams.clear()
+
+
+## stop_audio() の後、音声スレッドが停止した再生 (AudioStreamPlayback) を手放して全 WAV が解放されたか。
+## 解放は停止から数十ミリ秒後の音声スレッドの周期と、その後のメインスレッドのフレームで進むため、
+## 終了前に待つ側はフレーム数や秒数ではなくこの結果を見る (解放前に終了するとリーク WARNING になる)。
+func is_released() -> bool:
+	for ref: WeakRef in _stream_refs:
+		if ref.get_ref() != null:
+			return false
+	return true
 
 
 func _read_quit_after() -> void:

@@ -5,6 +5,8 @@ extends SceneTree
 ## autoload は --script 起動でも root から取得できる。
 
 const Gallery = preload("res://scripts/dev/animation_gallery.gd")
+## 音声の解放は通常 0.1 秒以内に終わる。CI (llvmpipe) で音声スレッドが遅れても足りる余裕を取る
+const AUDIO_RELEASE_TIMEOUT_MSEC := 10000
 
 func _initialize() -> void:
 	# BGM の autoload やゲーム側の SE が撮影中に鳴らないよう Master バスをミュートする
@@ -36,9 +38,23 @@ func _capture_scenes() -> bool:
 	if not await gallery.capture(self, main, _capture):
 		return false
 	main.stop_audio()
-	await create_timer(0.15).timeout
+	if not await _wait_audio_release(main):
+		return false
 	main.queue_free()
 	await process_frame
+	return true
+
+
+## 停止した再生を音声スレッドが手放し WAV が解放されるまで待つ。秒数 (0.15 秒) やフレーム数で待つと、
+## 音声スレッドが遅れる CI の回や高リフレッシュレートの画面で解放前に終了し、リーク WARNING で失敗する。
+func _wait_audio_release(main: Node) -> bool:
+	var deadline: int = Time.get_ticks_msec() + AUDIO_RELEASE_TIMEOUT_MSEC
+	while not main.audio.is_released():
+		if Time.get_ticks_msec() > deadline:
+			push_error("音声の解放が %d ms 以内に終わらない" % AUDIO_RELEASE_TIMEOUT_MSEC)
+			quit(1)
+			return false
+		await process_frame
 	return true
 
 
