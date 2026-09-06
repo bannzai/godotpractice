@@ -4,8 +4,8 @@
 #   serve <game>: build/web を PORT (webtunnel の port input。既定 8000) で配信する (フォアグラウンド)
 # Web エクスポートは variant/thread_support=false (COOP/COEP ヘッダ不要) で、python の http.server は .wasm を
 # application/wasm で返すため Node は不要。
-# 注意: runner の Chromium は既定では WebGL2 が無効で Godot が起動しない。webtunnel 側のソフトウェア WebGL
-# (SwiftShader) の起動オプション ( https://github.com/bannzai/webtunnel/issues/22 ) が入るまで、この経路は成立しない。
+# runner の Chromium は既定では WebGL2 が無効で Godot が起動しないため、caller workflow (browser-session.yml) が
+# session.yml へ software_webgl=true を渡して SwiftShader で起動する。
 set -euo pipefail
 
 mode="${1:?setup | serve}"
