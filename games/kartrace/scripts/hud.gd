@@ -220,7 +220,8 @@ func refresh() -> void:
 		var player: Dictionary = state.racers[0]
 		place.text = "%d 位" % state.rank_of(0)
 		lap.text = "%d / 3 周" % mini(player.lap, 3)
-		timer.text = "タイム  %s" % format_time(state.elapsed)
+		timer.text = "タイム  %s" % format_time(
+			player.finish_time if player.finish_time >= 0 else state.elapsed)
 		var lap_seconds: float = state.elapsed - player.lap_started
 		if player.finish_time >= 0 and not player.lap_times.is_empty():
 			lap_seconds = player.lap_times.back()
