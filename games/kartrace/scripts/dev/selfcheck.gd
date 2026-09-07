@@ -4,6 +4,7 @@ extends SceneTree
 
 const Course = preload("res://scripts/course_data.gd")
 const State = preload("res://scripts/race_state.gd")
+const Main = preload("res://scripts/main.gd")
 
 var failed := false
 
@@ -101,6 +102,12 @@ func _check_course() -> void:
 func _check_race() -> void:
 	var state: Node = State.new()
 	state.save_enabled = false
+	state.enter_menu_phase("garage")
+	_check(state.phase == "garage", "タイトルからガレージへ遷移")
+	state.enter_menu_phase("tutorial")
+	_check(state.phase == "tutorial", "ガレージからチュートリアルへ遷移")
+	state.enter_menu_phase("invalid")
+	_check(state.phase == "tutorial", "未定義のメニュー状態を拒否")
 	state.reset_race()
 	_check(state.racers.size() == 4, "プレイヤーと CPU 3 台")
 	_check(state.phase == "countdown", "開始前はカウントダウン")
@@ -169,8 +176,15 @@ func _check_items_and_drift() -> void:
 	state.racers[1].progress = state.projectiles[0].progress
 	state.racers[1].lateral = state.projectiles[0].lateral
 	state.racers[1].speed = 20.0
+	state.racers[1].drifting = true
+	state.racers[1].drift_charge = 0.8
+	state.racers[1].drift_direction = 1.0
 	state._update_weapons(0.0)
 	_check(state.racers[1].spin > 0.0 and state.racers[1].speed == 6.0, "飛び道具でスピンと減速")
+	_check(not state.racers[1].drifting and state.racers[1].drift_charge == 0.0
+		and state.racers[1].drift_direction == 0.0, "被弾時にドリフト蓄積を破棄")
+	state._update_drift(1, 0.01, 0.0, false)
+	_check(state.racers[1].boost == 0.0, "被弾直後のドリフト解除ではブーストしない")
 	_check(state.projectiles.is_empty(), "命中した飛び道具は消える")
 	state.racers[0].item = 2
 	state.use_item(0)
@@ -198,6 +212,8 @@ func _check_items_and_drift() -> void:
 	state._drive(0, 0.01, 1.0, 1.0, false)
 	_check(state.racers[0].progress == 122.0, "落下時は直前チェックポイントへ復帰")
 	_check(state.racers[0].respawn_timer > 0.0, "復帰には時間ペナルティ")
+	_check(Main.respawn_lift(0.55) > 3.9, "復帰演出は路面より上へ持ち上がる")
+	_check(Main.respawn_lift(0.0) == 0.0, "復帰演出の終了時は路面へ戻る")
 	state.free()
 
 

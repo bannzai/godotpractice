@@ -10,8 +10,10 @@ const EFFECTS: Array[String] = [
 var current_scene: String = ""
 var _music: AudioStreamPlayer
 var _engine: AudioStreamPlayer
+var _ambience: AudioStreamPlayer
 var _effects: Dictionary = {}
 var _tracks: Dictionary = {}
+var _ambience_tracks: Dictionary = {}
 var _initialized: bool = false
 var _stopped: bool = false
 var _enabled: bool = false
@@ -32,12 +34,17 @@ func _setup() -> void:
 	_music = AudioStreamPlayer.new()
 	_music.volume_db = -14.0
 	add_child(_music)
+	_ambience = AudioStreamPlayer.new()
+	_ambience.volume_db = -21.0
+	add_child(_ambience)
 	_engine = AudioStreamPlayer.new()
 	_engine.stream = _load_loop("engine")
 	_engine.volume_db = -27.0
 	add_child(_engine)
 	for key: String in SCENES:
 		_tracks[key] = _load_loop(key)
+	for key: String in ["garage", "crowd"]:
+		_ambience_tracks[key] = _load_loop(key)
 	for key: String in EFFECTS:
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()
 		player.stream = load("res://assets/audio/%s.wav" % key)
@@ -62,9 +69,17 @@ func set_scene(scene: String) -> void:
 	if not _enabled:
 		return
 	_music.stop()
-	if _tracks.has(scene):
-		_music.stream = _tracks[scene]
+	var music_scene: String = "title" if scene in ["garage", "tutorial"] else scene
+	if _tracks.has(music_scene):
+		_music.stream = _tracks[music_scene]
 		_music.play()
+	_ambience.stop()
+	var ambience_scene: String = "garage" if scene in ["garage", "tutorial"] else (
+		"crowd" if scene in ["race", "final", "results"] else "")
+	if _ambience_tracks.has(ambience_scene):
+		_ambience.stream = _ambience_tracks[ambience_scene]
+		_ambience.volume_db = -24.0 if scene == "results" else -21.0
+		_ambience.play()
 	if scene != "race" and scene != "final":
 		_engine.stop()
 
@@ -99,6 +114,7 @@ func stop_all() -> void:
 			child.stop()
 			child.stream = null
 	_tracks.clear()
+	_ambience_tracks.clear()
 
 
 func _exit_tree() -> void:

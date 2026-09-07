@@ -20,6 +20,9 @@ var quitting: bool = false
 var stop_frame: int = 0
 var last_count: int = 4
 var final_music: bool = false
+var tutorial_step: int = 0
+var tutorial_complete: bool = false
+var menu_axis_latched: bool = false
 
 
 func _ready() -> void:
@@ -42,6 +45,8 @@ func _ready() -> void:
 	hud = Hud.new()
 	layer.add_child(hud)
 	hud.start_requested.connect(start_race)
+	hud.garage_requested.connect(show_garage)
+	hud.course_requested.connect(show_tutorial)
 	hud.title_requested.connect(show_title)
 	hud.kart_selected.connect(select_kart)
 	audio = Audio.new()
@@ -59,16 +64,36 @@ func _input(event: InputEvent) -> void:
 			else DisplayServer.WINDOW_MODE_FULLSCREEN)
 	if event.is_action_pressed("mute"):
 		AudioServer.set_bus_mute(0, not AudioServer.is_bus_mute(0))
-	if event.is_action_pressed("confirm") and state.phase in ["title", "results"]:
+	if event.is_action_pressed("confirm"):
 		get_viewport().set_input_as_handled()
-		start_race()
+		match state.phase:
+			"title":
+				show_garage()
+			"garage":
+				show_tutorial()
+			"tutorial":
+				_skip_tutorial()
+			"results":
+				start_race()
 	if event.is_action_pressed("cancel"):
-		show_title()
+		if state.phase == "tutorial":
+			_skip_tutorial()
+		elif state.phase != "title":
+			show_title()
 	if state.phase == "title":
+		if event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_X:
+			if absf(event.axis_value) < 0.25:
+				menu_axis_latched = false
+				return
+			if menu_axis_latched:
+				return
+			menu_axis_latched = true
 		if event.is_action_pressed("steer_left"):
 			select_kart(posmod(state.selected_kart - 1, 3))
 		if event.is_action_pressed("steer_right"):
 			select_kart(posmod(state.selected_kart + 1, 3))
+	elif state.phase == "tutorial":
+		_advance_tutorial(event)
 
 
 func select_kart(kind: int) -> void:
@@ -86,6 +111,51 @@ func show_title() -> void:
 	camera.h_offset = 0
 	camera.v_offset = 0
 	hud.refresh()
+
+
+func show_garage() -> void:
+	state.enter_menu_phase("garage")
+	audio.set_scene("garage")
+	menu_axis_latched = false
+	hud.refresh()
+
+
+func show_tutorial() -> void:
+	if tutorial_complete:
+		start_race()
+		return
+	tutorial_step = 0
+	state.enter_menu_phase("tutorial")
+	audio.set_scene("tutorial")
+	hud.set_tutorial_step(tutorial_step)
+	hud.refresh()
+
+
+func _advance_tutorial(event: InputEvent) -> void:
+	var advanced: bool = false
+	if tutorial_step == 0 and event.is_action_pressed("accelerate"):
+		advanced = true
+	elif tutorial_step == 1 and (event.is_action_pressed("steer_left")
+			or event.is_action_pressed("steer_right")):
+		advanced = true
+	elif tutorial_step == 2 and (event.is_action_pressed("drift")
+			or event.is_action_pressed("item")):
+		advanced = true
+	if not advanced:
+		return
+	tutorial_step += 1
+	audio.play_sfx("select")
+	if tutorial_step >= 3:
+		tutorial_complete = true
+		start_race()
+	else:
+		hud.set_tutorial_step(tutorial_step)
+		hud.refresh()
+
+
+func _skip_tutorial() -> void:
+	tutorial_complete = true
+	start_race()
 
 
 func start_race() -> void:
@@ -131,6 +201,19 @@ func _physics_process(delta: float) -> void:
 			karts[index].rotation.y = -0.8
 		camera.position = Vector3(62, 12, -24)
 		camera.look_at(Vector3(38, 3, -11))
+	elif state.phase == "garage":
+		for index: int in range(karts.size()):
+			karts[index].position = World.point_at(6 + index * 2.8, -1.4 + index * 0.9)
+			karts[index].rotation.y = -0.55
+		camera.position = Vector3(51, 8, -17)
+		camera.look_at(Vector3(34, 2, -9))
+	elif state.phase == "tutorial":
+		for index: int in range(karts.size()):
+			karts[index].position = World.point_at(float(index) * -2.0,
+				-1.8 if index % 2 == 0 else 1.8)
+			karts[index].rotation.y = -0.18
+		camera.position = karts[0].position + Vector3(0, 4.6, 8.5)
+		camera.look_at(karts[0].position + Vector3(0, 0.8, -3.0))
 	elif state.phase == "results":
 		for index: int in range(karts.size()):
 			karts[index].play_state("celebrate")
@@ -153,13 +236,19 @@ func _update_racers() -> void:
 		var racer: Dictionary = state.racers[index]
 		var target: Vector3 = World.point_at(racer.progress, racer.lateral)
 		if racer.respawn_timer > 0:
-			target.y -= sin(racer.respawn_timer * PI) * 4
+			target.y += respawn_lift(racer.respawn_timer)
 		karts[index].position = target
 		var tangent: Vector3 = Course.tangent(racer.progress)
 		var yaw: float = atan2(-tangent.x, -tangent.z)
 		karts[index].rotation = Vector3(0, yaw, 0)
 		karts[index].set_motion(racer.speed, Input.get_axis("steer_left", "steer_right")
 			if index == 0 else 0.0, racer.drifting, racer.boost > 0)
+	if not state.racers.is_empty():
+		world.update_scoreboard(state.rank_of(0), mini(state.racers[0].lap, Course.LAPS))
+
+
+static func respawn_lift(timer: float) -> float:
+	return maxf(0.0, sin(clampf(timer / 1.1, 0.0, 1.0) * PI) * 4.0)
 
 
 func _update_camera(delta: float, snap: bool = false) -> void:
