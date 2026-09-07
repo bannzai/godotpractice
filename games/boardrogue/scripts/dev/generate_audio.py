@@ -15,6 +15,8 @@ import wave
 RATE = 22050
 MUSIC = ("title", "map", "battle", "boss", "result_win", "result_loss")
 SFX = ("card", "blade", "arrow", "drum", "hit", "reward")
+AMBIENCE = ("river", "wind", "snow", "insects")
+CUES = ("shakuhachi",)
 
 
 @lru_cache(maxsize=384)
@@ -191,6 +193,74 @@ def sfx(name):
     return encode(channels)
 
 
+def cyclic_noise(length, seed, points):
+    """固定した制御点を環状補間し、ループ境界でも連続するノイズを作る。"""
+    rng = random.Random(seed)
+    controls = [rng.uniform(-1, 1) for _ in range(points)]
+    result = array("f")
+    for frame in range(length):
+        position = frame*points/length
+        index = int(position)
+        part = position-index
+        part = part*part*(3-2*part)
+        value = controls[index]*(1-part)+controls[(index+1) % points]*part
+        result.append(value)
+    return result
+
+
+def ambience(name):
+    """録音を参照せず、周期ノイズと整数周期の倍音から環境ループを合成する。"""
+    duration = 8
+    length = duration*RATE
+    index = AMBIENCE.index(name)
+    slow_left = cyclic_noise(length, 1701+index*17, 41+index*6)
+    slow_right = cyclic_noise(length, 1801+index*19, 47+index*6)
+    detail_left = cyclic_noise(length, 1901+index*23, 1201+index*137)
+    detail_right = cyclic_noise(length, 2001+index*29, 1321+index*149)
+    channels = [array("f", [0])*length for _ in range(2)]
+    for frame in range(length):
+        phase = frame/length
+        if name == "river":
+            ripple = (.11*math.sin(math.tau*113*phase)
+                      +.07*math.sin(math.tau*179*phase+.7))
+            left = .38*slow_left[frame]+.25*detail_left[frame]+ripple
+            right = .36*slow_right[frame]+.24*detail_right[frame]-ripple*.55
+        elif name == "wind":
+            swell = .48+.30*math.sin(math.tau*2*phase-.4)
+            left = slow_left[frame]*swell+.12*detail_left[frame]
+            right = slow_right[frame]*(1.02-swell*.35)+.12*detail_right[frame]
+        elif name == "snow":
+            hush = .15*slow_left[frame]+.08*detail_left[frame]
+            crystal = (.035*math.sin(math.tau*997*phase)
+                       +.025*math.sin(math.tau*1597*phase+.9))
+            left = hush+crystal
+            right = .15*slow_right[frame]+.08*detail_right[frame]-crystal*.7
+        else:
+            chirp_phase = (phase*32) % 1
+            chirp = math.sin(math.tau*(157*phase+chirp_phase*1.8))
+            chirp *= math.sin(math.pi*chirp_phase)**8
+            answer_phase = (phase*24+.37) % 1
+            answer = math.sin(math.tau*(121*phase+answer_phase*1.3))
+            answer *= math.sin(math.pi*answer_phase)**10
+            left = .10*slow_left[frame]+.40*chirp+.22*answer
+            right = .10*slow_right[frame]+.23*chirp+.39*answer
+        channels[0][frame] = left
+        channels[1][frame] = right
+    return encode(channels, True)
+
+
+def shakuhachi_cue():
+    """既存曲を参照しない三音の短い息笛キューを合成する。"""
+    duration = 2.15
+    channels = [array("f", [0])*round(duration*RATE) for _ in range(2)]
+    for note, start, length, gain, pan in (
+            (67, 0, .82, .29, -.18),
+            (72, .54, .83, .31, .16),
+            (74, 1.12, .91, .27, 0)):
+        mix(channels, instrument("flute", note, length), start, gain, pan)
+    return encode(channels)
+
+
 def generate():
     arrangements = {
         "title":(76,(50,48,46,45),(74,0,77,81,79,77,74,0,72,74,77,0,69,0,72,74),"flute"),
@@ -202,6 +272,8 @@ def generate():
     }
     output = {f"audio/{name}.wav":music(name,*arrangements[name]) for name in MUSIC}
     output.update({f"audio/{name}.wav":sfx(name) for name in SFX})
+    output.update({f"audio/{name}.wav":ambience(name) for name in AMBIENCE})
+    output["audio/shakuhachi.wav"] = shakuhachi_cue()
     return output
 
 
@@ -211,14 +283,14 @@ def main():
     parser.add_argument("--print-spec",action="store_true")
     args=parser.parse_args()
     if args.print_spec:
-        print(json.dumps({"rate":RATE,"images":[],"audio":[{"path":f"audio/{name}.wav","loop":name in MUSIC,"stereo":True} for name in MUSIC+SFX]}))
+        print(json.dumps({"rate":RATE,"images":[],"audio":[{"path":f"audio/{name}.wav","loop":name in MUSIC+AMBIENCE,"stereo":True} for name in MUSIC+SFX+AMBIENCE+CUES]}))
         return
     for name,data in generate().items():
         target=args.out_dir/name
         target.parent.mkdir(parents=True,exist_ok=True)
         if not target.exists() or target.read_bytes()!=data:
             target.write_bytes(data)
-    print("独自 BGM 6 曲・効果音 6 点を生成しました（22050 Hz / 16 bit stereo PCM）。")
+    print("独自 BGM 6 曲・環境音 4 点・効果音 7 点を生成しました（22050 Hz / 16 bit stereo PCM）。")
 
 
 if __name__=="__main__":

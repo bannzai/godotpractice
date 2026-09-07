@@ -13,6 +13,25 @@ const NODE_NAMES: Dictionary = {
 	"rest": "灯の宿",
 	"shop": "旅の商人"
 }
+const NODE_PREVIEWS: Dictionary = {
+	"battle": "街道で札勝負・通常の盤",
+	"general": "険路の将軍・強敵と希少札",
+	"final": "最後の天守・旅の決着",
+	"reward": "札の社・新しい札を一枚",
+	"rest": "灯の宿・王を4回復",
+	"shop": "旅の商人・購入と札整理"
+}
+const MAP_POINTS: Array = [
+	[Vector2(120, 445), Vector2(148, 548)],
+	[Vector2(247, 383), Vector2(278, 516)],
+	[Vector2(382, 438), Vector2(408, 315)],
+	[Vector2(516, 351), Vector2(548, 492)],
+	[Vector2(654, 292), Vector2(684, 430)],
+	[Vector2(786, 363), Vector2(819, 513)],
+	[Vector2(920, 306), Vector2(948, 446)],
+	[Vector2(1041, 241), Vector2(1070, 388)],
+	[Vector2(1162, 285)],
+]
 
 
 static func render(main: Control) -> void:
@@ -36,41 +55,43 @@ static func render(main: Control) -> void:
 
 
 static func _title(main: Control) -> void:
-	UI.picture(main.content, "res://assets/art/title_keyart.svg", Rect2(542, -28, 770, 770))
-	UI.panel(main.content, Rect2(60, 76, 534, 566), Color("142522e8"))
-	UI.picture(main.content, "res://assets/art/logo_mark.svg", Rect2(89, 105, 91, 91))
-	UI.label(main.content, "墨将紀", Rect2(189, 100, 395, 100), 76, UI.PAPER)
-	UI.label(main.content, "霧 の 九 峠", Rect2(194, 207, 310, 44), 28, UI.GOLD)
-	UI.paragraph(main.content, "一枚を伏せ、一手を読む。\n王を守り、霧の先に道を描け。", Rect2(101, 282, 450, 81), 23)
+	var veil := ColorRect.new()
+	veil.color = Color("24170e42")
+	veil.size = Vector2(1280, 720)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.content.add_child(veil)
+	UI.scroll_panel(main.content, Rect2(52, 54, 514, 604), Color("f2dfb8ee"))
+	UI.label(main.content, "墨\n将\n紀", Rect2(91, 86, 75, 228), 55, UI.INK)
+	UI.label(main.content, "霧 の 九 峠", Rect2(187, 100, 320, 51), 30, UI.RED)
+	UI.paragraph(main.content, "一枚を伏せ、一手を読む。\n王を守り、霧の先に道を描け。", Rect2(190, 177, 320, 86), 24)
+	UI.label(main.content, "水墨札棋ローグライク", Rect2(188, 278, 320, 34), 17, UI.MUTED)
 	main.seed_input = LineEdit.new()
 	main.seed_input.name = "seed"
-	main.seed_input.position = Vector2(263, 378)
-	main.seed_input.size = Vector2(282, 42)
+	main.seed_input.position = Vector2(235, 351)
+	main.seed_input.size = Vector2(270, 42)
 	main.seed_input.placeholder_text = "空欄なら新しい旅路"
 	main.seed_input.max_length = 9
 	main.content.add_child(main.seed_input)
-	UI.label(main.content, "旅路の種", Rect2(101, 383, 150, 38), 18, UI.MUTED)
+	UI.label(main.content, "旅路の種", Rect2(90, 357, 137, 38), 18, UI.MUTED)
 	main.first_focus = UI.button(
-		main.content, "start", "新しい旅を始める", Rect2(100, 440, 445, 56), main.start_run
+		main.content, "start", "新しい旅を始める", Rect2(89, 419, 416, 56), main.start_run
 	)
 	var resume: Button = UI.button(
-		main.content, "resume", "旅の続きを再開", Rect2(100, 509, 445, 46), main.resume_run
+		main.content, "resume", "旅の続きを再開", Rect2(89, 487, 416, 46), main.resume_run
 	)
 	resume.disabled = not main.run.has_save()
 	UI.button(
-		main.content, "book", "札の図鑑", Rect2(100, 570, 213, 43), main._show_overlay.bind("book")
+		main.content, "book", "札の図鑑", Rect2(89, 550, 198, 43), main._show_overlay.bind("book")
 	)
 	UI.button(
-		main.content, "help", "遊び方", Rect2(327, 570, 218, 43), main._show_overlay.bind("help")
+		main.content, "help", "遊び方", Rect2(307, 550, 198, 43), main._show_overlay.bind("help")
 	)
-	UI.label(
-		main.content, "クリック / 矢印・決定 / 十字・左スティック・A　　F11 全画面", Rect2(66, 671, 1150, 31), 16, UI.MUTED
-	)
+	UI.label(main.content, "道中の手引きは盤上に現れます", Rect2(150, 610, 355, 28), 16, UI.MUTED)
 
 
 static func _header(main: Control) -> void:
-	UI.panel(main.content, Rect2(24, 17, 1232, 62), Color("10201deb"))
-	UI.label(main.content, "墨将紀", Rect2(42, 22, 158, 49), 31, UI.GOLD)
+	UI.scroll_panel(main.content, Rect2(20, 15, 1240, 65), Color("f0ddb5ef"))
+	UI.label(main.content, "墨将紀", Rect2(43, 22, 158, 49), 31, UI.RED)
 	main.hero_actor = _actor(main.content, "hero", Vector2(198, 47), 0.16)
 	var hp: int = main.run.king_hp
 	if main.run.stage == "battle":
@@ -89,79 +110,76 @@ static func _header(main: Control) -> void:
 
 
 static func _map(main: Control) -> void:
-	UI.label(main.content, "霧の向こうへ", Rect2(47, 105, 810, 56), 38)
-	UI.label(main.content, "険しい道の将軍は、稀なる札を隠し持つ。", Rect2(49, 165, 950, 36), 21, UI.MUTED)
-	var scroll := ScrollContainer.new()
-	scroll.name = "route_scroll"
-	scroll.position = Vector2(35, 220)
-	scroll.size = Vector2(1210, 355)
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	main.content.add_child(scroll)
+	UI.scroll_panel(main.content, Rect2(21, 91, 1238, 608), Color("f3e2bdae"))
+	UI.label(main.content, "街\n道\n絵\n巻", Rect2(45, 105, 48, 180), 28, UI.INK)
+	UI.label(main.content, "霧の九峠を越え、右上の天守へ", Rect2(109, 103, 680, 47), 34, UI.INK)
+	UI.label(main.content, "朱印が現在地。明るい札が、いま選べる道。", Rect2(112, 150, 700, 31), 19, UI.MUTED)
 	var canvas := Control.new()
-	canvas.custom_minimum_size = Vector2(1625, 320)
-	scroll.add_child(canvas)
+	canvas.name = "route_scroll"
+	canvas.size = Vector2(1280, 720)
+	canvas.mouse_filter = Control.MOUSE_FILTER_PASS
+	main.content.add_child(canvas)
 	for depth: int in range(9):
 		var nodes: Array = main.run.route[depth]
-		var x: float = 30 + depth * 172
 		for lane: int in range(nodes.size()):
 			var item: Dictionary = nodes[lane]
-			var y: float = 23 + lane * 160 if depth < 8 else 100
+			var point: Vector2 = MAP_POINTS[depth][mini(lane, MAP_POINTS[depth].size() - 1)]
 			if depth < 8:
 				for next_lane: int in range(main.run.route[depth + 1].size()):
+					var next_points: Array = MAP_POINTS[depth + 1]
+					var next_point: Vector2 = next_points[mini(next_lane, next_points.size() - 1)]
 					var line := Line2D.new()
-					line.width = 2
-					line.default_color = Color(UI.GOLD, 0.37)
-					var next_y: float = 23 + next_lane * 160 if depth < 7 else 100
+					line.width = 4
+					line.default_color = Color(UI.INK, 0.34)
 					line.points = PackedVector2Array(
-						[Vector2(x + 70, y + 55), Vector2(x + 242, next_y + 55)]
+						[point, (point + next_point) / 2 + Vector2(0, 13), next_point]
 					)
 					canvas.add_child(line)
 			var button: Button = UI.button(
 				canvas,
 				"route_%d_%d" % [depth, lane],
 				"",
-				Rect2(x, y, 140, 122),
+				Rect2(point - Vector2(38, 34), Vector2(76, 68)),
 				main.choose_node.bind(lane)
 			)
 			button.disabled = depth != main.run.depth + 1
 			if depth == main.run.depth + 1 and lane == 0:
 				main.first_focus = button
 			var icon: String = "merchant" if item.type == "shop" else item.type
-			UI.picture(button, "res://assets/art/route_%s.svg" % icon, Rect2(47, 9, 46, 46))
+			UI.picture(button, "res://assets/art/route_%s.svg" % icon, Rect2(20, 5, 36, 36))
 			var title: Label = UI.label(
 				button,
 				NODE_NAMES[item.type],
-				Rect2(0, 64, 140, 26),
-				18,
-				UI.GOLD if item.type in ["general", "final"] else UI.PAPER
+				Rect2(-18, 42, 112, 24),
+				14,
+				UI.RED if item.type in ["general", "final"] else UI.INK
 			)
 			title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			var mark: Label = UI.label(
-				button,
-				"%d 峠  /  %s" % [depth + 1, "五列" if item.width == 5 else "三列"],
-				Rect2(0, 94, 140, 22),
-				13,
-				UI.MUTED
-			)
-			mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			if depth <= main.run.depth:
 				button.modulate.a = 0.42
-	var offset: int = clampi(main.run.depth * 172 - 220, 0, 500)
-	scroll.set_deferred("scroll_horizontal", maxi(0, offset - 70))
-	main.create_tween().tween_property(scroll, "scroll_horizontal", offset, 0.7)
-	UI.panel(main.content, Rect2(47, 604, 1186, 72), Color("152a24e8"))
-	UI.label(main.content, "道を選ぶ  →  一局を戦う  →  札を増やす  →  最後の天守へ", Rect2(73, 625, 1100, 36), 22)
-	UI.label(main.content, "旅路の種  %d" % main.run.seed_value, Rect2(980, 173, 265, 28), 15, UI.GOLD)
+			elif depth == main.run.depth:
+				UI.label(canvas, "● 現在", Rect2(point.x - 33, point.y + 39, 80, 22), 14, UI.RED)
+			if depth == main.run.depth + 1:
+				var preview_y: float = 584.0 + lane * 49.0
+				UI.panel(canvas, Rect2(154 + lane * 493, preview_y, 470, 42), Color("f4e4c7ed"))
+				UI.label(
+					canvas,
+					"%s　—　%s" % [NODE_NAMES[item.type], NODE_PREVIEWS[item.type]],
+					Rect2(169 + lane * 493, preview_y + 8, 443, 27),
+					17,
+					UI.INK
+				)
+	UI.label(main.content, "旅路の種  %d" % main.run.seed_value, Rect2(978, 103, 250, 28), 15, UI.GOLD)
 
 
 static func _battle(main: Control) -> void:
 	var battle: RefCounted = main.run.battle
-	UI.panel(main.content, Rect2(27, 103, 273, 402), Color("12251fee"))
-	UI.panel(main.content, Rect2(971, 103, 282, 402), Color("231f1cee"))
-	UI.panel(main.content, Rect2(318, 131, 636, 350), Color("1b2d25b8"))
+	UI.scroll_panel(main.content, Rect2(27, 103, 273, 402), Color("f1dfb9ed"))
+	UI.scroll_panel(main.content, Rect2(971, 103, 282, 402), Color("e8d2a9ed"))
+	UI.scroll_panel(main.content, Rect2(310, 121, 649, 397), Color("ead6a49c"))
 	var start_x: float = 640.0 - battle.width * 52.0
-	UI.label(main.content, "敵陣", Rect2(319, 167, 42, 75), 17, UI.RED)
-	UI.label(main.content, "自陣", Rect2(319, 363, 42, 75), 17, UI.JADE)
+	UI.label(main.content, "敵\n陣", Rect2(324, 161, 29, 75), 18, UI.RED)
+	UI.label(main.content, "自\n陣", Rect2(324, 365, 29, 75), 18, UI.JADE)
 	for y: int in range(4):
 		for x: int in range(battle.width):
 			var pos := Vector2i(x, y)
@@ -196,23 +214,41 @@ static func _battle(main: Control) -> void:
 		Rect2(580, 90, 120, 37),
 		main._attack_king
 	)
+	var selected: Dictionary = battle.unit_by_id(main.selected_uid)
+	var king_legal: bool = not selected.is_empty() and battle.can_attack(main.selected_uid)
+	enemy_king.disabled = not king_legal
 	enemy_king.add_theme_color_override("font_color", UI.RED)
-	UI.panel(main.content, Rect2(580, 484, 120, 34), Color("294135"))
+	if king_legal:
+		enemy_king.add_theme_stylebox_override("normal", UI.box(Color("f6dfb8"), UI.RED))
+	UI.panel(main.content, Rect2(580, 484, 120, 34), Color("ead8a9e8"))
 	UI.label(main.content, "王  %d" % battle.hp[0], Rect2(604, 486, 105, 32), 19, UI.JADE)
 	UI.label(main.content, "%d 手目" % battle.turn_number, Rect2(727, 489, 160, 25), 16, UI.MUTED)
 	_detail(main)
 	_opponent(main)
 	_hand(main)
-	var phase: String = "準 備" if battle.phase == "standby" else "攻 撃"
+	var phase: String = "先\n手\n布\n陣" if battle.phase == "standby" else "先\n手\n攻\nめ"
 	if battle.turn == 1:
-		phase = "敵の手番"
-	UI.label(main.content, phase, Rect2(981, 523, 256, 45), 30, UI.GOLD)
-	UI.paragraph(main.content, main.note, Rect2(981, 570, 256, 67), 15)
+		phase = "敵\nの\n手\n番"
+	UI.panel(main.content, Rect2(922, 142, 31, 139), Color("e0c38eea"))
+	UI.label(main.content, phase, Rect2(926, 149, 24, 128), 18, UI.RED)
+	UI.scroll_panel(main.content, Rect2(971, 516, 282, 124), Color("f3e1bbed"))
+	var instruction: String = _tutorial_text(main) if main.tutorial_active else main.note
+	UI.paragraph(main.content, instruction, Rect2(990, 529, 243, 96), 16)
+	if main.tutorial_active:
+		var skip: Button = UI.button(
+			main.content,
+			"tutorial_skip",
+			"手ほどきを省く",
+			Rect2(1085, 604, 142, 27),
+			main._skip_tutorial
+		)
+		skip.add_theme_font_size_override("font_size", 13)
 	var next_text: String = "バトルへ  E / Y" if battle.phase == "standby" else "手番を終える  E / Y"
 	var next: Button = UI.button(
 		main.content, "phase", next_text, Rect2(978, 644, 266, 49), main._advance_phase
 	)
 	next.disabled = battle.turn == 1
+	next.add_theme_color_override("font_color", UI.RED if battle.phase == "standby" else UI.INK)
 
 
 static func _detail(main: Control) -> void:
@@ -423,7 +459,7 @@ static func _shop(main: Control) -> void:
 
 
 static func _result(main: Control) -> void:
-	UI.picture(main.content, "res://assets/art/title_keyart.svg", Rect2(543, 74, 670, 670))
+	UI.picture(main.content, "res://assets/art/generated/title-key-art.png", Rect2(543, 74, 670, 670))
 	UI.panel(main.content, Rect2(68, 117, 548, 532), Color("152920ed"))
 	UI.label(
 		main.content,
@@ -574,7 +610,7 @@ static func _book(main: Control, parent: Control, kind: String) -> void:
 		UI.paragraph(cell, card.text, Rect2(109, 83, 230, 78), 15)
 	UI.label(
 		parent,
-		"素材：独自SVG・合成音声。字体：Zen Old Mincho / Yoshimichi Ohira / SIL OFL 1.1。",
+		"素材：生成水墨画・独自SVG・合成音声。字体：Yuji Syuku / SIL OFL 1.1。",
 		Rect2(81, 630, 1120, 29),
 		14,
 		UI.MUTED
@@ -618,3 +654,14 @@ static func _legal_target(main: Control, pos: Vector2i, unit: Dictionary) -> boo
 	if main.mode == "effect":
 		return not unit.is_empty() and unit.side == 1 and not unit.face
 	return not unit.is_empty() and battle.can_attack(selected.uid, unit.uid)
+
+
+static func _tutorial_text(main: Control) -> String:
+	var messages: Array[String] = [
+		"手ほどき 一｜手札から一枚を選ぶ。名と能力は左の巻物に現れます。",
+		"手ほどき 二｜青磁に脈打つ自陣の空きマスを選び、札を伏せて置きます。",
+		"手ほどき 三｜置いた伏せ札を選び、左の「登場」で表向きにします。",
+		"手ほどき 四｜右下の「バトルへ」で攻めへ。移動した札は攻撃できません。",
+		"手ほどき 五｜表向き札を選び、朱に脈打つ隣の敵札を選んで攻撃します。",
+	]
+	return messages[clampi(main.tutorial_step, 0, messages.size() - 1)]

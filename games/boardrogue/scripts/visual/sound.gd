@@ -16,15 +16,26 @@ const EFFECTS: Dictionary = {
 	"drum": preload("res://assets/audio/drum.wav"),
 	"hit": preload("res://assets/audio/hit.wav"),
 	"reward": preload("res://assets/audio/reward.wav"),
+	"shakuhachi": preload("res://assets/audio/shakuhachi.wav"),
 }
+const AMBIENCE: Dictionary = {
+	"river": preload("res://assets/audio/river.wav"),
+	"wind": preload("res://assets/audio/wind.wav"),
+	"snow": preload("res://assets/audio/snow.wav"),
+	"insects": preload("res://assets/audio/insects.wav"),
+}
+const AMBIENCE_VOLUME: Dictionary = {"river": -25.0, "wind": -27.0, "snow": -32.0, "insects": -29.0}
 const RELEASE_FRAMES: int = 16
 
 var stopped: bool = false
 var scene_key: String = ""
+var ambience_key: String = ""
 var _music_players: Array[AudioStreamPlayer] = []
 var _effect_players: Array[AudioStreamPlayer] = []
+var _ambience_player: AudioStreamPlayer
 var _active: int = 0
 var _fade: Tween
+var _ambience_fade: Tween
 var _has_played: bool = false
 var _released: bool = false
 
@@ -37,10 +48,17 @@ func _ready() -> void:
 		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		stream.loop_begin = 0
 		stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
+	for stream: AudioStreamWAV in AMBIENCE.values():
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_begin = 0
+		stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
 	for index: int in range(2):
 		var player := AudioStreamPlayer.new()
 		add_child(player)
 		_music_players.append(player)
+	_ambience_player = AudioStreamPlayer.new()
+	_ambience_player.volume_db = -50.0
+	add_child(_ambience_player)
 	for index: int in range(8):
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -10.0
@@ -68,6 +86,41 @@ func play_music(next_scene: String) -> void:
 	_fade.chain().tween_callback(previous.stop)
 
 
+func play_ambience(next_ambience: String) -> void:
+	if stopped or next_ambience == ambience_key:
+		return
+	ambience_key = next_ambience
+	if _ambience_fade:
+		_ambience_fade.kill()
+		_ambience_fade = null
+	if not AMBIENCE.has(next_ambience):
+		if _ambience_player.playing:
+			_ambience_fade = create_tween()
+			_ambience_fade.tween_property(_ambience_player, "volume_db", -50.0, 0.25)
+			_ambience_fade.tween_callback(_ambience_player.stop)
+		return
+	if _ambience_player.playing:
+		_ambience_fade = create_tween()
+		_ambience_fade.tween_property(_ambience_player, "volume_db", -50.0, 0.20)
+		_ambience_fade.tween_callback(_start_ambience.bind(next_ambience))
+	else:
+		_start_ambience(next_ambience)
+
+
+func _start_ambience(next_ambience: String) -> void:
+	if stopped or ambience_key != next_ambience or not AMBIENCE.has(next_ambience):
+		return
+	_ambience_player.stop()
+	_ambience_player.stream = AMBIENCE[next_ambience]
+	_ambience_player.volume_db = -50.0
+	_ambience_player.play()
+	_has_played = true
+	_ambience_fade = create_tween()
+	_ambience_fade.tween_property(
+		_ambience_player, "volume_db", float(AMBIENCE_VOLUME[next_ambience]), 0.35
+	)
+
+
 # 効果音は入力イベントごとに鳴らすため非冪等。停止後の再開は防ぐ。
 func play_sfx(key: String) -> void:
 	if stopped or not EFFECTS.has(key):
@@ -85,7 +138,11 @@ func stop_audio() -> void:
 	if _fade:
 		_fade.kill()
 		_fade = null
-	for player: AudioStreamPlayer in _music_players + _effect_players:
+	if _ambience_fade:
+		_ambience_fade.kill()
+		_ambience_fade = null
+	ambience_key = ""
+	for player: AudioStreamPlayer in _music_players + _effect_players + [_ambience_player]:
 		player.stop()
 		player.stream = null
 
