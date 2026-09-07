@@ -3,7 +3,7 @@ extends Area2D
 ## 飛び道具の移動・命中は時間と入力を消費するため非冪等。1発につき命中は1回。
 
 const WAVES: Array[Texture2D] = [
-	preload("res://assets/effects/wave-teal.svg"), preload("res://assets/effects/wave-amber.svg")
+	preload("res://assets/effects/wave-teal.png"), preload("res://assets/effects/wave-amber.png")
 ]
 
 var target: Node2D

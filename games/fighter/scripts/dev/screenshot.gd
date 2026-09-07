@@ -23,21 +23,17 @@ func _capture_scenes() -> bool:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await create_timer(0.6).timeout
-	if not await _capture("tmp/screenshot-title.png"):
+	if not await _capture_menu_screens(main):
 		return false
-	main.show_select()
-	await create_timer(0.5).timeout
-	if not await _capture("tmp/screenshot-select.png"):
+	if not await _capture_tutorial(main):
 		return false
-	main.start_match()
-	await create_timer(0.08).timeout
-	if not await _capture("tmp/screenshot-transition-fight.png"):
-		return false
-	main.intro = 0.0
-	await create_timer(0.5).timeout
 	main.previewing = true
 	main.player.enabled = false
 	main.cpu.enabled = false
+	if not await _capture_stage_backgrounds(main):
+		return false
+	main.combo_count = 7
+	main.combo_time = 10.0
 	if not await _capture("tmp/screenshot-play.png"):
 		return false
 	for capture_group: Callable in [
@@ -50,6 +46,65 @@ func _capture_scenes() -> bool:
 	# 音声ミキサーが停止済みの再生リソースを解放する周期を待つ。
 	await create_timer(0.2).timeout
 	await process_frame
+	return true
+
+
+func _capture_menu_screens(main: Control) -> bool:
+	if not await _capture("tmp/screenshot-title.png"):
+		return false
+	main.show_select()
+	await create_timer(0.5).timeout
+	if not await _capture("tmp/screenshot-select.png"):
+		return false
+	main._choose(1)
+	await create_timer(0.2).timeout
+	if not await _capture("tmp/screenshot-select-highlight.png"):
+		return false
+	main._choose(0)
+	if not await _capture_stage_screens(main):
+		return false
+	return true
+
+
+func _capture_stage_screens(main: Control) -> bool:
+	main.show_stage()
+	await create_timer(0.5).timeout
+	if not await _capture("tmp/screenshot-stage-map.png"):
+		return false
+	main._choose_stage(1)
+	await create_timer(0.6).timeout
+	if not await _capture("tmp/screenshot-stage-highlight.png"):
+		return false
+	main._choose_stage(0)
+	main.start_match()
+	await create_timer(0.08).timeout
+	if not await _capture("tmp/screenshot-transition-fight.png"):
+		return false
+	return true
+
+
+func _capture_tutorial(main: Control) -> bool:
+	main.intro = 0.0
+	await create_timer(0.5).timeout
+	main.tutorial_step = 0
+	if not await _capture("tmp/screenshot-tutorial-move.png"):
+		return false
+	main.tutorial_step = 1
+	if not await _capture("tmp/screenshot-tutorial-strike.png"):
+		return false
+	main.tutorial_step = 2
+	if not await _capture("tmp/screenshot-tutorial-special.png"):
+		return false
+	main._finish_tutorial(false)
+	return true
+
+
+func _capture_stage_backgrounds(main: Control) -> bool:
+	for index: int in range(main.STAGE_NAMES.size()):
+		main.stage_index = index
+		if not await _capture("tmp/screenshot-fight-%s.png" % ["tokyo", "seoul", "rio"][index]):
+			return false
+	main.stage_index = 0
 	return true
 
 
@@ -201,7 +256,7 @@ func _capture_character_frames(main: Control) -> bool:
 			background.color = Color("102236")
 			gallery.add_child(background)
 			_gallery_label(gallery, Vector2(35, 22),
-				("蒼" if character == 0 else "燈") + "  /  連続フレーム  %d" % (page + 1), 30)
+				("蒼電" if character == 0 else "紅蓮") + "  /  連続フレーム  %d" % (page + 1), 30)
 			for column: int in range(3):
 				_gallery_label(gallery, Vector2(300 + column * 335, 82),
 					["開始  1/8", "途中  4/8", "終了  8/8"][column], 19)
@@ -232,7 +287,7 @@ func _gallery_label(parent: Control, at: Vector2, text: String, size_px: int) ->
 	var label: Label = Label.new()
 	label.position = at
 	label.text = text
-	label.add_theme_font_override("font", preload("res://assets/fonts/font.ttf"))
+	label.add_theme_font_override("font", preload("res://assets/fonts/DelaGothicOne-Regular.ttf"))
 	label.add_theme_font_size_override("font_size", size_px)
 	label.add_theme_color_override("font_color", Color("f5e7c9"))
 	parent.add_child(label)

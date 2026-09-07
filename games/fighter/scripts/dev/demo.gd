@@ -4,25 +4,29 @@ extends SceneTree
 
 const TOTAL_FRAMES: int = 870
 const REQUIRED: Array[String] = [
-	"タイトル", "選択", "対戦", "移動", "ジャンプ", "通常技", "ガード", "被弾", "コマンド必殺", "結果", "タイトル復帰"
+	"タイトル", "選択", "地図", "チュートリアル", "対戦", "移動", "ジャンプ", "通常技", "ガード",
+	"被弾", "コマンド必殺", "結果", "タイトル復帰"
 ]
 const EVENTS: Array[Array] = [
 	[30, KEY_ENTER, true], [32, KEY_ENTER, false],
 	[49, KEY_D, true], [51, KEY_D, false],
 	[75, KEY_ENTER, true], [77, KEY_ENTER, false],
-	[132, KEY_D, true], [153, KEY_D, false],
-	[155, KEY_W, true], [158, KEY_W, false],
-	[165, KEY_I, true], [168, KEY_I, false],
-	[194, KEY_A, true], [194, KEY_S, true],
-	[242, KEY_A, false], [242, KEY_S, false],
-	[244, KEY_K, true], [247, KEY_K, false],
-	[261, KEY_A, true], [276, KEY_A, false],
-	[278, KEY_S, true], [281, KEY_D, true],
-	[284, KEY_S, false], [284, KEY_J, true],
-	[287, KEY_J, false], [287, KEY_D, false],
-	[311, KEY_S, true], [314, KEY_D, true],
-	[317, KEY_S, false], [317, KEY_J, true],
-	[320, KEY_J, false], [320, KEY_D, false],
+	[88, KEY_D, true], [90, KEY_D, false],
+	[100, KEY_ENTER, true], [102, KEY_ENTER, false],
+	[160, KEY_SPACE, true], [162, KEY_SPACE, false],
+	[172, KEY_D, true], [193, KEY_D, false],
+	[195, KEY_W, true], [198, KEY_W, false],
+	[205, KEY_I, true], [208, KEY_I, false],
+	[224, KEY_A, true], [224, KEY_S, true],
+	[272, KEY_A, false], [272, KEY_S, false],
+	[274, KEY_K, true], [277, KEY_K, false],
+	[291, KEY_A, true], [306, KEY_A, false],
+	[308, KEY_S, true], [311, KEY_D, true],
+	[314, KEY_S, false], [314, KEY_J, true],
+	[317, KEY_J, false], [317, KEY_D, false],
+	[341, KEY_S, true], [344, KEY_D, true],
+	[347, KEY_S, false], [347, KEY_J, true],
+	[350, KEY_J, false], [350, KEY_D, false],
 	[810, KEY_ESCAPE, true], [812, KEY_ESCAPE, false],
 ]
 
@@ -80,10 +84,14 @@ func _observe(frame: int) -> void:
 			_record("タイトル復帰" if evidence.has("結果") else "タイトル", frame)
 		state.Screen.SELECT:
 			_record("選択", frame)
+		state.Screen.STAGE:
+			_record("地図", frame)
 		state.Screen.RESULT:
 			_record("結果", frame)
 		state.Screen.FIGHT:
 			_record("対戦", frame)
+			if main.tutorial_active:
+				_record("チュートリアル", frame)
 			if main.player.get_instance_id() != observed_player_id:
 				observed_player_id = main.player.get_instance_id()
 				main.player.special_cast.connect(_record_special)

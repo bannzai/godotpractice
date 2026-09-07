@@ -412,17 +412,44 @@ func _check_main_inputs(gamepad: bool) -> void:
 		_send_key(KEY_D, false)
 	_check(state.selected != original_selection, label + "左右入力でキャラ選択")
 	await _tap_control(gamepad, KEY_ENTER, JOY_BUTTON_A)
-	_check(state.screen == MATCH_SCRIPT.Screen.FIGHT, label + "決定で対戦開始")
+	_check(state.screen == MATCH_SCRIPT.Screen.STAGE, label + "決定で世界地図へ")
+	var original_stage: int = main.stage_index
+	if gamepad:
+		_send_axis(JOY_AXIS_LEFT_X, 1.0)
+	else:
+		_send_key(KEY_D, true)
+	await _frames(2)
+	if gamepad:
+		_send_axis(JOY_AXIS_LEFT_X, 0.0)
+	else:
+		_send_key(KEY_D, false)
+	_check(main.stage_index != original_stage, label + "左右入力で会場選択")
+	await _tap_control(gamepad, KEY_ENTER, JOY_BUTTON_A)
+	_check(state.screen == MATCH_SCRIPT.Screen.FIGHT, label + "地図の決定で対戦開始")
 	_check(is_instance_valid(main.player) and is_instance_valid(main.cpu), label + "両闘士生成")
 	main.intro = 0.0
 	await _frames(2)
-	await _check_main_pause(main, state, gamepad, label)
+	_check(main.tutorial_active and main.tutorial_step == 0, label + "初戦で場面内チュートリアルを表示")
+	if gamepad:
+		await _tap_control(true, KEY_SPACE, JOY_BUTTON_A)
+		_check(not main.tutorial_active and main.tutorial_seen, label + "決定入力でチュートリアルをスキップ")
+	else:
+		_send_key(KEY_D, true)
+		await _frames(3)
+		_send_key(KEY_D, false)
+		_check(main.tutorial_step == 1, label + "移動入力でチュートリアルを進める")
+		await _tap_control(false, KEY_J, JOY_BUTTON_X)
+		_check(main.tutorial_step == 2, label + "通常技入力でチュートリアルを進める")
+		await _frames(50)
 	await _enter_special(gamepad)
 	_check(main.player.action == "special", label + "入力履歴を通じて必殺技発動")
+	if not gamepad:
+		_check(not main.tutorial_active and main.tutorial_seen, label + "必殺技でチュートリアル完了")
 	_check(main.commands.history.is_empty(), label + "成立したコマンド履歴を消費")
 	await _frames(20)
 	_check(not get_nodes_in_group("projectiles").is_empty(), label + "必殺技から投射物生成")
 	await _frames(50)
+	await _check_main_pause(main, state, gamepad, label)
 	var start_x: float = main.player.position.x
 	if gamepad:
 		_send_axis(JOY_AXIS_LEFT_X, -1.0)
@@ -589,6 +616,9 @@ func _check_audio() -> void:
 		_check(track.loop_mode == AudioStreamWAV.LOOP_FORWARD and track.loop_end > 0,
 			"場面別の曲がループする: " + name)
 		_check(track.get_length() >= 10.0, "場面別の曲に十分な長さがある: " + name)
+	var crowd: AudioStreamWAV = load("res://assets/audio/crowd.wav")
+	_check(crowd.loop_mode == AudioStreamWAV.LOOP_FORWARD, "観客の環境音は前方ループ")
+	_check(crowd.get_length() >= 10.0, "観客の環境音に十分な長さがある")
 
 
 func _check_animation_assets() -> void:
@@ -652,7 +682,11 @@ func _check_presentation() -> void:
 	root.add_child(main)
 	await _frames(35)
 	_check(main.music_name == "title" and main.bgm.playing, "タイトル曲を再生")
+	_check(not main.ambience.playing, "タイトルでは会場環境音を停止")
 	_check(main.screen_cover.modulate.a < 0.01, "タイトルのフェードが終了")
+	main.show_stage()
+	await _frames(2)
+	_check(main.ambience.playing, "世界地図から観客の環境音を再生")
 	main.start_match()
 	main.previewing = true
 	main.intro = 0.0
@@ -686,6 +720,10 @@ func _check_presentation() -> void:
 	_check(main.screen_cover.modulate.a < 0.01, "結果画面へのフェードが終了")
 	main.stop_audio()
 	main.stop_audio()
-	_check(not main.bgm.playing and main.bgm.stream == null, "音声停止は繰返し可能でリソース参照を解放")
+	_check(
+		not main.bgm.playing and main.bgm.stream == null
+		and not main.ambience.playing and main.ambience.stream == null,
+		"音声停止は繰返し可能でリソース参照を解放"
+	)
 	main.queue_free()
 	await create_timer(0.3).timeout

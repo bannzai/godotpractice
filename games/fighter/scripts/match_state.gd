@@ -1,7 +1,7 @@
 extends Node
 ## 画面をまたぐ試合状態。時間更新は経過時間を消費するため非冪等。
 
-enum Screen { TITLE, SELECT, FIGHT, RESULT }
+enum Screen { TITLE, SELECT, STAGE, FIGHT, RESULT }
 
 var screen: Screen = Screen.TITLE
 var selected: int = 0

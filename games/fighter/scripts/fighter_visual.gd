@@ -15,8 +15,8 @@ var _flash_material: ShaderMaterial
 
 func configure(index: int) -> void:
 	sprite_frames = TEAL if index == 0 else AMBER
-	offset = Vector2(48.0, -110.0)
-	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	offset = Vector2(0.0, -80.0)
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	if not is_instance_valid(_flash_material):
 		_flash_material = ShaderMaterial.new()
 		_flash_material.shader = FLASH_SHADER

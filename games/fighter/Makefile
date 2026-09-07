@@ -16,7 +16,11 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie movie-play shutdown-check run build-macos build-windows build-linux build-web build-all clean
+.PHONY: pixel-assets import check selfcheck lint test screenshot movie movie-play shutdown-check run build-macos build-windows build-linux build-web build-all clean
+
+# CC0 の元スプライトから、色替え・フレーム組み合わせ・背景合成済みの PNG を再生成する。
+pixel-assets:
+	python3 scripts/dev/generate_pixel_assets.py
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
