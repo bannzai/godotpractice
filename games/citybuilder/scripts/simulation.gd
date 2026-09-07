@@ -75,15 +75,26 @@ static func new_city() -> Dictionary:
 
 
 static func can_place(state: Dictionary, cell: Vector2i, kind: String) -> bool:
-	if not _inside(cell) or not COSTS.has(kind) or state.outcome != "playing":
-		return false
+	return placement_reason(state, cell, kind).is_empty()
+
+
+static func placement_reason(state: Dictionary, cell: Vector2i, kind: String) -> String:
+	if not _inside(cell):
+		return "図面の外側です。枠内の区画を選んでください"
+	if not COSTS.has(kind):
+		return "この製図道具は登録されていません"
+	if state.outcome != "playing":
+		return "最終報告が確定しているため配置できません"
 	var tile: Dictionary = state.tiles[cell.y * SIZE + cell.x]
-	return (
-		state.money >= COSTS[kind]
-		and tile.terrain != "water"
-		and tile.kind != kind
-		and (kind == "empty" or tile.kind == "empty")
-	)
+	if state.money < COSTS[kind]:
+		return "資金が %d 不足しています" % (COSTS[kind] - state.money)
+	if tile.terrain == "water":
+		return "水面は区画外です。陸地を選んでください"
+	if tile.kind == kind:
+		return "撤去する建物がありません" if kind == "empty" else "同じ用途が配置済みです"
+	if kind != "empty" and tile.kind != "empty":
+		return "既存の区画を撤去してから配置してください"
+	return ""
 
 
 static func place(state: Dictionary, cell: Vector2i, kind: String) -> Dictionary:
@@ -145,6 +156,8 @@ static func analyze(state: Dictionary) -> Dictionary:
 		"powered": grid_power.powered,
 		"capacity": grid_power.capacity,
 		"power_used": grid_power.used,
+		"component_capacity": grid_power.component_capacity,
+		"component_used": grid_power.component_used,
 		"road_access": [],
 		"pollution": [],
 		"crime": [],
@@ -324,6 +337,12 @@ static func _power(state: Dictionary) -> Dictionary:
 	var powered: Array[bool] = []
 	powered.resize(SIZE * SIZE)
 	powered.fill(false)
+	var component_capacity: Array[int] = []
+	component_capacity.resize(SIZE * SIZE)
+	component_capacity.fill(0)
+	var component_used: Array[int] = []
+	component_used.resize(SIZE * SIZE)
+	component_used.fill(0)
 	var visited: Array[bool] = []
 	visited.resize(SIZE * SIZE)
 	visited.fill(false)
@@ -347,8 +366,18 @@ static func _power(state: Dictionary) -> Dictionary:
 			cursor += 1
 		var capacity: int = sources.size() * 90
 		total_capacity += capacity
-		used += _supply_component(state, sources, capacity, powered)
-	return {"powered": powered, "capacity": total_capacity, "used": used}
+		var supplied: int = _supply_component(state, sources, capacity, powered)
+		used += supplied
+		for member: int in component:
+			component_capacity[member] = capacity
+			component_used[member] = supplied
+	return {
+		"powered": powered,
+		"capacity": total_capacity,
+		"used": used,
+		"component_capacity": component_capacity,
+		"component_used": component_used,
+	}
 
 
 ## この解析で生成した配列だけへ給電結果を記録する。保存状態の入力は変更しない。

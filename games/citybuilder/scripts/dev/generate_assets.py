@@ -1,230 +1,401 @@
-"""街の独自 SVG と PCM 音声を、固定シードで冪等に再生成する。"""
-from pathlib import Path
+#!/usr/bin/env python3
+"""青焼き図面の世界に合わせた 16bit PCM 音声だけを決定的に生成する。"""
+
+from array import array
+import argparse
+import io
+import json
 import math
+from pathlib import Path
 import random
-import struct
+import sys
 import wave
 
-ROOT = Path(__file__).resolve().parents[2] / 'assets'
-INK = '#28464e'
-MINT = '#83bba5'
-CREAM = '#f9ebca'
-CORAL = '#de826e'
-GOLD = '#e8ba64'
 
-
-def svg(name, body, width=64, height=80):
-    """同じ入力から同じ SVG を上書きする。"""
-    path = ROOT / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}"><g stroke-linejoin="round" stroke-linecap="round">{body}</g></svg>\n')
-
-
-def rect(x, y, w, h, fill, stroke=INK, r=0):
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="{fill}" stroke="{stroke}" stroke-width="1.3"/>'
-
-
-def path(d, fill, stroke=INK, sw=1.4):
-    return f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
-
-
-def ellipse(x, y, rx, ry, fill, opacity=1):
-    return f'<ellipse cx="{x}" cy="{y}" rx="{rx}" ry="{ry}" fill="{fill}" opacity="{opacity}"/>'
-
-
-def line(x, y, xx, yy, color=INK, sw=1):
-    return f'<path d="M{x} {y}L{xx} {yy}" fill="none" stroke="{color}" stroke-width="{sw}"/>'
-
-
-def shadow():
-    return ellipse(34, 69, 27, 7, '#234b47', .18)
-
-
-def windows(xs, ys, width=6, height=8, color='#baded8'):
-    out = ''
-    for y in ys:
-        for x in xs:
-            out += rect(x, y, width, height, color, INK, .5)
-            out += line(x + 1, y + height, x + width - 1, y + height, CREAM, 1.8)
-    return out
-
-
-def tree(x=32, y=54, scale=1):
-    return f'<g transform="translate({x} {y}) scale({scale})">' + ellipse(0, 11, 13, 4, '#28464e', .15) + path('M-2 10L-2 -8L3 -8L3 10Z', '#ad8760') + ellipse(0, -10, 13, 16, '#488b78') + ellipse(-4, -15, 9, 10, '#82b79a') + ellipse(-6, -19, 4, 4, '#b0d1a5') + line(0, 1, -5, -7, '#436f5b', 1.8) + '</g>'
-
-
-def building(body):
-    return shadow() + body
-
-
-def generate_sprites():
-    """用途ごとに輪郭と装飾を変えた独立した素材を保存する。"""
-    svg('sprites/residential.svg', building(
-        rect(14, 38, 37, 29, CREAM) + path('M51 38L58 33V61L51 67Z', '#d8bd94') + path('M8 39L31 16L55 38Z', CORAL) + path('M31 16L38 12L61 33L55 38Z', '#b76056') + rect(43, 15, 5, 14, INK) + windows([20, 40], [44], 7, 9) + rect(29, 49, 8, 18, MINT) + ellipse(35, 58, .8, .8, INK) + line(18, 38, 48, 38, '#f5b39a', 2) + rect(9, 63, 15, 5, '#73a87f', '#73a87f', 2) + ellipse(13, 63, 3, 3, '#93b57d') + ellipse(20, 63, 3, 3, '#93b57d')))
-    svg('sprites/residential_mid.svg', building(
-        rect(12, 18, 37, 49, '#a8c9b5') + path('M49 18L58 13V62L49 67Z', '#649b8f') + path('M9 18L19 11H58V18Z', '#dae0c4') + rect(9, 18, 42, 5, INK) + windows([17, 28, 39], [29, 44], 6, 9) + rect(28, 57, 9, 10, CREAM) + line(13, 41, 48, 41, '#e8e7cd', 3) + line(13, 56, 48, 56, '#e8e7cd', 3) + rect(20, 7, 11, 5, CORAL) + line(52, 30, 55, 28, '#c5e2ce', 2) + line(52, 44, 55, 42, '#c5e2ce', 2)))
-    shop = rect(9, 36, 46, 31, CREAM) + path('M55 36L61 31V62L55 67Z', '#caa975') + rect(9, 28, 46, 11, GOLD) + rect(17, 31, 30, 4, CREAM, CREAM, 1) + windows([15, 40], [48], 10, 14) + rect(29, 48, 8, 19, INK)
-    for i in range(8):
-        shop += path(f'M{7+i*6} 39h6l2 8h-6Z', CORAL if i % 2 == 0 else CREAM, 'none')
-    shop += line(7, 47, 57, 47, INK, 1.4) + rect(7, 63, 8, 7, '#b47a54') + ellipse(11, 61, 4, 4, MINT)
-    svg('sprites/commercial.svg', building(shop))
-    svg('sprites/commercial_mid.svg', building(
-        rect(12, 15, 38, 52, '#e4bf83') + path('M50 15L58 10V62L50 67Z', '#ba925f') + path('M12 15L20 10H58L50 15Z', CREAM) + windows([17, 29, 41], [23, 38], 6, 10, '#689e9f') + rect(13, 53, 37, 5, CORAL) + windows([18, 35], [59], 11, 8) + rect(21, 6, 23, 8, INK, INK, 2) + line(25, 10, 40, 10, GOLD, 2)))
-    svg('sprites/industrial.svg', building(
-        rect(10, 39, 44, 28, '#b4b7a6') + path('M54 39L61 33V62L54 67Z', '#828f84') + path('M8 39V29L24 39V28L40 39V28L56 39Z', '#72979a') + rect(46, 13, 8, 23, '#b97968') + rect(44, 11, 12, 5, INK) + windows([15, 29], [44], 9, 6) + rect(16, 56, 18, 11, '#607d7c') + line(17, 59, 33, 59, '#a6bfab') + line(17, 63, 33, 63, '#a6bfab') + rect(42, 56, 8, 11, GOLD) + line(6, 68, 57, 68, '#bdad78', 2)))
-    svg('sprites/industrial_mid.svg', building(
-        rect(9, 31, 45, 36, '#a5adb0') + path('M54 31L61 25V61L54 67Z', '#718a8a') + path('M9 31L16 25H61L54 31Z', '#d1d3bd') + rect(11, 15, 7, 15, CORAL) + rect(9, 13, 11, 4, INK) + rect(25, 8, 8, 22, '#c48b70') + rect(23, 6, 12, 5, INK) + windows([15, 29, 43], [38], 7, 8) + rect(14, 53, 24, 14, '#47666c') + line(15, 57, 37, 57, '#98b7b3') + line(15, 62, 37, 62, '#98b7b3') + rect(43, 52, 7, 15, GOLD)))
-    svg('sprites/power.svg', building(
-        rect(8, 46, 45, 21, '#d9ceb0') + path('M53 46L60 40V62L53 67Z', '#b0ad96') + path('M8 46L15 40H60L53 46Z', '#92b6ac') + rect(13, 50, 17, 17, '#739598') + rect(36, 49, 11, 14, INK) + path('M43 48L37 56H41L38 64L48 54H44L46 48Z', GOLD, 'none') + path('M18 42L22 6H29L34 42M21 14H30M20 24H31M19 34H33M20 34L31 24L21 14M21 24L32 34', 'none', INK, 2) + line(14, 13, 38, 13, INK, 2) + ellipse(15, 13, 2, 4, '#b4d7d1') + ellipse(37, 13, 2, 4, '#b4d7d1')))
-    svg('sprites/park.svg', shadow() + rect(5, 35, 54, 35, '#a6c79a', '#83a788', 7) + path('M13 69Q21 46 48 38', 'none', '#eadfba', 7) + ellipse(40, 56, 13, 8, '#79b8bd') + path('M33 53Q40 50 46 53', 'none', '#c2ded4', 2) + tree(18, 41, .8) + tree(46, 29, .7) + rect(20, 59, 9, 4, '#c09265') + line(21, 63, 21, 66) + line(28, 63, 28, 66))
-    svg('sprites/police.svg', building(
-        rect(10, 33, 45, 34, '#d5e0ce') + path('M55 33L60 28V62L55 67Z', '#9eb9ae') + path('M7 33L32 17L58 33Z', '#5b8391') + windows([15, 43], [43], 7, 11) + rect(27, 48, 10, 19, '#548292') + rect(22, 39, 20, 6, INK) + path('M31 28L34 30L38 29L37 34L32 38L27 34L26 29L30 30Z', GOLD) + line(52, 18, 52, 29, INK, 1.4) + path('M52 18H60V24H52Z', '#6d9ab0')))
-    svg('sprites/fire.svg', building(
-        rect(9, 31, 46, 36, '#eab797') + path('M55 31L61 26V62L55 67Z', '#bd8b77') + rect(7, 27, 49, 6, CORAL) + rect(14, 45, 35, 22, INK, INK, 2) + rect(18, 55, 26, 10, '#dd765f', INK, 2) + windows([21, 35], [53], 7, 5, '#c2dfdc') + ellipse(24, 65, 3, 3, INK) + ellipse(39, 65, 3, 3, INK) + rect(27, 49, 8, 3, GOLD) + line(16, 39, 46, 39, '#bd745e', 2) + path('M30 15Q38 23 33 27Q24 30 25 22L28 25Q32 23 30 15Z', CORAL)))
-    svg('sprites/tree.svg', tree(32, 55, 1.2))
-    svg('sprites/car.svg', ellipse(20, 17, 18, 5, INK, .18) + rect(5, 6, 29, 13, GOLD, INK, 5) + rect(14, 7, 12, 11, '#f2d284', INK, 3) + path('M15 8H19V16H15Z', '#87b9ba') + path('M23 8H26V16H23Z', '#87b9ba') + rect(6, 5, 6, 2, INK) + rect(27, 5, 6, 2, INK) + rect(6, 19, 6, 2, INK) + rect(27, 19, 6, 2, INK) + line(34, 9, 34, 11, CREAM, 2) + line(34, 15, 34, 17, CREAM, 2), 40, 24)
-    svg('sprites/walker.svg', ellipse(10, 28, 7, 3, INK, .16) + line(7, 22, 6, 28, INK, 3) + line(13, 22, 14, 28, INK, 3) + rect(5, 12, 10, 12, CORAL, INK, 3) + line(4, 15, 2, 21, '#dfba92', 3) + line(16, 15, 18, 20, '#dfba92', 3) + ellipse(10, 9, 5, 6, '#ebc99b') + ellipse(10, 5, 8, 3, GOLD) + rect(6, 1, 8, 5, GOLD, GOLD, 2), 20, 32)
-
-
-def generate_backgrounds():
-    """独立した多層背景と文字に依存しないロゴを保存する。"""
-    terrain = rect(0, 0, 1280, 720, '#f0e5c9', 'none')
-    for x in range(0, 1280, 40):
-        terrain += line(x, 0, x, 720, '#e4dabe', .6)
-    for y in range(0, 720, 40):
-        terrain += line(0, y, 1280, y, '#e4dabe', .6)
-    terrain += path('M-40 220Q160 80 295 190T550 315Q740 400 875 255T1340 285', 'none', '#c2d0b0', 115)
-    terrain += path('M-40 220Q160 80 295 190T550 315Q740 400 875 255T1340 285', 'none', '#9ec6c1', 68)
-    terrain += path('M-40 217Q160 77 295 187T550 312Q740 397 875 252T1340 282', 'none', '#bbd8cd', 3)
-    for i in range(90):
-        x = (i * 137 + 59) % 1280
-        y = (i * 83 + 421) % 720
-        terrain += path(f'M{x} {y}l3 -4m-3 4l-3 -3', 'none', '#c5c5a5', .8)
-    svg('backgrounds/terrain.svg', terrain, 1280, 720)
-    mountains = path('M-40 235L80 68L178 188L340 20L485 173L625 70L760 204L908 45L1110 198L1220 87L1320 240Z', '#adc2ad', 'none') + path('M-40 240L185 124L318 216L478 116L688 244L820 162L1005 230L1150 137L1320 240Z', '#84aa99', 'none') + path('M297 70L340 20L389 77L349 58L331 69L318 55Z', '#e1e6ce', 'none')
-    svg('backgrounds/mountains.svg', mountains, 1280, 240)
-    clouds = ''
-    for x, y, scale in [(100, 70, 1), (450, 145, 1.2), (820, 60, .8), (1150, 165, 1.1)]:
-        clouds += f'<g transform="translate({x} {y}) scale({scale})" opacity="0.66">' + ellipse(0, 0, 70, 15, '#fff8e4') + ellipse(-28, -10, 25, 21, '#fff8e4') + ellipse(11, -17, 36, 30, '#fff8e4') + ellipse(42, -6, 25, 21, '#fff8e4') + '</g>'
-    svg('backgrounds/clouds.svg', clouds, 1280, 240)
-    panel = rect(2, 5, 316, 173, '#17383e', '#17383e', 18) + rect(2, 2, 316, 173, '#23494f', '#53726d', 18) + line(22, 4, 298, 4, '#76917e', 1) + line(22, 156, 298, 156, '#3d6263', 1)
-    svg('ui/panel.svg', panel, 320, 180)
-    svg('ui/button.svg', rect(2, 7, 236, 55, '#47786b', '#1d4746', 15) + rect(2, 2, 236, 55, '#96c8ae', '#d9e9c9', 15) + line(22, 7, 218, 7, '#c7e0be', 2), 240, 64)
-    logo = path('M32 128Q122 104 206 128T398 128T577 128', 'none', '#a7c8b3', 6)
-    for i, name in enumerate(['residential', 'commercial', 'residential_mid', 'park', 'industrial', 'police', 'fire']):
-        source = (ROOT / f'sprites/{name}.svg').read_text().split('<g stroke-linejoin="round" stroke-linecap="round">', 1)[1].rsplit('</g></svg>', 1)[0]
-        logo += f'<g transform="translate({36+i*76} 25) scale(1.08)">{source}</g>'
-    logo += ellipse(531, 32, 17, 17, GOLD)
-    svg('branding/logo.svg', logo, 600, 160)
-    keyart = rect(0, 0, 1280, 720, '#efdfb9', 'none') + ellipse(986, 134, 100, 100, '#edc37b') + f'<g transform="translate(0 140)">{mountains}</g>'
-    keyart += path('M0 530Q245 395 458 518T840 520T1280 470V720H0Z', '#bacdb1', 'none')
-    keyart += path('M630 720Q750 610 600 553T720 443T1020 450T1280 350', 'none', '#82b6b4', 85)
-    keyart += path('M610 720Q730 610 580 553T700 443T1000 450T1260 350', 'none', '#c5dad0', 2)
-    for row in range(4):
-        for col in range(7):
-            if col in [3, 4] and row > 1:
-                continue
-            px = 290 + col * 100 - row * 48
-            py = 295 + row * 76
-            keyart += rect(px-4, py+64, 110, 18, '#557776', '#eadcbc', 2)
-            name = ['residential', 'commercial', 'park', 'residential_mid', 'industrial', 'police', 'fire'][(col + row*3) % 7]
-            source = (ROOT / f'sprites/{name}.svg').read_text().split('<g stroke-linejoin="round" stroke-linecap="round">', 1)[1].rsplit('</g></svg>', 1)[0]
-            keyart += f'<g transform="translate({px} {py}) scale(1.25)">{source}</g>'
-    keyart += f'<g opacity="0.5">{clouds}</g>'
-    svg('branding/keyart.svg', keyart, 1280, 720)
-
-
+# 22,050 Hz はゲーム内の環境音、短い効果音、簡素なループ曲に十分な帯域を持ち、
+# 44,100 Hz より生成物を小さく保てる。すべての乱数は固定 seed から作る。
 RATE = 22050
+SEED = 20260907
+TAU = math.tau
+
+MUSIC = {
+    "title": {
+        "seconds": 12.0,
+        "chords": ((48, 55, 60, 64), (45, 52, 57, 60), (53, 60, 64, 69), (55, 62, 67, 71)),
+        "melody": (72, 76, 79, 76, 74, 72, 67, 71),
+        "activity": 0.72,
+    },
+    "town": {
+        "seconds": 10.0,
+        "chords": ((48, 55, 60, 64), (57, 64, 69, 72), (53, 60, 65, 69), (55, 62, 67, 71)),
+        "melody": (76, 79, 81, 79, 76, 74, 72, 74),
+        "activity": 0.88,
+    },
+    "city": {
+        "seconds": 8.0,
+        "chords": ((50, 57, 62, 65), (55, 62, 67, 71), (48, 55, 60, 64), (57, 64, 69, 72)),
+        "melody": (74, 77, 81, 84, 81, 79, 77, 76),
+        "activity": 1.15,
+    },
+    "result": {
+        "seconds": 12.0,
+        "chords": ((48, 55, 60, 64), (53, 60, 65, 69), (55, 62, 67, 71), (48, 55, 60, 64)),
+        "melody": (79, 84, 83, 79, 81, 79, 76, 72),
+        "activity": 0.62,
+    },
+}
+
+SOUNDS = {
+    **{
+        name: {
+            "path": f"audio/{name}.wav",
+            "loop": True,
+            "stereo": True,
+            "peak": 0.68,
+            "build": lambda name=name: music_samples(name),
+        }
+        for name in MUSIC
+    },
+    "build": {
+        "path": "audio/build.wav",
+        "loop": False,
+        "stereo": False,
+        "peak": 0.72,
+        "build": lambda: effect_samples("build"),
+    },
+    "demolish": {
+        "path": "audio/demolish.wav",
+        "loop": False,
+        "stereo": False,
+        "peak": 0.72,
+        "build": lambda: effect_samples("demolish"),
+    },
+    "alert": {
+        "path": "audio/alert.wav",
+        "loop": False,
+        "stereo": False,
+        "peak": 0.68,
+        "build": lambda: effect_samples("alert"),
+    },
+    "month": {
+        "path": "audio/month.wav",
+        "loop": False,
+        "stereo": False,
+        "peak": 0.70,
+        "build": lambda: effect_samples("month"),
+    },
+    "click": {
+        "path": "audio/click.wav",
+        "loop": False,
+        "stereo": False,
+        "peak": 0.62,
+        "build": lambda: effect_samples("click"),
+    },
+    "ambience": {
+        "path": "audio/ambience.wav",
+        "loop": True,
+        "stereo": True,
+        "peak": 0.34,
+        "build": lambda: ambience_samples(12.0),
+    },
+}
 
 
-def add_note(samples, start, duration, frequency, gain, voice='bell'):
-    """バッファへの加算合成は音の重なりを表すため非冪等。呼び出し元で毎回空にする。"""
-    begin = round(start * RATE)
+def pitch(midi):
+    """MIDI 音高を周波数へ変換する。"""
+    return 440.0 * 2.0 ** ((midi - 69.0) / 12.0)
+
+
+def empty_buffer(seconds, stereo):
+    """指定秒数の無音バッファを作る。"""
+    frames = round(seconds * RATE)
+    return [[0.0] * frames for _channel in range(2 if stereo else 1)]
+
+
+def bell_samples(frequency, duration, softness=1.0):
+    """図面台のガラスベルを思わせる、減衰の速い倍音音色を作る。"""
+    result = []
+    for index in range(round(duration * RATE)):
+        time = index / RATE
+        attack = min(1.0, time / 0.009)
+        release = min(1.0, max(0.0, duration - time) / 0.055)
+        phase = TAU * frequency * time
+        tone = (
+            math.sin(phase) * math.exp(-2.8 * time)
+            + 0.29 * math.sin(phase * 2.01) * math.exp(-6.5 * time)
+            + 0.12 * math.sin(phase * 3.97) * math.exp(-10.0 * time)
+        )
+        result.append(tone * attack * release * softness)
+    return result
+
+
+def drafting_pad_samples(frequencies, duration):
+    """青焼き機の低い共鳴を模した、柔らかな持続和音を作る。"""
+    result = []
+    for index in range(round(duration * RATE)):
+        time = index / RATE
+        attack = min(1.0, time / 0.18)
+        release = min(1.0, max(0.0, duration - time) / 0.28)
+        tone = 0.0
+        for voice, frequency in enumerate(frequencies):
+            drift = 1.0 + (voice - 1.5) * 0.0007
+            phase = TAU * frequency * drift * time
+            tone += math.sin(phase) + 0.14 * math.sin(phase * 2.0)
+        result.append(tone * attack * release / len(frequencies))
+    return result
+
+
+def ruler_tap_samples(duration=0.12, bright=True):
+    """木製定規を図面台へ置く短い打音を作る。"""
+    result = []
+    for index in range(round(duration * RATE)):
+        time = index / RATE
+        attack = min(1.0, time / 0.0015)
+        decay = math.exp(-time * (34.0 if bright else 25.0))
+        low = math.sin(TAU * 178.0 * time)
+        edge = math.sin(TAU * (1180.0 if bright else 720.0) * time)
+        result.append((0.72 * low + 0.28 * edge) * attack * decay)
+    return result
+
+
+def pencil_stroke_samples(duration, rng, hardness=1.0):
+    """固定乱数の摩擦音を高域差分で整え、鉛筆の線引きを表現する。"""
+    result = []
+    previous = 0.0
+    smooth = 0.0
     count = round(duration * RATE)
-    for i in range(count):
-        t = i / RATE
-        phase = 2 * math.pi * frequency * t
-        attack = min(t / .015, 1)
-        release = min((duration - t) / .055, 1)
-        if voice == 'bell':
-            tone = math.sin(phase) * math.exp(-t * 5) + .32 * math.sin(phase * 2) * math.exp(-t * 10) + .12 * math.sin(phase * 3) * math.exp(-t * 13)
-        elif voice == 'bass':
-            tone = .8 * math.sin(phase) + .24 * math.sin(phase * 2) + .1 * math.sin(phase * 3)
-        else:
-            tone = .6 * math.sin(phase) + .24 * math.sin(phase * 2) + .09 * math.sin(phase * 4)
-        samples[(begin + i) % len(samples)] += tone * attack * release * gain
+    for index in range(count):
+        time = index / RATE
+        raw = rng.uniform(-1.0, 1.0)
+        smooth = smooth * 0.74 + raw * 0.26
+        grain = smooth - previous * 0.58
+        previous = smooth
+        phase_envelope = max(0.0, math.sin(math.pi * index / max(1, count - 1)))
+        envelope = phase_envelope**0.55
+        tooth = 0.72 + 0.28 * math.sin(TAU * (27.0 + hardness * 5.0) * time)
+        result.append(grain * envelope * tooth * hardness)
+    return result
 
 
-def add_drum(samples, start, duration, gain, rng, kick=False):
-    """ノイズ打楽器を加算するため非冪等。固定シードを使う生成元が再現性を保証する。"""
+def paper_rustle_samples(duration, rng):
+    """低域を残した固定乱数で紙をめくる音を作る。"""
+    result = []
+    smooth = 0.0
+    count = round(duration * RATE)
+    for index in range(count):
+        raw = rng.uniform(-1.0, 1.0)
+        smooth = smooth * 0.91 + raw * 0.09
+        phase_envelope = max(0.0, math.sin(math.pi * index / max(1, count - 1)))
+        envelope = phase_envelope**0.8
+        result.append((smooth * 0.8 + raw * 0.12) * envelope)
+    return result
+
+
+def eraser_samples(duration, rng):
+    """消しゴムを往復させる、周期的な紙の摩擦音を作る。"""
+    stroke = pencil_stroke_samples(duration, rng, 0.72)
+    for index in range(len(stroke)):
+        time = index / RATE
+        stroke[index] *= 0.5 + 0.5 * abs(math.sin(TAU * 8.0 * time))
+    return stroke
+
+
+def mix(buffer, samples, start, gain, pan=0.0, wrap=False):
+    """音をバッファへ加算する。呼び出し元は毎回空バッファから始める。"""
     begin = round(start * RATE)
-    for i in range(round(duration * RATE)):
-        t = i / RATE
-        tone = math.sin(2 * math.pi * (62 * t + 6 * (1 - math.exp(-t * 24)))) if kick else rng.uniform(-1, 1)
-        env = math.exp(-t * (24 if kick else 44)) * min(t / .002, 1)
-        samples[(begin + i) % len(samples)] += tone * env * gain
+    frame_count = len(buffer[0])
+    if len(buffer) == 1:
+        gains = (gain,)
+    else:
+        limited_pan = max(-1.0, min(1.0, pan))
+        gains = (
+            gain * math.sqrt((1.0 - limited_pan) * 0.5),
+            gain * math.sqrt((1.0 + limited_pan) * 0.5),
+        )
+    for offset, sample in enumerate(samples):
+        frame = begin + offset
+        if wrap:
+            frame %= frame_count
+        elif frame < 0 or frame >= frame_count:
+            continue
+        for channel, channel_gain in enumerate(gains):
+            buffer[channel][frame] += sample * channel_gain
 
 
-def write_wave(name, samples):
-    """クリッピングを防ぎ、同じ波形を同じ PCM データで保存する。"""
-    peak = max(max(abs(v) for v in samples), .001)
-    attenuation = min(1, .58 / peak)
-    pcm = b''.join(struct.pack('<h', round(max(-1, min(1, v * attenuation)) * 32767)) for v in samples)
-    with wave.open(str(ROOT / f'audio/{name}.wav'), 'wb') as stream:
-        stream.setparams((1, 2, RATE, len(samples), 'NONE', 'not compressed'))
-        stream.writeframes(pcm)
+def periodic_room_tone(buffer, seconds, seed, gain):
+    """整数周期の正弦波群で、端点が連続する静かな製図室の空気を重ねる。"""
+    frames = len(buffer[0])
+    for channel in range(len(buffer)):
+        rng = random.Random(seed + channel * 101)
+        components = [
+            (rng.randint(190, 510), rng.uniform(0.0, TAU), rng.uniform(0.35, 1.0))
+            for _component in range(18)
+        ]
+        hum_phase = rng.uniform(0.0, TAU)
+        for frame in range(frames):
+            position = frame / frames
+            texture = sum(
+                weight * math.sin(TAU * cycles * position + phase)
+                for cycles, phase, weight in components
+            ) / len(components)
+            hum = math.sin(TAU * round(55.0 * seconds) * position + hum_phase)
+            buffer[channel][frame] += gain * (texture * 0.78 + hum * 0.06)
 
 
-def hz(midi):
-    return 440 * 2 ** ((midi - 69) / 12)
+def interleave(buffer):
+    """チャンネル別バッファをWAV用のインターリーブ配列へ変換する。"""
+    if len(buffer) == 1:
+        return buffer[0]
+    return [sample for frame in zip(*buffer) for sample in frame]
 
 
-def generate_audio():
-    """場面ごとの旋律・伴奏・ベース・打楽器を固定シードで再生成する。"""
-    tracks = {'title': (108, [60, 65, 57, 67], [72, 76, 79, 76, 77, 81, 79, 76]), 'town': (112, [60, 57, 65, 67], [76, 79, 81, 79, 77, 76, 74, 72]), 'city': (132, [62, 67, 60, 69], [74, 77, 81, 84, 81, 79, 77, 76]), 'result': (100, [60, 65, 67, 60], [79, 84, 83, 79, 81, 79, 76, 72])}
-    for index, (name, (bpm, chords, melody)) in enumerate(tracks.items()):
-        beat = 60 / bpm
-        samples = [0.] * round(beat * 16 * RATE)
-        rng = random.Random(711 + index)
-        for bar, root in enumerate(chords):
-            for semitone in [0, 4 if root not in [57, 62, 69] else 3, 7]:
-                add_note(samples, bar * beat * 4, beat * 3.8, hz(root + semitone), .027, 'pad')
-            for n in range(4):
-                time = (bar * 4 + n) * beat
-                add_note(samples, time, beat * .72, hz(root - 12 + (7 if n == 2 else 0)), .09, 'bass')
-                add_drum(samples, time, .18, .09, rng, kick=True)
-                add_drum(samples, time + beat * .5, .08, .035, rng)
-                add_note(samples, time + beat * .5, beat * .75, hz(melody[(bar*2+n) % len(melody)]), .09, 'bell')
-                if name == 'city':
-                    add_drum(samples, time + beat * .75, .055, .024, rng)
-        write_wave(name, samples)
-    for index, name in enumerate(['build', 'demolish', 'alert', 'month', 'click']):
-        duration = {'build': .5, 'demolish': .45, 'alert': .65, 'month': .65, 'click': .13}[name]
-        samples = [0.] * round(duration * RATE)
-        rng = random.Random(500 + index)
-        if name == 'build':
-            for n, midi in enumerate([67, 72, 79]):
-                add_note(samples, .08*n, .25, hz(midi), .15)
-            add_drum(samples, 0, .09, .09, rng)
-        elif name == 'demolish':
-            add_drum(samples, 0, .32, .22, rng)
-            for n, midi in enumerate([55, 48, 43]):
-                add_note(samples, n*.08, .2, hz(midi), .12, 'bass')
-        elif name == 'alert':
-            for n in range(2):
-                add_note(samples, n*.24, .2, hz(71), .13, 'pad')
-                add_note(samples, n*.24, .2, hz(77), .07, 'pad')
-        elif name == 'month':
-            for n, midi in enumerate([72, 76, 79, 84]):
-                add_note(samples, n*.09, .28, hz(midi), .11)
-        else:
-            add_note(samples, 0, .09, hz(81), .12)
-            add_drum(samples, 0, .035, .065, rng)
-        write_wave(name, samples)
+def music_samples(name):
+    """ベル、鉛筆、定規、青焼き機の共鳴を場面ごとに組み合わせる。"""
+    config = MUSIC[name]
+    seconds = config["seconds"]
+    activity = config["activity"]
+    buffer = empty_buffer(seconds, True)
+    rng = random.Random(SEED + sum(ord(character) for character in name))
+    periodic_room_tone(buffer, seconds, SEED + len(name) * 17, 0.022)
+    bar_duration = seconds / len(config["chords"])
+
+    for bar, chord in enumerate(config["chords"]):
+        bar_start = bar * bar_duration
+        pad = drafting_pad_samples([pitch(note) for note in chord], bar_duration * 0.84)
+        mix(buffer, pad, bar_start + bar_duration * 0.06, 0.11, -0.12 if bar % 2 == 0 else 0.12)
+        for step in range(4):
+            event_time = bar_start + bar_duration * (step + 0.18) / 4.0
+            note = config["melody"][(bar * 2 + step) % len(config["melody"])]
+            # 最終拍でもループ終端より前にリリースを完了させ、波形を途中で切らない。
+            bell = bell_samples(pitch(note), min(0.42, bar_duration * 0.18), 0.92)
+            mix(buffer, bell, event_time, 0.19 * activity, -0.62 if step % 2 == 0 else 0.62)
+            if name in ("town", "city") or step % 2 == 0:
+                tap = ruler_tap_samples(0.09, bright=step % 2 == 0)
+                mix(buffer, tap, event_time, 0.055 * activity, 0.34 if step % 2 == 0 else -0.34)
+        stroke_count = 4 if name == "city" else 2
+        for stroke_index in range(stroke_count):
+            start = bar_start + bar_duration * (0.34 + stroke_index * 0.5 / stroke_count)
+            stroke = pencil_stroke_samples(0.13 if name == "city" else 0.19, rng, 0.72)
+            mix(buffer, stroke, start, 0.035 * activity, -0.5 + stroke_index * 0.35)
+
+    return interleave(buffer)
 
 
-if __name__ == '__main__':
-    generate_sprites()
-    generate_backgrounds()
-    generate_audio()
-    print('独自素材生成完了: SVG 20 ファイル、WAV 9 ファイル')
+def ambience_samples(seconds):
+    """紙、鉛筆、定規と静かな製図室だけで構成する環境音ループを作る。"""
+    buffer = empty_buffer(seconds, True)
+    rng = random.Random(SEED + 4000)
+    periodic_room_tone(buffer, seconds, SEED + 4100, 0.10)
+    for index, start in enumerate((1.15, 2.72, 4.48, 6.36, 8.05, 10.22)):
+        stroke = pencil_stroke_samples(0.44 + (index % 3) * 0.11, rng, 0.78 + (index % 2) * 0.12)
+        mix(buffer, stroke, start, 0.11, -0.68 if index % 2 == 0 else 0.56)
+    for index, start in enumerate((3.38, 8.88)):
+        paper = paper_rustle_samples(0.82, rng)
+        mix(buffer, paper, start, 0.10, 0.58 if index == 0 else -0.58)
+    for index, start in enumerate((5.62, 9.82)):
+        mix(buffer, ruler_tap_samples(0.10, bright=index == 0), start, 0.055, -0.25 + index * 0.5)
+    return interleave(buffer)
+
+
+def effect_samples(name):
+    """建設操作を製図道具の動作として聞かせる5種類の効果音を作る。"""
+    durations = {"build": 0.58, "demolish": 0.62, "alert": 0.76, "month": 0.82, "click": 0.16}
+    buffer = empty_buffer(durations[name], False)
+    rng = random.Random(SEED + 5000 + sum(ord(character) for character in name))
+    if name == "build":
+        mix(buffer, pencil_stroke_samples(0.34, rng, 1.05), 0.0, 0.30)
+        for index, note in enumerate((67, 72, 79)):
+            mix(buffer, bell_samples(pitch(note), 0.31), 0.11 + index * 0.09, 0.23)
+        mix(buffer, ruler_tap_samples(0.08), 0.04, 0.16)
+    elif name == "demolish":
+        mix(buffer, eraser_samples(0.46, rng), 0.0, 0.42)
+        mix(buffer, ruler_tap_samples(0.18, bright=False), 0.02, 0.32)
+        for index, note in enumerate((55, 50, 43)):
+            mix(buffer, bell_samples(pitch(note), 0.24, 0.65), 0.18 + index * 0.09, 0.15)
+    elif name == "alert":
+        for index in range(2):
+            start = index * 0.29
+            mix(buffer, ruler_tap_samples(0.12), start, 0.24)
+            mix(buffer, bell_samples(pitch(71), 0.27), start, 0.24)
+            mix(buffer, bell_samples(pitch(77), 0.27), start, 0.13)
+    elif name == "month":
+        mix(buffer, paper_rustle_samples(0.38, rng), 0.0, 0.24)
+        for index, note in enumerate((72, 76, 79, 84)):
+            mix(buffer, bell_samples(pitch(note), 0.35), 0.23 + index * 0.10, 0.20)
+    else:
+        mix(buffer, ruler_tap_samples(0.07), 0.0, 0.34)
+        mix(buffer, bell_samples(pitch(84), 0.11, 0.75), 0.018, 0.16)
+    return buffer[0]
+
+
+def wave_bytes(samples, stereo, target_peak):
+    """波形を指定ピーク以下に正規化した16bit PCM WAVへ変換する。"""
+    peak = max((abs(value) for value in samples), default=0.0)
+    scale = target_peak / peak if peak else 1.0
+    pcm = array(
+        "h",
+        (
+            round(max(-1.0, min(1.0, value * scale)) * 32767)
+            for value in samples
+        ),
+    )
+    if sys.byteorder != "little":
+        pcm.byteswap()
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as target:
+        target.setnchannels(2 if stereo else 1)
+        target.setsampwidth(2)
+        target.setframerate(RATE)
+        target.writeframes(pcm.tobytes())
+    return buffer.getvalue()
+
+
+def write_asset(path, data):
+    """同じバイト列なら書き直さず、再実行でmtimeを変えない。"""
+    if path.is_file() and path.read_bytes() == data:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return True
+
+
+def asset_spec():
+    """game-asset-searchの検査スクリプトが読む素材定義を返す。"""
+    return {
+        "rate": RATE,
+        "images": [],
+        "audio": [
+            {"path": sound["path"], "loop": sound["loop"], "stereo": sound["stereo"]}
+            for sound in SOUNDS.values()
+        ],
+    }
+
+
+def generate(out_dir):
+    """定義した音声をすべて生成する。"""
+    for name, sound in SOUNDS.items():
+        samples = sound["build"]()
+        data = wave_bytes(samples, sound["stereo"], sound["peak"])
+        changed = write_asset(out_dir / sound["path"], data)
+        channels = "stereo" if sound["stereo"] else "mono"
+        status = "更新" if changed else "変更なし"
+        print(f"{name}: {sound['path']} ({channels}, {RATE} Hz, {status})")
+
+
+def main():
+    """--out-dirで生成し、--print-specではJSON定義だけを出力する。"""
+    parser = argparse.ArgumentParser(description="青焼き図面を題材にしたPCM音声を生成する")
+    parser.add_argument("--out-dir", help="生成先のassetsディレクトリ")
+    parser.add_argument("--print-spec", action="store_true", help="生成せず定義をJSONで出力する")
+    args = parser.parse_args()
+    if args.print_spec:
+        print(json.dumps(asset_spec(), ensure_ascii=False))
+        return 0
+    if not args.out_dir:
+        parser.error("--out-dir を指定してください")
+    generate(Path(args.out_dir))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
