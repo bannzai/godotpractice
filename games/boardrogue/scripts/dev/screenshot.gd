@@ -58,6 +58,7 @@ func _capture_scenes() -> void:
 	await _capture("move-mid")
 	await _wait_idle()
 	await _capture("battle-moved")
+	await _attack_sequence()
 	await _representative_scenes()
 	await _galleries()
 
@@ -69,6 +70,11 @@ func _representative_scenes() -> void:
 	main._render()
 	await create_timer(0.4).timeout
 	await _capture("battle-five-columns")
+	_visit(2, "battle")
+	_board_fixture()
+	main._render()
+	await create_timer(0.4).timeout
+	await _capture("stage-snow")
 	_visit(3, "general")
 	main._render()
 	main.effects.spawn("boss", Vector2(640, 265))
@@ -136,6 +142,51 @@ func _representative_scenes() -> void:
 	main._render()
 	await create_timer(0.9).timeout
 	await _capture("result-defeat")
+
+
+func _attack_sequence() -> void:
+	# 描画比較専用fixtureで、入力から攻撃演出へ入る前・最中・結果を連続撮影する。
+	_visit(0, "battle")
+	run.battle.phase = "battle"
+	run.battle.turn = 0
+	run.battle.units.assign(
+		[
+			{"uid": 201, "card": "blade", "x": 1, "y": 2, "side": 0, "face": true,
+				"moved": false, "attacked": false, "effect_used": false},
+			{"uid": 202, "card": "reed", "x": 1, "y": 1, "side": 1, "face": true,
+				"moved": false, "attacked": false, "effect_used": false},
+		]
+	)
+	main.selected_uid = 201
+	main.detail_id = "blade"
+	main._render()
+	await _capture("attack-enemy-ready")
+	await _click("cell_1_1")
+	await create_timer(0.14).timeout
+	await _capture("attack-enemy-contact")
+	await _wait_idle()
+	run.save_error = ""
+	main._render()
+	await _capture("attack-enemy-result")
+	run.battle.units.assign(
+		[
+			{"uid": 203, "card": "lancer", "x": 1, "y": 0, "side": 0, "face": true,
+				"moved": false, "attacked": false, "effect_used": false},
+		]
+	)
+	run.battle.phase = "battle"
+	run.battle.turn = 0
+	main.selected_uid = 203
+	main.detail_id = "lancer"
+	main._render()
+	await _capture("attack-king-ready")
+	await _click("enemy_king")
+	await create_timer(0.14).timeout
+	await _capture("attack-king-contact")
+	await _wait_idle()
+	run.save_error = ""
+	main._render()
+	await _capture("attack-king-result")
 
 
 func _visit(depth: int, kind: String) -> void:
