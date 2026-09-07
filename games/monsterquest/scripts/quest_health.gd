@@ -25,7 +25,7 @@ func setup(monster: Dictionary, rect: Rect2) -> void:
 	caption = Label.new()
 	caption.position.y = size.y + 2
 	caption.add_theme_font_size_override("font_size", 14)
-	caption.add_theme_color_override("font_color", Color("617369"))
+	caption.add_theme_color_override("font_color", Color("9bbc0f"))
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(caption)
 	_set_display(monster.hp)
@@ -43,5 +43,5 @@ func present(hp: int, new_maximum: int = 0) -> void:
 
 func _set_display(hp: float) -> void:
 	bar.value = hp
-	fill.bg_color = Color("c77354") if hp / maximum <= 0.3 else Color("45926b")
+	fill.bg_color = Color("8bac0f") if hp / maximum <= 0.3 else Color("306230")
 	caption.text = "HP  %d / %d" % [roundi(hp), maximum]

@@ -19,7 +19,7 @@ var wins: Array[int] = [0, 0]
 var round_winner: int = -1
 var result_text: String = ""
 var paused: bool = false
-var records: Dictionary = {"high_score": 0, "best_chain": 0}
+var records: Dictionary = {"high_score": 0, "best_chain": 0, "tutorial_seen": false}
 var save_enabled: bool = true
 var save_message: String = ""
 var rng := RandomNumberGenerator.new()
@@ -279,7 +279,7 @@ func _lock_piece(side: int) -> void:
 	var b: Dictionary = boards[side]
 	var placed: Dictionary = Rules.place(b.board, b.position, b.rotation, b.pair)
 	if placed.overflow:
-		_finish(1 - side, "温室がいっぱいになりました")
+		_finish(1 - side, "盤面の入口まで積み上がりました")
 		return
 	b.board = Rules.gravity(placed.board)
 	b.phase = "land"
@@ -321,7 +321,7 @@ func _drop_nuisance(side: int) -> void:
 	var added: Dictionary = Rules.add_nuisance(b.board, amount, rng.randi_range(0, 5))
 	b.board = added.board
 	if added.overflow:
-		_finish(1 - side, "おじゃまで温室がいっぱいになりました")
+		_finish(1 - side, "予告ブロックで入口が埋まりました")
 		return
 	b.phase = "garbage"
 	b.timer = 0.48

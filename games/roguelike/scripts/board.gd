@@ -1,41 +1,34 @@
 extends Node2D
-## 地形・視界・探索済み地図は RunState の同じダンジョンを参照する。
+## 地形・視界・探索済み地図を、同梱フォントのグリフだけで描画する。
 
-const TILE: int = 40
-const COLS: int = 23
+const TILE: int = 30
+const COLS: int = 29
 const ROWS: int = 13
+const GLYPH_SIZE: int = 24
 const Data := preload("res://scripts/game_data.gd")
 const UI := preload("res://scripts/ui.gd")
 
 var run: Node
 var origin: Vector2i = Vector2i.ZERO
 var map_open: bool = false
-var textures: Dictionary = {}
 var minimap: Node2D
+var _font: Font
+var _pulse: float = 0.0
 
 
 func _ready() -> void:
+	_font = load(UI.FONT_PATH)
 	minimap = Node2D.new()
 	minimap.z_index = 15
 	add_child(minimap)
 	minimap.draw.connect(_draw_minimap)
 	run = get_node("/root/RunState")
-	for kind: String in ["floor", "wall"]:
-		textures[kind] = load("res://assets/tiles/" + kind + ".svg")
-	for kind: String in [
-		"stairs",
-		"weapon",
-		"sunblade",
-		"shield",
-		"ironshield",
-		"herb",
-		"food",
-		"scroll_fire",
-		"scroll_warp",
-		"wand",
-		"coin"
-	]:
-		textures[kind] = load("res://assets/items/" + kind + ".svg")
+
+
+## 発光する目標記号を呼吸させるため、描画時刻は非冪等。
+func _process(delta: float) -> void:
+	_pulse = fmod(_pulse + delta, TAU)
+	queue_redraw()
 
 
 func refresh() -> void:
@@ -50,50 +43,93 @@ func point(cell: Vector2i) -> Vector2:
 func _draw() -> void:
 	if not is_instance_valid(run) or run.dungeon == null:
 		return
-	draw_rect(Rect2(0, 0, COLS * TILE, ROWS * TILE), Color("101923"))
+	draw_rect(Rect2(0, 0, COLS * TILE, ROWS * TILE), UI.INK)
 	for y: int in range(ROWS):
 		for x: int in range(COLS):
 			var cell := origin + Vector2i(x, y)
-			var rect := Rect2(x * TILE, y * TILE, TILE, TILE)
 			if not run.dungeon.explored.has(cell):
 				continue
 			var visible_cell: bool = run.dungeon.visible.has(cell)
-			var tint := Color.WHITE if visible_cell else Color("465563")
-			var kind: String = "floor" if run.dungeon.is_floor(cell) else "wall"
-			draw_texture_rect(textures[kind], rect, false, tint)
+			var color := UI.MUTED.darkened(0.42)
+			if visible_cell:
+				color = UI.MUTED.lightened(0.05)
+			var glyph: String = "." if run.dungeon.is_floor(cell) else "#"
 			if cell == run.dungeon.stairs:
-				draw_texture_rect(textures.stairs, rect.grow(-3), false, tint)
+				glyph = ">"
+				color = UI.GOLD if visible_cell else UI.GOLD.darkened(0.55)
+			_draw_glyph(Vector2(x * TILE, y * TILE), glyph, color, GLYPH_SIZE)
 	for item: Dictionary in run.ground_items:
-		var image_name: String = str(Data.ITEMS.get(item.kind, {}).get("image", item.kind))
-		if run.dungeon.visible.has(item.pos) and textures.has(image_name):
-			draw_texture_rect(
-				textures[image_name],
-				Rect2(point(item.pos) - Vector2(16, 16), Vector2(32, 32)),
-				false
-			)
+		if not run.dungeon.visible.has(item.pos):
+			continue
+		var item_data: Dictionary = Data.ITEMS.get(item.kind, {})
+		var glyph: String = str(item_data.get("glyph", "?"))
+		_draw_glyph(point(item.pos) - Vector2.ONE * TILE * 0.5, glyph, UI.TEAL, GLYPH_SIZE)
 	var hero: Vector2 = point(run.player_pos)
-	draw_arc(hero, 19, 0, TAU, 32, UI.GOLD, 1.5, true)
-	draw_line(hero + Vector2(run.facing) * 18, hero + Vector2(run.facing) * 26, UI.GOLD, 3)
+	var alpha: float = 0.35 + (sin(_pulse * 2.0) + 1.0) * 0.18
+	draw_rect(Rect2(hero - Vector2.ONE * 14.0, Vector2.ONE * 28.0), Color(UI.TEAL, alpha), false, 2.0)
 	minimap.queue_redraw()
 
 
+func _draw_glyph(top_left: Vector2, glyph: String, color: Color, size: int) -> void:
+	var baseline := top_left + Vector2(4, float(size))
+	draw_string(
+		_font, baseline + Vector2(1, 1), glyph,
+		HORIZONTAL_ALIGNMENT_CENTER, TILE - 4, size, Color(0, 0, 0, 0.9)
+	)
+	draw_string(
+		_font, baseline, glyph, HORIZONTAL_ALIGNMENT_CENTER, TILE - 4, size, color
+	)
+
+
 func _draw_minimap() -> void:
-	var scale_map: float = 8.0 if map_open else 5.0
-	var base := Vector2(950, 290)
 	if map_open:
-		base = Vector2(290, 135)
-		minimap.draw_rect(Rect2(base - Vector2(20, 40), Vector2(345, 225)), Color("102330f5"))
+		_draw_large_map()
+		return
+	var base := Vector2(908, 285)
+	minimap.draw_string(
+		_font, base - Vector2(0, 18), "SCAN // 探索済み",
+		HORIZONTAL_ALIGNMENT_LEFT, 320, 13, UI.MUTED
+	)
 	for cell: Vector2i in run.dungeon.explored:
 		if not run.dungeon.is_floor(cell):
 			continue
-		var color := Color("547278")
-		if run.dungeon.visible.has(cell):
-			color = UI.TEAL.darkened(0.3)
-		minimap.draw_rect(
-			Rect2(base + Vector2(cell) * scale_map, Vector2.ONE * (scale_map - 1)), color
+		var glyph := "."
+		var color := UI.MUTED.darkened(0.2)
+		if cell == run.dungeon.stairs:
+			glyph = ">"
+			color = UI.GOLD
+		if cell == run.player_pos:
+			glyph = "@"
+			color = UI.TEAL
+		minimap.draw_string(
+			_font, base + Vector2(cell) * 2.7, glyph,
+			HORIZONTAL_ALIGNMENT_LEFT, 5, 7, color
 		)
-	if run.dungeon.explored.has(run.dungeon.stairs):
-		minimap.draw_circle(
-			base + Vector2(run.dungeon.stairs) * scale_map, scale_map * 0.7, UI.GOLD
+
+
+func _draw_large_map() -> void:
+	minimap.draw_rect(Rect2(18, 14, 834, 362), UI.INK)
+	minimap.draw_string(
+		_font, Vector2(42, 48),
+		"┌─ 地下探索図 / EXPLORED CELLS ──────────────────────────┐",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UI.TEAL
+	)
+	var base := Vector2(112, 58)
+	for cell: Vector2i in run.dungeon.explored:
+		var glyph := "·" if run.dungeon.is_floor(cell) else "#"
+		var color := UI.MUTED if run.dungeon.is_floor(cell) else UI.MUTED.darkened(0.25)
+		if cell == run.dungeon.stairs:
+			glyph = ">"
+			color = UI.GOLD
+		if cell == run.player_pos:
+			glyph = "@"
+			color = UI.TEAL
+		minimap.draw_string(
+			_font, base + Vector2(cell.x * 16, cell.y * 13), glyph,
+			HORIZONTAL_ALIGNMENT_LEFT, 16, 16, color
 		)
-	minimap.draw_circle(base + Vector2(run.player_pos) * scale_map, scale_map * 0.65, Color.WHITE)
+	minimap.draw_string(
+		_font, Vector2(42, 356),
+		"└─ @ 現在地   > 階段   · 探索済み   M / SELECT で閉じる ─────┘",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.MUTED
+	)

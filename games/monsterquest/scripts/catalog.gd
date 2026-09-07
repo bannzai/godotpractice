@@ -17,32 +17,32 @@ const MOVES: Dictionary = {
 const SPECIES: Dictionary = {
 	"ember": {
 		"name": "コハネ", "type": "fire", "hp": 27, "attack": 15, "defense": 12,
-		"speed": 16, "image": "res://assets/monsters/ember.svg",
+		"speed": 16, "image": "res://assets/pixel/characters/ember.png",
 		"learn": [[1, "spark"], [6, "seed"], [8, "flare"], [11, "wave"], [14, "sun"]],
 	},
 	"tide": {
 		"name": "シズモ", "type": "water", "hp": 31, "attack": 13, "defense": 15,
-		"speed": 11, "image": "res://assets/monsters/tide.svg",
+		"speed": 11, "image": "res://assets/pixel/characters/tide.png",
 		"learn": [[1, "drop"], [6, "spark"], [8, "wave"], [11, "vine"], [14, "rain"]],
 	},
 	"sprout": {
 		"name": "ネムリネ", "type": "leaf", "hp": 33, "attack": 14, "defense": 14,
-		"speed": 10, "image": "res://assets/monsters/sprout.svg",
+		"speed": 10, "image": "res://assets/pixel/characters/sprout.png",
 		"learn": [[1, "seed"], [6, "drop"], [8, "vine"], [11, "flare"], [14, "bloom"]],
 	},
 	"moth": {
 		"name": "ヒノコガ", "type": "fire", "hp": 24, "attack": 16, "defense": 10,
-		"speed": 20, "image": "res://assets/monsters/moth.svg",
+		"speed": 20, "image": "res://assets/pixel/characters/moth.png",
 		"learn": [[1, "spark"], [5, "seed"], [8, "flare"], [11, "wave"], [14, "sun"]],
 	},
 	"crab": {
 		"name": "アワガニ", "type": "water", "hp": 29, "attack": 16, "defense": 18,
-		"speed": 8, "image": "res://assets/monsters/crab.svg",
+		"speed": 8, "image": "res://assets/pixel/characters/crab.png",
 		"learn": [[1, "drop"], [5, "spark"], [8, "wave"], [11, "vine"], [14, "rain"]],
 	},
 	"owl": {
 		"name": "モリフク", "type": "leaf", "hp": 28, "attack": 15, "defense": 12,
-		"speed": 17, "image": "res://assets/monsters/owl.svg",
+		"speed": 17, "image": "res://assets/pixel/characters/owl.png",
 		"learn": [[1, "seed"], [5, "drop"], [8, "vine"], [11, "flare"], [14, "bloom"]],
 	},
 }

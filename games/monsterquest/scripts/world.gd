@@ -3,15 +3,22 @@ extends Node2D
 ## 地形はセルと地域だけで決まり、進行状況は保持しない。
 
 const GRID := Vector2i(24, 14)
-const CELL_SIZE := 40
-const FONT = preload("res://assets/fonts/MPLUSRounded1c-Regular.ttf")
-const INK := Color("283e43")
+const CELL_SIZE := 32
+const SOURCE_TILE_SIZE := 16
+const FONT = preload("res://assets/fonts/DotGothic16-Regular.ttf")
+const INK := Color("0f380f")
+const DARK_GREEN := Color("306230")
+const LIGHT_GREEN := Color("8bac0f")
+const PAPER := Color("9bbc0f")
+const PIXEL_ROOT := "res://assets/pixel/world/"
 const TILE_NAMES: Array[String] = ["meadow", "path", "grass", "hedge", "water", "wood"]
 
 var visual_player: QuestActor
 var _ground: TileMapLayer
 var _scenery: Node2D
 var _zone := "town"
+var _highlight_cell := Vector2i(-1, -1)
+var _highlight_kind := ""
 
 
 func setup(zone: String) -> void:
@@ -19,10 +26,11 @@ func setup(zone: String) -> void:
 	if not is_instance_valid(_ground):
 		_build_ground()
 		_scenery = Node2D.new()
+		_scenery.scale = Vector2.ONE * 0.8
 		add_child(_scenery)
 		visual_player = QuestActor.new()
 		add_child(visual_player)
-		visual_player.setup("player", Rect2(0, 0, 54, 54))
+		visual_player.setup("player", Rect2(0, 0, 64, 64))
 		# セル中心を使う移動 Tween と、中央寄せした画像の座標系を揃える。
 		visual_player.sprite.position = Vector2.ZERO
 	for child: Node in _scenery.get_children():
@@ -48,13 +56,14 @@ func setup(zone: String) -> void:
 func _build_ground() -> void:
 	_ground = TileMapLayer.new()
 	_ground.show_behind_parent = true
-	_ground.scale = Vector2.ONE * float(CELL_SIZE) / 48.0
+	_ground.scale = Vector2.ONE * float(CELL_SIZE) / SOURCE_TILE_SIZE
+	_ground.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var tiles := TileSet.new()
-	tiles.tile_size = Vector2i(48, 48)
+	tiles.tile_size = Vector2i(SOURCE_TILE_SIZE, SOURCE_TILE_SIZE)
 	for index in range(TILE_NAMES.size()):
 		var atlas := TileSetAtlasSource.new()
-		atlas.texture = load("res://assets/world/tile_%s.svg" % TILE_NAMES[index]) as Texture2D
-		atlas.texture_region_size = Vector2i(48, 48)
+		atlas.texture = load(PIXEL_ROOT + "tile_%s.png" % TILE_NAMES[index]) as Texture2D
+		atlas.texture_region_size = Vector2i(SOURCE_TILE_SIZE, SOURCE_TILE_SIZE)
 		atlas.create_tile(Vector2i.ZERO)
 		tiles.add_source(atlas, index)
 	_ground.tile_set = tiles
@@ -63,6 +72,12 @@ func _build_ground() -> void:
 
 func set_player(cell: Vector2i) -> void:
 	visual_player.position = Vector2(cell * CELL_SIZE) + Vector2.ONE * CELL_SIZE / 2.0
+
+
+func set_highlight(cell: Vector2i, kind: String = "target") -> void:
+	_highlight_cell = cell
+	_highlight_kind = kind
+	queue_redraw()
 
 
 static func tile(zone: String, cell: Vector2i) -> int:
@@ -152,7 +167,19 @@ static func _indoor_walkable(zone: String, cell: Vector2i) -> bool:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(0, 0, 960, 560), Color("597a61"), false, 3.0)
+	draw_rect(Rect2(0, 0, GRID.x * CELL_SIZE, GRID.y * CELL_SIZE), INK, false, 4.0)
+	if Rect2i(Vector2i.ZERO, GRID).has_point(_highlight_cell):
+		var origin := Vector2(_highlight_cell * CELL_SIZE)
+		draw_rect(Rect2(origin + Vector2(2, 2), Vector2(CELL_SIZE - 4, CELL_SIZE - 4)), PAPER, false, 4.0)
+		var marker_color := PAPER if _highlight_kind == "target" else LIGHT_GREEN
+		draw_colored_polygon(
+			PackedVector2Array([
+				origin + Vector2(CELL_SIZE - 10, 4),
+				origin + Vector2(CELL_SIZE - 2, 8),
+				origin + Vector2(CELL_SIZE - 10, 12),
+			]),
+			marker_color
+		)
 
 
 func _decorate_town() -> void:
@@ -190,7 +217,7 @@ func _decorate_room() -> void:
 	_place("room_walls", Rect2(0, 0, 960, 560))
 	_place("rug", Rect2(320, 282, 320, 160))
 	var title := "旅人の家 ・ ひと休み" if _zone == "home" else "回復と預かりの家"
-	_label(Rect2(185, 17, 590, 37), title, 25, Color("fff0ce"))
+	_label(Rect2(185, 17, 590, 37), title, 25, PAPER)
 	_sign(Vector2(377, 508), "町へ戻る ↓", 170.0)
 	if _zone == "home":
 		_place("bed", Rect2(113, 113, 216, 128))
@@ -208,8 +235,9 @@ func _decorate_room() -> void:
 
 func _place(image_name: String, rect: Rect2) -> void:
 	var picture := Sprite2D.new()
-	picture.texture = load("res://assets/world/%s.svg" % image_name) as Texture2D
+	picture.texture = load(PIXEL_ROOT + image_name + ".png") as Texture2D
 	picture.centered = false
+	picture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	picture.position = rect.position
 	picture.scale = rect.size / picture.texture.get_size()
 	_scenery.add_child(picture)
@@ -241,24 +269,7 @@ func _label(rect: Rect2, value: String, font_size: int, color: Color = INK) -> v
 
 
 func _water(rect: Rect2) -> void:
-	var surface := ColorRect.new()
-	surface.position = rect.position
-	surface.size = rect.size
-	surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var shader := Shader.new()
-	shader.code = """shader_type canvas_item;
-render_mode unshaded;
-void fragment() {
-    vec2 wave = UV * vec2(15.0, 21.0);
-    float ripple = sin(wave.y + TIME * 1.1 + sin(wave.x + TIME * 0.45) * 1.2);
-    float gleam = smoothstep(0.92, 1.0, ripple) * (0.5 + sin(wave.x * 0.8) * 0.5);
-    COLOR = vec4(0.85, 0.96, 0.81, gleam * 0.24);
-}
-"""
-	var surface_material := ShaderMaterial.new()
-	surface_material.shader = shader
-	surface.material = surface_material
-	_scenery.add_child(surface)
+	_place("tile_water", rect)
 
 
 func _add_pollen() -> void:
@@ -275,7 +286,8 @@ func _add_pollen() -> void:
 	pollen.initial_velocity_min = 4.0
 	pollen.initial_velocity_max = 9.0
 	pollen.scale_amount_min = 0.16
-	pollen.scale_amount_max = 0.3
-	pollen.color = Color(1.0, 0.95, 0.7, 0.48)
-	pollen.texture = load("res://assets/world/pollen.svg") as Texture2D
+	pollen.scale_amount_max = 0.16
+	pollen.color = PAPER
+	pollen.texture = load(PIXEL_ROOT + "pollen.png") as Texture2D
+	pollen.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_scenery.add_child(pollen)

@@ -3,7 +3,7 @@ extends Control
 ## キャラクターごとの原画と姿勢を、画面側から独立して表示する。
 
 const ACTIONS: Array[String] = ["idle", "walk", "attack", "hurt", "defeat"]
-const FRAME_SIZE := 192
+const FRAME_SIZE := 32
 const FRAME_COUNT := 6
 
 var sprite: AnimatedSprite2D
@@ -16,13 +16,15 @@ func setup(character_id: String, rect: Rect2) -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if not is_instance_valid(sprite):
 		sprite = AnimatedSprite2D.new()
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(sprite)
 	sprite.position = rect.size / 2.0
-	sprite.scale = Vector2.ONE * minf(rect.size.x, rect.size.y) / FRAME_SIZE
+	var integer_scale: float = maxf(1.0, floorf(minf(rect.size.x, rect.size.y) / FRAME_SIZE))
+	sprite.scale = Vector2.ONE * integer_scale
 	if _character_id == character_id:
 		return
 	_character_id = character_id
-	var sheet := load("res://assets/characters/%s.svg" % character_id) as Texture2D
+	var sheet := load("res://assets/pixel/characters/%s.png" % character_id) as Texture2D
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	for row in range(ACTIONS.size()):

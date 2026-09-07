@@ -31,9 +31,9 @@ func _run() -> void:
 		if held_key != 0:
 			_key(held_key, false)
 			held_key = 0
-		if frame == 30:
+		if frame in [30, 60, 90, 120]:
 			_press(KEY_ENTER)
-		elif frame > 45 and frame % 4 == 0:
+		elif frame > 135 and frame % 4 == 0:
 			_drive(frame)
 	main.set_process(false)
 	state.set_process(false)

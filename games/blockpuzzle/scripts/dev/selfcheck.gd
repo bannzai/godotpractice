@@ -4,6 +4,7 @@ extends SceneTree
 
 const Rules = preload("res://scripts/puzzle_rules.gd")
 const Session = preload("res://scripts/session.gd")
+const SoundscapeScript = preload("res://scripts/soundscape.gd")
 
 var failed: bool = false
 
@@ -11,6 +12,7 @@ var failed: bool = false
 func _initialize() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_audio_loops()
 	_check_motion()
 	_check_clearing()
 	_check_chains()
@@ -77,6 +79,16 @@ func _check_asset_directory(path: String, credits: String) -> void:
 		)
 	for subdirectory: String in directory.get_directories():
 		_check_asset_directory(path.path_join(subdirectory), credits)
+
+
+func _check_audio_loops() -> void:
+	for filename: String in ["ambient", "bgm_title", "bgm_play", "bgm_danger", "bgm_result"]:
+		var stream: AudioStreamWAV = load("res://assets/audio/%s.wav" % filename)
+		SoundscapeScript._configure_full_loop(stream)
+		var sample_count: int = roundi(stream.get_length() * stream.mix_rate)
+		_check(stream.loop_mode == AudioStreamWAV.LOOP_FORWARD, "音声: %s を前方ループ" % filename)
+		_check(stream.loop_begin == 0, "音声: %s の先頭からループ" % filename)
+		_check(stream.loop_end == sample_count and sample_count > 0, "音声: %s の全サンプルをループ" % filename)
 
 
 func _board(bottom_rows: Array) -> Array:
@@ -210,16 +222,24 @@ func _check_cpu() -> void:
 
 
 func _check_records() -> void:
-	var empty: Dictionary = {"high_score": 0, "best_chain": 0}
+	var empty: Dictionary = {"high_score": 0, "best_chain": 0, "tutorial_seen": false}
 	_check(Rules.parse_records(null) == empty, "保存: 未作成")
 	_check(Rules.parse_records([]) == empty, "保存: 不正形式")
 	_check(Rules.parse_records({"high_score": "100", "best_chain": -2}) == empty, "保存: 不正型と負数")
 	_check(
 		(
 			Rules.parse_records({"high_score": 240.0, "best_chain": 3.0})
-			== {"high_score": 240, "best_chain": 3}
+			== {"high_score": 240, "best_chain": 3, "tutorial_seen": false}
 		),
 		"保存: JSONの浮動小数を解釈"
+	)
+	_check(
+		Rules.parse_records({"tutorial_seen": true}).tutorial_seen,
+		"保存: 初回チュートリアル完了を解釈"
+	)
+	_check(
+		not Rules.parse_records({"tutorial_seen": 1}).tutorial_seen,
+		"保存: チュートリアル完了の不正型を拒否"
 	)
 	_check(Rules.parse_records({"high_score": INF, "best_chain": NAN}) == empty, "保存: 非有限値")
 	_check(Rules.parse_records({"best_chain": 999}).best_chain == 18, "保存: 盤面上の連鎖上限")

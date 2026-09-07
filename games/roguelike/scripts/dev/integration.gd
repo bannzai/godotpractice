@@ -37,10 +37,18 @@ func _keyboard_cycle() -> void:
 	_check(main.modal_kind == "help", "キーでタイトルの手引きを開く")
 	await _key(KEY_ESCAPE)
 	_check(main.modal_kind.is_empty(), "タイトルの手引きを Esc で閉じる")
+	await _key(KEY_SLASH)
+	_check(main.modal_kind == "help", "? キーの位置で手引きを開く")
+	await _key(KEY_SLASH)
+	_check(main.modal_kind.is_empty(), "? キーの位置で手引きを閉じる")
 	await _key(KEY_ENTER)
 	_check(run.status == "playing", "Enter で開始")
 	if run.status != "playing":
 		return
+	await process_frame
+	_check(main.modal_kind == "tutorial", "初回開始時にチュートリアル")
+	await _key(KEY_ESCAPE)
+	_check(main.modal_kind.is_empty() and main.tutorial_seen, "Esc でチュートリアルをスキップ")
 	run.start_run(Demo.DEMO_SEED)
 	var before: Vector2i = run.player_pos
 	var direction: Vector2i = _open_direction(false)
@@ -50,7 +58,21 @@ func _keyboard_cycle() -> void:
 	direction = _open_direction(true)
 	await _key(Demo.STEP_KEYS[direction])
 	_check(run.player_pos == before + direction, "Q E Z C で斜め移動")
+	before = run.player_pos
+	direction = _open_direction(false)
+	var held_turns: int = run.turns
+	await _held_key(Demo.STEP_KEYS[direction], 0.3)
+	_check(
+		run.player_pos == before + direction and run.turns == held_turns + 1,
+		"キーを移動間隔より長く押しても一手だけ進む"
+	)
 	var turns: int = run.turns
+	await _key(KEY_I)
+	await _key(KEY_ENTER)
+	var equipped_use: Button = Demo.find_button(main, "使う / 装備")
+	_check(equipped_use != null and equipped_use.disabled, "装備中の道具は理由つきで使用不可")
+	await _key(KEY_ESCAPE)
+	run.weapon = ""
 	await _key(KEY_I)
 	_check(main.modal_kind == "inventory", "I で道具一覧")
 	await _key(KEY_ENTER)
@@ -76,10 +98,15 @@ func _gamepad_cycle() -> void:
 	_check(main.modal_kind == "help", "ゲームパッドでタイトルの手引きを開く")
 	await _pad(JOY_BUTTON_B)
 	_check(main.modal_kind.is_empty(), "タイトルの手引きを B で閉じる")
+	main.tutorial_seen = false
 	await _pad(JOY_BUTTON_A)
 	_check(run.status == "playing", "ゲームパッド A で開始")
 	if run.status != "playing":
 		return
+	await process_frame
+	_check(main.modal_kind == "tutorial", "ゲームパッド開始時にチュートリアル")
+	await _pad(JOY_BUTTON_B)
+	_check(main.modal_kind.is_empty(), "B でチュートリアルをスキップ")
 	run.start_run(Demo.DEMO_SEED)
 	var before: Vector2i = run.player_pos
 	var direction: Vector2i = _open_direction(false)
@@ -94,6 +121,7 @@ func _gamepad_cycle() -> void:
 	await _stick(direction)
 	_check(run.player_pos == before + direction, "左スティックの二軸で斜め移動")
 	var turns: int = run.turns
+	run.weapon = ""
 	await _pad(JOY_BUTTON_Y)
 	_check(main.modal_kind == "inventory", "Y で道具一覧")
 	await _pad(JOY_BUTTON_A)
@@ -111,13 +139,17 @@ func _gamepad_cycle() -> void:
 
 
 func _mouse_cycle() -> void:
+	main.tutorial_seen = false
 	await _click("深層へ潜る")
 	_check(run.status == "playing", "マウスで開始")
 	if run.status != "playing":
 		return
+	await _click("案内を飛ばす")
+	_check(main.modal_kind.is_empty(), "マウスでチュートリアルをスキップ")
+	run.hp -= 10
 	var herbs: int = run.inventory.count("herb")
 	var turns: int = run.turns
-	await _click("道具  I")
+	await _click("道具")
 	_check(main.modal_kind == "inventory", "マウスで道具一覧")
 	await _click("灯り草")
 	_check(main.modal_kind == "item", "マウスで消費アイテム選択")
@@ -127,7 +159,7 @@ func _mouse_cycle() -> void:
 	await _click("使う / 装備")
 	_check(run.inventory.count("herb") == herbs - 1, "マウスで灯り草を消費")
 	_check(run.turns == turns + 1, "道具使用は一手だけ消費")
-	await _click("道具  I")
+	await _click("道具")
 	await _click("戻る")
 	_check(main.modal_kind.is_empty(), "マウスで一覧から戻る")
 	await _finish_to_title("mouse")
@@ -144,7 +176,8 @@ func _finish_to_title(device: String) -> void:
 		await _key(KEY_ENTER)
 	else:
 		await _key(KEY_ESCAPE)
-		await _click("旅を諦める")
+		_check(main.modal_kind == "pause", "マウス経路でも Esc で中断を開く")
+		await _click("旅を諦め")
 	_check(run.status == "dead", "中断から結果へ")
 	for attempt: int in range(30):
 		if main.current_screen == run.status:
@@ -180,6 +213,19 @@ func _key(code: Key) -> void:
 	event.physical_keycode = code
 	event.keycode = code
 	await _press(event)
+
+
+func _held_key(code: Key, seconds: float) -> void:
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = code
+	event.keycode = code
+	event.pressed = true
+	Input.parse_input_event(event)
+	await create_timer(seconds).timeout
+	var release: InputEventKey = event.duplicate()
+	release.pressed = false
+	Input.parse_input_event(release)
+	await create_timer(0.25).timeout
 
 
 func _pad(button: JoyButton) -> void:
