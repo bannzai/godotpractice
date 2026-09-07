@@ -71,10 +71,12 @@ func _key(key: Key) -> void:
 	event.keycode = key
 	event.pressed = true
 	Input.parse_input_event(event)
-	await process_frame
+	for _frame: int in range(2):
+		await process_frame
 	event.pressed = false
 	Input.parse_input_event(event)
-	await process_frame
+	for _frame: int in range(2):
+		await process_frame
 
 
 func _capture(label: String) -> void:

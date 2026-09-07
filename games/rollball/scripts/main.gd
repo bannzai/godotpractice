@@ -100,8 +100,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("confirm") and RunState.phase != "playing":
 		var focused: Control = get_viewport().gui_get_focus_owner()
 		if focused is Button:
-			focused.pressed.emit()
-		elif RunState.phase == "title":
+			# confirm は ui_accept と同じ入力を持つ。Button が先に処理済みなので再発火しない。
+			get_viewport().set_input_as_handled()
+			return
+		if RunState.phase == "title":
 			show_stage_select()
 		elif RunState.phase == "stage_select":
 			begin_selected_stage()

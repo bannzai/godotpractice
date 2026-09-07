@@ -54,26 +54,31 @@ func _run() -> void:
 
 
 func _check_stage_select_and_tutorial() -> void:
-	game.show_stage_select()
-	await process_frame
+	await _key_button(KEY_ENTER)
 	_check(state.phase == "stage_select", "タイトルからおもちゃ箱の部屋選択へ遷移")
 	_check(game.hud.stage_panel.visible, "部屋選択画面を表示")
-	game.select_stage("playroom")
-	await process_frame
+	await _key_button(KEY_RIGHT)
 	_check(state.selected_stage == "playroom", "2つ目の部屋を選択")
 	_check(game.room.stage_id == "playroom", "選択中の部屋を背景でプレビュー")
 	_check(game.items.get_child_count() >= 100, "2つ目の部屋にも100個以上配置")
-	game.begin_selected_stage()
-	await process_frame
+	await _key_button(KEY_DOWN)
+	await _key_button(KEY_ENTER)
 	_check(state.phase == "tutorial", "初回だけ開始前チュートリアルへ遷移")
 	_check(game.hud.tutorial_panel.visible, "チュートリアルの紙札を表示")
 	_check(is_instance_valid(game.tutorial_actors), "身振りをする粘土キャラクターを表示")
 	_check(game.tutorial_actors.get_child_count() == 2, "2体のキャラクターで操作を案内")
-	game.next_tutorial_step()
-	game.next_tutorial_step()
+	await _key_button(KEY_ENTER)
+	_check(game.tutorial_step == 1 and state.phase == "tutorial", "1回の決定で説明を1段階だけ進める")
+	await _key_button(KEY_ENTER)
 	_check(game.tutorial_step == 2, "移動・視点・巻き込みを順に案内")
-	game.skip_tutorial()
+	await _key_button(KEY_ENTER)
+	_check(state.phase == "playing" and state.tutorial_seen, "最後の決定でプレイを開始")
+	state.tutorial_seen = false
+	game.show_stage_select()
+	game.begin_selected_stage()
 	await process_frame
+	_check(state.phase == "tutorial", "未体験ならチュートリアルを再表示")
+	await _key_button(KEY_ESCAPE)
 	_check(state.phase == "playing" and state.tutorial_seen, "スキップしてプレイ開始")
 	game.show_title()
 	game.show_stage_select()
@@ -128,6 +133,19 @@ func _check_arrow_key(key: Key, direction: float) -> void:
 	Input.parse_input_event(event)
 	_check((game.ball.position.x - initial_x) * direction > 0.2,
 		"%s キーで指定方向へ移動" % OS.get_keycode_string(key))
+
+
+# メニューの実キー入力は GUI とゲーム側の両方を通し、押下と解放を次の試験へ残さない。
+func _key_button(key: Key) -> void:
+	var event: InputEventKey = InputEventKey.new()
+	event.keycode = key
+	event.physical_keycode = key
+	event.pressed = true
+	Input.parse_input_event(event)
+	await _frames(2)
+	event.pressed = false
+	Input.parse_input_event(event)
+	await _frames(2)
 
 
 # 棚の背後に玉を置き、追従カメラの視線が実際の物理形状を横切らないことを確認する。
