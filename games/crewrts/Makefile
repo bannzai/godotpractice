@@ -18,7 +18,10 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
+.PHONY: generate-audio import check selfcheck lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
+
+generate-audio:
+	python3 scripts/dev/generate_audio.py
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:

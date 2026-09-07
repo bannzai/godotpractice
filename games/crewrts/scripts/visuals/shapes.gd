@@ -1,15 +1,21 @@
 extends RefCounted
-## 種類ごとのモデルで使う低分割メッシュと材質。描画資源だけを共有する。
+## 種類ごとのモデルで使う低分割メッシュと水彩トゥーン材質。描画資源だけを共有する。
+
+const WATERCOLOR_SHADER: Shader = preload("res://assets/materials/watercolor_toon.gdshader")
+const WATERCOLOR_TEXTURE: Texture2D = preload("res://assets/textures/watercolor-wash.png")
+const PAPER_TEXTURE: Texture2D = preload("res://assets/textures/paper-grain.png")
 
 static var _materials: Dictionary = {}
 static var _meshes: Dictionary = {}
 
 
-static func material(color: Color) -> StandardMaterial3D:
+static func material(color: Color) -> Material:
 	if not _materials.has(color):
-		var surface := StandardMaterial3D.new()
-		surface.albedo_color = color
-		surface.roughness = 0.82
+		var surface := ShaderMaterial.new()
+		surface.shader = WATERCOLOR_SHADER
+		surface.set_shader_parameter("tint", color)
+		surface.set_shader_parameter("watercolor_texture", WATERCOLOR_TEXTURE)
+		surface.set_shader_parameter("paper_texture", PAPER_TEXTURE)
 		_materials[color] = surface
 	return _materials[color]
 

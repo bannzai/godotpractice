@@ -202,6 +202,36 @@ def gesture(kind: str) -> list[float]:
     return result
 
 
+def island_ambience() -> list[float]:
+    """周期的な風・葉音と短い鳥声を、継ぎ目のない島の環境音へ合成する。"""
+    duration = 12.0
+    frames = round(RATE * duration)
+    noise = random.Random(1492)
+    control = [noise.uniform(-1.0, 1.0) for _ in range(72)]
+    left, right = [], []
+    for index in range(frames):
+        t = index / RATE
+        position = index / frames * len(control)
+        low = math.floor(position)
+        blend = position - low
+        smooth = blend * blend * (3.0 - 2.0 * blend)
+        breeze = control[low % len(control)] * (1.0 - smooth)
+        breeze += control[(low + 1) % len(control)] * smooth
+        wash = 0.14 * breeze + 0.07 * math.sin(TAU * 5 * t / duration)
+        leaves = 0.035 * math.sin(TAU * 31 * t / duration + 0.8 * breeze)
+        bird = 0.0
+        for start, pan in ((2.3, -0.35), (7.8, 0.42)):
+            local = t - start
+            if 0.0 <= local < 0.62:
+                envelope = math.sin(math.pi * local / 0.62) ** 2
+                phase = TAU * (1060 * local + 250 * local * local)
+                chirp = envelope * (math.sin(phase) + 0.22 * math.sin(phase * 2))
+                bird += chirp * (0.11 + pan * 0.025)
+        left.append(wash + leaves + bird * 0.82)
+        right.append(wash - leaves + bird)
+    return [sample for pair in zip(left, right) for sample in pair]
+
+
 def main() -> None:
     """全音声を決定的に更新する。"""
     OUT.mkdir(parents=True, exist_ok=True)
@@ -212,7 +242,8 @@ def main() -> None:
     write_wav("delivery.wav", chime((72, 76, 79, 84), 0.08, 0.7))
     write_wav("lost.wav", chime((76, 72, 69), 0.13, 0.48, "reed"))
     write_wav("switch.wav", chime((76, 81), 0.04, 0.2, "pluck"))
-    print("音声 12 ファイルの生成完了")
+    write_wav("island-ambience.wav", island_ambience(), stereo=True)
+    print("音声 13 ファイルの生成完了")
 
 
 if __name__ == "__main__":

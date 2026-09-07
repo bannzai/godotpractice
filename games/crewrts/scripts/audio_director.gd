@@ -9,6 +9,7 @@ const MUSIC_DB: float = -11.0
 
 var current_track: String = ""
 var music_players: Array[AudioStreamPlayer] = []
+var ambience_player: AudioStreamPlayer
 var sounds: Dictionary = {}
 var _streams: Dictionary = {}
 ## 読み込んだ全 WAV への弱参照。stop_audio() で自前の参照を捨てた後も音声スレッドの AudioStreamPlayback が
@@ -45,6 +46,16 @@ func setup() -> void:
 		player.volume_db = -50.0
 		add_child(player)
 		music_players.append(player)
+	var ambience: AudioStreamWAV = load("res://assets/audio/island-ambience.wav")
+	ambience.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	ambience.loop_end = roundi(ambience.get_length() * ambience.mix_rate)
+	_streams["ambience"] = ambience
+	_stream_refs.append(weakref(ambience))
+	ambience_player = AudioStreamPlayer.new()
+	ambience_player.stream = ambience
+	ambience_player.volume_db = -38.0
+	add_child(ambience_player)
+	ambience_player.play()
 	for key: String in EFFECT_KEYS:
 		var player := AudioStreamPlayer.new()
 		player.stream = load("res://assets/audio/%s.wav" % key)
@@ -74,6 +85,7 @@ func update_state(model: Node) -> void:
 		next_track = "battle" if Time.get_ticks_msec() < _battle_until else "garden"
 	else:
 		_battle_until = 0
+	ambience_player.volume_db = -25.0 if model.phase in ["map", "playing"] else -38.0
 	_set_track(next_track)
 
 
@@ -112,6 +124,9 @@ func stop_audio() -> void:
 	for player: AudioStreamPlayer in music_players:
 		player.stop()
 		player.stream = null
+	if is_instance_valid(ambience_player):
+		ambience_player.stop()
+		ambience_player.stream = null
 	for player: AudioStreamPlayer in sounds.values():
 		player.stop()
 		player.stream = null
