@@ -126,13 +126,13 @@ func show_help() -> void:
 	_reset_screen()
 	var scroll: Panel = UI.scroll_panel(screen, Rect2(142, 48, 996, 620))
 	UI.label(scroll, "軍議の手引き", Rect2(58, 36, 880, 55), 38, UI.CORAL)
-	var text: String = "味方を選ぶ → 青いマスへ移動 → 相手を選んで予測 → 戦闘を確定\n\n"
+	var text: String = "味方を選ぶ、青いマスへ移動、相手を選んで予測、戦闘を確定\n\n"
 	text += "剣は斧に、斧は槍に、槍は剣に有利。速さの差で追撃。\n"
 	text += "弓は２マス先だけに攻撃。祈り手は隣の味方を回復します。\n"
 	text += "森・山・砦は守りに有利。水は通行不可。移動は取消できます。\n"
 	text += "全員行動、または E / Y で敵の番。W / X で待機、I / RB で薬。\n"
 	text += "主人公が倒れると敗北。他の仲間の戦死は次の章にも残ります。\n"
-	text += "敵全滅 → ボス撃破 → 目的地への到達、の全３章です。\n"
+	text += "敵全滅、ボス撃破、目的地への到達という全３章です。\n"
 	text += "S / Start で保存してタイトル。F11 で全画面切替。\n"
 	text += "マウスはマスとボタンをクリック。パッドは方向キーにも対応。"
 	text += "\n最初の戦場では、金雲の指南が盤面上で順番に案内します。"
@@ -355,7 +355,7 @@ func _actions(unit: Dictionary) -> void:
 		UI.fan_button(sidebar, "薬", Rect2(997, 454, 126, 62), 0.06, item_selected)
 		UI.fan_button(sidebar, "取消", Rect2(1087, 478, 126, 62), 0.18, cancel_selection)
 	else:
-		UI.label(sidebar, "剣 ＞ 斧 ＞ 槍 ＞ 剣\n弓は二升先　祈りは隣の味方", Rect2(828, 438, 390, 67), 20, UI.JADE)
+		UI.label(sidebar, "剣 > 斧 > 槍 > 剣\n弓は二升先　祈りは隣の味方", Rect2(828, 438, 390, 67), 20, UI.JADE)
 	UI.button(sidebar, "軍議を終えて敵軍へ", Rect2(828, 553, 388, 38), end_phase)
 	UI.button(sidebar, "記録して表紙へ", Rect2(828, 600, 388, 34), save_to_title)
 
@@ -367,7 +367,7 @@ func _forecast() -> void:
 		return
 	var opponent: Dictionary = _unit(target)
 	var scroll: Panel = UI.scroll_panel(sidebar, Rect2(819, 430, 411, 204))
-	UI.label(scroll, "戦の見立て　→　" + opponent.name, Rect2(22, 22, 367, 32), 23, UI.CORAL)
+	UI.label(scroll, "戦の見立て　対　" + opponent.name, Rect2(22, 22, 367, 32), 23, UI.CORAL)
 	var summary: String = (
 		"回復  +%d" % prediction.heal
 		if prediction.heal > 0
