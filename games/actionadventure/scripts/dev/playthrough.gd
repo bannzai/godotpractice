@@ -22,6 +22,9 @@ func _run() -> void:
 	state = main.state
 	await _wait(5)
 	await _tap(KEY_ENTER)
+	_check(state.mode == "dialogue", "新しい旅で長老の初回案内を表示")
+	await _tap(KEY_ESCAPE)
+	_check(state.mode == "play" and state.has_flag("map-owned"), "初回案内を省いて地図を受け取る")
 	for room: int in range(12):
 		if failed:
 			break

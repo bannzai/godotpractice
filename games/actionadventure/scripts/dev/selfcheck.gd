@@ -13,6 +13,7 @@ func _run() -> void:
 	_check_state_and_world()
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_art_direction()
 
 	if failed:
 		quit(1)
@@ -65,12 +66,49 @@ func _check_asset_directory(path: String, credits: String) -> void:
 	for filename: String in directory.get_files():
 		if filename in ["CREDITS.md", ".gdignore"] or filename.get_extension() in ["import", "uid"]:
 			continue
+		_check(filename.get_extension().to_lower() != "svg", "画像: SVG を使っていない")
 		_check(
 			credits.contains(filename),
 			"CREDITS: %s が assets/CREDITS.md に記録されていない" % path.path_join(filename)
 		)
 	for subdirectory: String in directory.get_directories():
 		_check_asset_directory(path.path_join(subdirectory), credits)
+
+
+func _check_art_direction() -> void:
+	_check(FileAccess.file_exists("res://assets/fonts/Stick-Regular.ttf"), "フォント: Stick を同梱")
+	_check(not FileAccess.file_exists("res://assets/fonts/font.ttf"), "フォント: 旧 font.ttf を使わない")
+	var catalog_text: String = FileAccess.get_file_as_string("res://assets/palettes.json")
+	var parsed: Variant = JSON.parse_string(catalog_text)
+	_check(parsed is Dictionary, "パレット: palettes.json を解析できる")
+	if not parsed is Dictionary:
+		return
+	var catalog: Dictionary = parsed
+	var palettes: Dictionary = catalog.get("palettes", {})
+	_check(palettes.size() >= 4, "パレット: 地域・用途別の配色が4種類以上")
+	for palette_name: String in palettes:
+		var palette: Dictionary = palettes[palette_name]
+		var colors: Array = palette.get("colors", [])
+		_check(colors.size() >= 4 and colors.size() <= 8,
+			"パレット: %s は4〜8色" % palette_name)
+	var outputs: Dictionary = catalog.get("outputs", {})
+	_check(outputs.size() >= 30, "画像: 再着色したPNGを30点以上記録")
+	for output_name: String in outputs:
+		var metadata: Dictionary = outputs[output_name]
+		var expected_size: Array = metadata.get("size", [])
+		var texture: Texture2D = load("res://assets/" + output_name) as Texture2D
+		_check(texture != null, "画像: %s を読み込める" % output_name)
+		if texture != null and expected_size.size() == 2:
+			_check(Vector2i(texture.get_width(), texture.get_height()) == \
+				Vector2i(expected_size[0], expected_size[1]),
+				"画像: %s の寸法が生成記録と一致" % output_name)
+		var verification: Dictionary = metadata.get("verification", {})
+		_check(verification.get("unique_rgb_colors", 999) <= verification.get("palette_limit", 0),
+			"画像: %s は割り当てた色数以内" % output_name)
+	var sources: Array = catalog.get("sources", [])
+	_check(sources.size() == 3, "素材: 採用したCC0素材3点を記録")
+	for source: Dictionary in sources:
+		_check(source.get("license", "") == "CC0-1.0", "素材: CC0のみを採用")
 
 
 func _check_state_and_world() -> void:
@@ -81,6 +119,7 @@ func _check_state_and_world() -> void:
 	state.free()
 	var world_script: GDScript = load("res://scripts/world.gd")
 	_check(world_script.ROOM_NAMES.size() == 12, "フィールド6画面と遺跡6部屋")
+	_check(world_script.TILE_SIZE == 56, "画像: 56pxタイルで構成")
 	_check(world_script.sword_hits(Vector2.ZERO, Vector2.RIGHT, Vector2(100, 0)), "剣は前方へ届く")
 	_check(not world_script.sword_hits(Vector2.ZERO, Vector2.RIGHT, Vector2(-80, 0)), "剣は背後へ届かない")
 	_check(not world_script.sword_hits(Vector2.ZERO, Vector2.RIGHT, Vector2(0, 80)), "剣の扇の外は無傷")

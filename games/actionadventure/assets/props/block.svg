@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><defs>
-<linearGradient id="jade" x2="0.2" y2="1"><stop stop-color="#91dac2"/><stop offset="1" stop-color="#316b72"/></linearGradient>
-<linearGradient id="stone" x2="0.3" y2="1"><stop stop-color="#9cadac"/><stop offset="1" stop-color="#46566a"/></linearGradient>
-<linearGradient id="gold" x2="0.3" y2="1"><stop stop-color="#fff1bb"/><stop offset="1" stop-color="#b87746"/></linearGradient>
-<linearGradient id="cloth" x2="0.3" y2="1"><stop stop-color="#356e80"/><stop offset="1" stop-color="#20354f"/></linearGradient>
-<linearGradient id="sky" x2="0.2" y2="1"><stop stop-color="#101c35"/><stop offset="0.65" stop-color="#29435c"/><stop offset="1" stop-color="#4c7879"/></linearGradient>
-<radialGradient id="glow"><stop stop-color="#fff0b0" stop-opacity="0.8"/><stop offset="0.4" stop-color="#ebc776" stop-opacity="0.18"/><stop offset="1" stop-color="#ebc776" stop-opacity="0"/></radialGradient>
-</defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="48" cy="81" rx="29" ry="6" fill="#102932" stroke="none" stroke-width="2"/><path d="M16 30L34 17L80 25L79 71L62 84L16 75Z" fill="#536b74" stroke="#142733" stroke-width="2"/><path d="M16 30L62 37L80 25M62 37L62 84" fill="none" stroke="#bfd0bc" stroke-width="2"/><path d="M25 41L53 45L53 69L25 66Z" fill="#344d60" stroke="#93b4a6" stroke-width="2"/><path d="M33 49L46 51L45 61L33 59Z" fill="none" stroke="#edc67d" stroke-width="2"/></g></svg>

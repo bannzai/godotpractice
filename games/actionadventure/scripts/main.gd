@@ -3,6 +3,20 @@ extends Control
 
 const WorldScript = preload("res://scripts/world.gd")
 const Presentation = preload("res://scripts/presentation.gd")
+const TUTORIAL_PAGES: Array[Dictionary] = [
+	{
+		"title": "長老の石版　はじめの刻み 1 / 3",
+		"text": "琥珀色に点滅するものへ近づき、E または A で調べるのじゃ。\nまずは、この長老へ話しかける感覚を覚えよう。",
+	},
+	{
+		"title": "長老の石版　はじめの刻み 2 / 3",
+		"text": "WASD・矢印・左スティックで歩く。J・Space・X で剣、K・Y で道具。\n赤い印は、鍵や道具が足りず今はできないことを示す。",
+	},
+	{
+		"title": "長老の石版　はじめの刻み 3 / 3",
+		"text": "この羊皮紙を持ってゆけ。M または Back で地図を開ける。\n金の灯が現在地、点線の先が次の目的じゃ。東の遺跡へ向かえ。",
+	},
+]
 var state: Node
 var world: Node2D
 var ui: Control
@@ -11,6 +25,7 @@ var notice: String = "東へ進み、遺跡に消えた灯りを探そう。"
 var dialogue_title: String = ""
 var dialogue_text: String = ""
 var shop_open: bool = false
+var tutorial_step: int = -1
 var closing: bool = false
 
 
@@ -30,6 +45,7 @@ func _ready() -> void:
 	canvas.add_child(ui)
 	ui.setup(self, state)
 	audio.set_track("title")
+	audio.set_region(0)
 	if OS.get_environment("ACTIONADVENTURE_RUN_CAPTURE") == "1":
 		_run_capture.call_deferred()
 
@@ -52,20 +68,31 @@ func _input(event: InputEvent) -> void:
 			state.mode = "menu"
 		elif state.mode == "menu":
 			close_menu()
+		elif state.mode == "map":
+			_close_map()
 		elif state.mode == "dialogue":
-			close_dialogue()
+			if _tutorial_active():
+				_skip_tutorial()
+			else:
+				close_dialogue()
+		get_viewport().set_input_as_handled()
+	if event.is_action_pressed("map") and not world.fatal:
+		if state.mode == "map":
+			_close_map()
+		elif state.mode == "play":
+			_open_map()
 		get_viewport().set_input_as_handled()
 
 
 func start_new() -> void:
 	state.new_game()
-	notice = "東へ進み、遺跡に消えた灯りを探そう。"
+	notice = "長老の石版を読み、島の歩き方を知ろう。"
 	world.enter_room(0, Vector2(280, 384))
-	ui.refresh()
+	_begin_tutorial()
 
 
 func continue_game() -> void:
-	if state.load_game():
+	if state.load_game(_save_path()):
 		world.enter_room(state.room, Vector2(200, 384))
 	else:
 		notice = "保存データを読み込めませんでした。新しい旅を始められます。"
@@ -81,11 +108,75 @@ func retry_game() -> void:
 func to_title() -> void:
 	state.mode = "title"
 	audio.set_track("title")
+	audio.set_region(0)
 	ui.refresh()
 
 
 func close_menu() -> void:
 	state.mode = "play"
+	ui.refresh()
+
+
+func _open_map() -> void:
+	if not state.has_flag("map-owned"):
+		notice = "地図はまだ持っていない。村の長老に話しかけよう。"
+		world.flash_unavailable("地図なし", world.hero.position)
+		ui.refresh()
+		return
+	state.mode = "map"
+	ui.refresh()
+
+
+func _close_map() -> void:
+	state.mode = "play"
+	ui.refresh()
+
+
+func _tutorial_active() -> bool:
+	return tutorial_step >= 0 and tutorial_step < TUTORIAL_PAGES.size()
+
+
+func _begin_tutorial() -> void:
+	tutorial_step = 0
+	_show_tutorial_page()
+
+
+func _next_tutorial() -> void:
+	if not _tutorial_active():
+		return
+	tutorial_step += 1
+	if tutorial_step >= TUTORIAL_PAGES.size():
+		_finish_tutorial(false)
+	else:
+		_show_tutorial_page()
+
+
+func _skip_tutorial() -> void:
+	if _tutorial_active():
+		_finish_tutorial(true)
+
+
+func _finish_tutorial(skipped: bool) -> void:
+	tutorial_step = -1
+	state.set_flag("map-owned")
+	state.mode = "play"
+	shop_open = false
+	notice = (
+		"案内を省いた。M / Back の羊皮紙で、次の目的を確かめられる。"
+		if skipped else
+		"羊皮紙の地図を受け取った。東の遺跡へ向かおう。"
+	)
+	world.effects.burst(world.hero.position, Color("d8c28a"), 22)
+	world.effects.popup(world.hero.position, "羊皮紙の地図")
+	ui.refresh()
+
+
+func _show_tutorial_page() -> void:
+	var page: Dictionary = TUTORIAL_PAGES[tutorial_step]
+	dialogue_title = page.title
+	dialogue_text = page.text
+	shop_open = false
+	state.mode = "dialogue"
 	ui.refresh()
 
 
@@ -104,8 +195,13 @@ func select_tool(tool: String) -> void:
 
 
 func save_progress() -> void:
-	notice = "旅を記録しました。" if state.save_game() else "保存できませんでした。"
+	notice = "旅を記録しました。" if state.save_game(_save_path()) else "保存できませんでした。"
 	close_menu()
+
+
+func _save_path() -> String:
+	var override: String = OS.get_environment("ACTIONADVENTURE_SAVE_PATH")
+	return state.SAVE_PATH if override.is_empty() else override
 
 
 # 購入は取引ごとに所持金と在庫を更新する。

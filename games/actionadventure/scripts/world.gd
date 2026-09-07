@@ -1,3 +1,4 @@
+# gdlint: disable=max-returns
 extends Node2D
 ## 部屋ごとの障害物・戦闘を所有する。報酬と解錠は永続状態の一回性を使う。
 
@@ -9,6 +10,10 @@ const ROOM_NAMES: Array[String] = [
 ]
 const GOLD: Color = Color("f4ce82")
 const MINT: Color = Color("70d7bb")
+const PAPER: Color = Color("f0dfa6")
+const MUTED: Color = Color("c3c88c")
+const WORLD_RECT := Rect2(80, 132, 1120, 504)
+const TILE_SIZE := 56
 var host: Node
 var state: Node
 var hero: Node2D
@@ -34,12 +39,17 @@ var block_pos: Vector2 = Vector2(480, 384)
 var boom_pos: Vector2 = Vector2.ZERO
 var boom_direction: Vector2 = Vector2.RIGHT
 var boom_timer: float = 0.0
+var boom_targets: Array[Node2D] = []
 var bomb_pos: Vector2 = Vector2.ZERO
 var bomb_timer: float = 0.0
 var fatal: bool = false
 var background: Array[Sprite2D] = []
 var ambient: CanvasModulate
 var lantern: PointLight2D
+var hint_font: Font
+var unavailable_label: String = ""
+var unavailable_position: Vector2 = Vector2.ZERO
+var unavailable_time: float = 0.0
 
 
 func setup(main: Node) -> void:
@@ -47,27 +57,29 @@ func setup(main: Node) -> void:
 	state = host.state
 	for name: String in ["chest", "grass", "rock", "block", "switch", "door", "heart", \
 		"coin", "key", "boomerang", "bomb", "potion", "treasure"]:
-		textures[name] = load("res://assets/props/%s.svg" % name)
+		textures[name] = load("res://assets/props/%s.png" % name)
 	for name: String in ["tree", "house", "stall", "crystals", "ruins", "column", "lily", "arch"]:
-		textures[name] = load("res://assets/scenery/%s.svg" % name)
+		textures[name] = load("res://assets/scenery/%s.png" % name)
 	for name: String in ["distant", "middle", "foreground"]:
 		var layer := Sprite2D.new()
-		layer.texture = load("res://assets/backgrounds/%s.svg" % name)
+		layer.texture = load("res://assets/backgrounds/%s.png" % name)
+		layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		layer.centered = false
 		layer.z_index = -5
 		add_child(layer)
 		background.append(layer)
 	tiles = TileMapLayer.new()
 	var atlas := TileSetAtlasSource.new()
-	atlas.texture = load("res://assets/terrain/tiles.svg")
-	atlas.texture_region_size = Vector2i(64, 64)
+	atlas.texture = load("res://assets/terrain/tiles.png")
+	atlas.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
 	for i: int in range(4):
 		atlas.create_tile(Vector2i(i, 0))
 	var tile_set := TileSet.new()
-	tile_set.tile_size = Vector2i(64, 64)
+	tile_set.tile_size = Vector2i(TILE_SIZE, TILE_SIZE)
 	tile_set.add_source(atlas, 0)
 	tiles.tile_set = tile_set
-	tiles.position = Vector2(64, 128)
+	tiles.position = WORLD_RECT.position
+	tiles.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	tiles.z_index = -2
 	add_child(tiles)
 	actors = Node2D.new()
@@ -76,6 +88,7 @@ func setup(main: Node) -> void:
 	hero = Actor.new()
 	hero.setup("hero")
 	actors.add_child(hero)
+	hint_font = load("res://assets/fonts/Stick-Regular.ttf") as Font
 	ambient = CanvasModulate.new()
 	add_child(ambient)
 	var gradient := Gradient.new()
@@ -115,7 +128,7 @@ func objective() -> String:
 func enter_room(index: int, spawn: Vector2, animate: bool = true) -> void:
 	if animate and DisplayServer.get_name() != "headless":
 		var screen: Image = get_viewport().get_texture().get_image()
-		var world_rect := Rect2i(64, 128, 1152, 512)
+		var world_rect := Rect2i(WORLD_RECT)
 		old_image = ImageTexture.create_from_image(screen.get_region(world_rect))
 	transition = 0.38 if animate else 0.0
 	slide_dir = 1.0 if index >= state.room else -1.0
@@ -127,6 +140,7 @@ func enter_room(index: int, spawn: Vector2, animate: bool = true) -> void:
 	invulnerable = 1.0
 	attack_time = 0
 	boom_timer = 0
+	boom_targets.clear()
 	bomb_timer = 0
 	projectiles.clear()
 	pickups.clear()
@@ -146,24 +160,28 @@ func enter_room(index: int, spawn: Vector2, animate: bool = true) -> void:
 	_build_tiles()
 	_build_props()
 	_build_enemies()
+	actors.visible = transition <= 0
 	host.audio.set_track("boss" if index == 11 else ("dungeon" if index >= 6 else "field"))
+	host.audio.set_region(index)
 	queue_redraw()
 
 
 func _build_tiles() -> void:
 	tiles.clear()
-	for x: int in range(18):
-		for y: int in range(8):
+	for x: int in range(20):
+		for y: int in range(9):
 			var tile: int = 2 if state.room >= 6 else 0
-			if y in [3, 4] and state.room < 6:
+			if y in [4, 5] and state.room < 6:
 				tile = 1
 			if state.room == 3 and ((x in range(1, 5) and y < 2)
-				or (x in range(13, 17) and y > 5)):
+				or (x in range(15, 19) and y > 6)):
 				tile = 3
 			tiles.set_cell(Vector2i(x, y), 0, Vector2i(tile, 0))
-	tiles.modulate = Color("c1d3d2") if state.room >= 6 else Color.WHITE
-	if state.room == 4:
-		tiles.modulate = Color("efd3a8")
+	var region_tints: Array[Color] = [
+		Color("d8ca78"), Color("c4a965"), Color("9db65d"), Color("70a59a"),
+		Color("d39a5f"), Color("a7a064"), Color("858976"),
+	]
+	tiles.modulate = region_tints[mini(state.room, 6)]
 
 
 func _prop(kind: String, at: Vector2, id: String = "", reward: String = "") -> void:
@@ -245,6 +263,9 @@ func _build_enemies() -> void:
 func _physics_process(delta: float) -> void:
 	elapsed += delta
 	transition = maxf(0, transition - delta)
+	unavailable_time = maxf(0, unavailable_time - delta)
+	if is_instance_valid(actors):
+		actors.visible = transition <= 0
 	shake = maxf(0, shake - delta)
 	position = Vector2(sin(elapsed * 97), cos(elapsed * 83)) * shake * 15
 	for i: int in range(background.size()):
@@ -330,15 +351,18 @@ func _move_hero(step: Vector2) -> void:
 	for prop: Dictionary in props:
 		if prop.kind == "rock" and next.distance_to(prop.pos) < 44:
 			return
-	hero.position = Vector2(clampf(next.x, 84, 1196), clampf(next.y, 166, 610))
+	hero.position = Vector2(
+		clampf(next.x, WORLD_RECT.position.x + 4, WORLD_RECT.end.x - 4),
+		clampf(next.y, WORLD_RECT.position.y + 34, WORLD_RECT.end.y - 26)
+	)
 	if state.room == 10 and hero.position.distance_to(Vector2(416, 384)) < 38:
 		activate("star")
 
 
 func _check_room_exit() -> void:
-	if hero.position.x > 1188 and state.room != 5 and state.room != 11:
+	if hero.position.x > WORLD_RECT.end.x - 12 and state.room != 5 and state.room != 11:
 		enter_room(state.room + 1, Vector2(120, hero.position.y))
-	elif hero.position.x < 92 and state.room > 0:
+	elif hero.position.x < WORLD_RECT.position.x + 12 and state.room > 0:
 		enter_room(state.room - 1, Vector2(1150, hero.position.y))
 
 
@@ -368,42 +392,129 @@ func sword() -> void:
 
 
 func interact() -> void:
-	for prop: Dictionary in props.duplicate():
+	var prop: Dictionary = nearby_interaction()
+	if prop.is_empty():
+		flash_unavailable("近くに調べるものがない", hero.position)
+		return
+	var details: Dictionary = interaction_details(prop)
+	if not details.available:
+		host.notice = details.detail
+		flash_unavailable(details.title, prop.pos)
+		return
+	match prop.kind:
+		"villager":
+			var text: String = "東の遺跡に島の灯りが眠っている。宝箱は琥珀色に点滅した時に調べるのじゃ。"
+			if prop.id == "scout":
+				text = "剣は向いている方向へ届くよ。点滅する草を切り、岩を調べると琥珀貨が見つかる。"
+			host.talk("灯守の長老" if prop.id == "elder" else "見習いの灯守", text)
+		"merchant":
+			host.talk("旅の道具屋", "選ぶ品の先に起きることを石版へ刻んだ。爆弾3個は10貨、回復薬は15貨。", true)
+		"rock":
+			props.erase(prop)
+			hero.sprite.play("action")
+			effects.burst(prop.pos, GOLD)
+			pickups.append({"kind": "coin", "pos": prop.pos})
+		"chest", "treasure":
+			if prop.id == "powder" and state.opened.has("powder") and state.bombs < 3:
+				state.bombs = 3
+				effects.popup(prop.pos, "爆弾を3個まで補充")
+				host.audio.cue("chest")
+			else:
+				_open_chest(prop)
+		"door":
+			if prop.id == "entrance":
+				enter_room(6, Vector2(200, 384))
+			elif state.unlock_door("iron"):
+				host.audio.cue("door")
+				effects.burst(prop.pos, GOLD)
+	return
+
+
+func nearby_interaction() -> Dictionary:
+	var nearest: Dictionary = {}
+	var nearest_distance: float = INF
+	for prop: Dictionary in props:
 		if prop.kind not in ["villager", "merchant", "rock", "chest", "treasure", "door"]:
 			continue
-		if hero.position.distance_to(prop.pos) > 110:
-			continue
-		match prop.kind:
-			"villager":
-				var text: String = "東の遺跡に島の灯りが眠っている。宝箱は E / A で開けよう。"
-				if prop.id == "scout":
-					text = "剣は向いている方向へ届くよ。草を切り、岩を持ち上げると琥珀貨が見つかる。"
-				host.talk("灯守の長老" if prop.id == "elder" else "見習いの灯守", text)
-			"merchant":
-				host.talk("旅の道具屋", "爆弾 3 個は 10 貨、回復薬は 15 貨。何を用意しよう？", true)
-			"rock":
-				props.erase(prop)
-				hero.sprite.play("action")
-				effects.burst(prop.pos, GOLD)
-				pickups.append({"kind": "coin", "pos": prop.pos})
-			"chest", "treasure":
-				if state.room == 9 and not state.has_flag("weight"):
-					host.notice = "宝箱は沈んでいる。石を床の灯へ押そう。"
-				elif prop.id == "powder" and state.opened.has("powder") and state.bombs < 3:
-					state.bombs = 3
-					effects.popup(prop.pos, "爆弾を3個まで補充")
-					host.audio.cue("chest")
-				else:
-					_open_chest(prop)
-			"door":
-				if prop.id == "entrance":
-					enter_room(6, Vector2(200, 384))
-				elif state.unlock_door("iron"):
-					host.audio.cue("door")
-					effects.burst(prop.pos, GOLD)
-				else:
-					host.notice = "鍵が必要。石を押して宝箱を取り出そう。"
-		return
+		var distance: float = hero.position.distance_to(prop.pos)
+		if distance <= 125 and distance < nearest_distance:
+			nearest = prop
+			nearest_distance = distance
+	return nearest
+
+
+func interaction_details(prop: Dictionary) -> Dictionary:
+	match prop.kind:
+		"villager":
+			return {
+				"available": true,
+				"title": "E / A　話す",
+				"detail": "島の歩き方と、次の目的を聞く",
+			}
+		"merchant":
+			return {
+				"available": true,
+				"title": "E / A　品を見る",
+				"detail": "爆弾と回復薬の効果・価格を見る",
+			}
+		"rock":
+			return {
+				"available": true,
+				"title": "E / A　岩を持ち上げる",
+				"detail": "下に隠れた琥珀貨を取り出す",
+			}
+		"chest", "treasure":
+			if state.room == 9 and not state.has_flag("weight"):
+				return {
+					"available": false,
+					"title": "× 宝箱は沈んでいる",
+					"detail": "石を右の床の灯へ押すと浮かび上がる",
+				}
+			if state.opened.has(prop.id) and not (prop.id == "powder" and state.bombs < 3):
+				return {
+					"available": false,
+					"title": "× 開封済み",
+					"detail": "この宝はすでに受け取った",
+				}
+			var rewards: Dictionary = {
+				"boomerang": "遠いスイッチを押す風の輪を得る",
+				"bombs": "ひび割れ壁を壊す爆弾袋を得る",
+				"key": "東の鉄扉を開く鍵を得る",
+				"heart": "最大ハートが1つ増える",
+				"treasure": "島の灯を受け取り、旅を終える",
+			}
+			return {
+				"available": true,
+				"title": "E / A　宝箱を開く",
+				"detail": "爆弾を3個まで補充" if prop.id == "powder" and state.opened.has("powder") \
+					else rewards.get(prop.reward, "中身を確かめる"),
+			}
+		"door":
+			if prop.id == "entrance":
+				return {
+					"available": true,
+					"title": "E / A　遺跡へ入る",
+					"detail": "風の宝庫へ進み、最初の道具を探す",
+				}
+			if state.unlocked.has("iron"):
+				return {
+					"available": true,
+					"title": "E / A　扉を開く",
+					"detail": "解錠済みの東の部屋へ進む",
+				}
+			return {
+				"available": state.keys > 0,
+				"title": "E / A　鍵で扉を開く" if state.keys > 0 else "× 小さな鍵が必要",
+				"detail": "鍵を1本使い東へ進む" if state.keys > 0 \
+					else "石を床の灯へ押し、浮かぶ宝箱を開ける",
+			}
+	return {"available": false, "title": "× 調べられない", "detail": "別の対象を探す"}
+
+
+func flash_unavailable(label: String, at: Vector2) -> void:
+	unavailable_label = label
+	unavailable_position = at
+	unavailable_time = 1.4
 
 
 func _open_chest(prop: Dictionary) -> void:
@@ -434,6 +545,7 @@ func use_tool() -> void:
 		boom_pos = hero.position
 		boom_direction = facing
 		boom_timer = 0.95
+		boom_targets = enemies.duplicate()
 	elif state.tool == "bomb" and state.bombs_owned and state.bombs > 0 and bomb_timer <= 0:
 		state.bombs -= 1
 		bomb_pos = hero.position + facing * 48
@@ -453,10 +565,16 @@ func _update_tools(delta: float) -> void:
 			* 650 * delta
 		if state.room == 7 and boom_pos.distance_to(Vector2(850, 384)) < 64:
 			activate("wind-bridge")
-		for enemy: Node2D in enemies:
+		# 投擲後に分裂した小敵は、この投擲の対象へ追加しない。
+		for enemy: Node2D in boom_targets.duplicate():
+			if not is_instance_valid(enemy):
+				boom_targets.erase(enemy)
+				continue
 			if enemy.kind not in ["villager", "merchant"] and not enemy.dead \
 				and enemy.hurt_time <= 0 and boom_pos.distance_to(enemy.position) < 60:
 				_hit_enemy(enemy, 1)
+		if boom_timer <= 0:
+			boom_targets.clear()
 	if bomb_timer > 0:
 		bomb_timer -= delta
 		if bomb_timer <= 0:
@@ -473,7 +591,7 @@ func _update_tools(delta: float) -> void:
 
 
 func _update_enemies(delta: float) -> void:
-	for enemy: Node2D in enemies:
+	for enemy: Node2D in enemies.duplicate():
 		if enemy.dead or enemy.kind in ["villager", "merchant"]:
 			continue
 		enemy.timer += delta
@@ -502,7 +620,7 @@ func _update_enemies(delta: float) -> void:
 		enemy.position.x = clampf(enemy.position.x, 150, 1120)
 		enemy.position.y = clampf(enemy.position.y, 200, 580)
 		if hero.position.distance_to(enemy.position) < (70 if enemy.kind == "boss" else 43):
-			_damage_hero(-direction)
+			_damage_hero(direction)
 
 
 func _boss_step(enemy: Node2D, delta: float) -> void:
@@ -606,7 +724,7 @@ func _collect_pickups() -> void:
 func _draw() -> void:
 	if not is_instance_valid(hero):
 		return
-	draw_rect(Rect2(58, 122, 1164, 524), Color("071d2b"), false, 8)
+	draw_rect(WORLD_RECT.grow(6), Color("20251b"), false, 8)
 	_draw_architecture()
 	_draw_scenery()
 	for prop: Dictionary in props:
@@ -639,14 +757,47 @@ func _draw() -> void:
 		draw_arc(hero.position, 90, angle - 1.2, angle + 1.2, 18, GOLD, 9, true)
 		draw_arc(hero.position, 110, angle - 0.9, angle + 0.9, 18, Color(0.5, 1, 0.9, 0.7), 3, true)
 	_draw_enemy_signals()
+	_draw_interaction_hint()
 	if shake > 0.6:
-		draw_rect(Rect2(64, 128, 1152, 512), Color(1, 0.9, 0.5, (shake - 0.6) * 0.45))
+		draw_rect(WORLD_RECT, Color(1, 0.9, 0.5, (shake - 0.6) * 0.45))
 	if transition > 0 and old_image != null:
 		if state.room == 6:
 			draw_rect(Rect2(0, 0, 1280, 720), Color(0.025, 0.05, 0.08, transition / 0.38))
 		else:
-			draw_texture_rect(old_image, Rect2(64 - slide_dir * (1.0 - transition / 0.38) * 1152, 128,
-				1152, 512), false, Color(1, 1, 1, transition / 0.38))
+			draw_texture_rect(old_image, Rect2(
+				WORLD_RECT.position.x - slide_dir * (1.0 - transition / 0.38) * WORLD_RECT.size.x,
+				WORLD_RECT.position.y, WORLD_RECT.size.x, WORLD_RECT.size.y
+			), false, Color(1, 1, 1, transition / 0.38))
+
+
+func _draw_interaction_hint() -> void:
+	if state.mode != "play" or transition > 0 or not is_instance_valid(hint_font):
+		return
+	var target: Dictionary = nearby_interaction()
+	if not target.is_empty():
+		var details: Dictionary = interaction_details(target)
+		var pulse: float = 0.65 + 0.35 * sin(elapsed * 9.0)
+		var color: Color = GOLD if details.available else Color("b9574f")
+		color.a = pulse
+		draw_arc(target.pos, 52, 0, TAU, 20, color, 5, true)
+		draw_line(target.pos + Vector2(0, -52), target.pos + Vector2(0, -72), color, 3)
+		var box_pos: Vector2 = target.pos + Vector2(-158, -126)
+		box_pos.x = clampf(box_pos.x, WORLD_RECT.position.x + 8, WORLD_RECT.end.x - 324)
+		box_pos.y = maxf(box_pos.y, WORLD_RECT.position.y + 10)
+		draw_rect(Rect2(box_pos, Vector2(316, 58)), Color("353d2f"), true)
+		draw_rect(Rect2(box_pos, Vector2(316, 58)), color, false, 3)
+		draw_string(hint_font, box_pos + Vector2(12, 22), details.title,
+			HORIZONTAL_ALIGNMENT_LEFT, 292, 18, PAPER)
+		draw_string(hint_font, box_pos + Vector2(12, 46), details.detail,
+			HORIZONTAL_ALIGNMENT_LEFT, 292, 14, MUTED)
+	if unavailable_time > 0:
+		var at: Vector2 = unavailable_position + Vector2(-100, -86)
+		at.x = clampf(at.x, WORLD_RECT.position.x + 8, WORLD_RECT.end.x - 208)
+		at.y = maxf(at.y, WORLD_RECT.position.y + 8)
+		draw_rect(Rect2(at, Vector2(208, 38)), Color("4d2b2a"), true)
+		draw_rect(Rect2(at, Vector2(208, 38)), Color("b9574f"), false, 3)
+		draw_string(hint_font, at + Vector2(10, 26), unavailable_label,
+			HORIZONTAL_ALIGNMENT_CENTER, 188, 17, PAPER)
 
 
 func _draw_architecture() -> void:

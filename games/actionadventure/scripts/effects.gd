@@ -5,7 +5,7 @@ var font: Font
 
 
 func _ready() -> void:
-	font = load("res://assets/fonts/font.ttf")
+	font = load("res://assets/fonts/Stick-Regular.ttf")
 
 
 # ゲーム内の一回の衝突・獲得に対する視覚効果なので非冪等。

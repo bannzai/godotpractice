@@ -1,6 +1,7 @@
 extends SceneTree
 ## 実入力イベントによる統合検証。各検査の開始位置と所持品は明示した fixture を使う。
 
+const TEST_SAVE_PATH := "res://tmp/integration-menu-save.json"
 var main: Control
 var state: Node
 var world: Node2D
@@ -13,6 +14,8 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	OS.set_environment("ACTIONADVENTURE_SAVE_PATH", TEST_SAVE_PATH)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SAVE_PATH))
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	state = root.get_node("AdventureState")
@@ -20,7 +23,27 @@ func _run() -> void:
 	await _pause(0.1)
 	_check(state.mode == "title", "タイトルから起動")
 	await _key(KEY_ENTER)
-	_check(state.mode == "play", "Enter で冒険開始")
+	_check(state.mode == "dialogue" and main.tutorial_step == 0, "Enter で長老の初回案内を開始")
+	await _button("次の刻み", true)
+	_check(main.tutorial_step == 1 and state.mode == "dialogue", "パッド A で案内の次頁へ進む")
+	await _button("次の刻み", false)
+	_check(main.tutorial_step == 2, "Enter で羊皮紙の説明へ進む")
+	await _button("次の刻み", false)
+	_check(state.mode == "play" and state.has_flag("map-owned"), "案内完了で羊皮紙の地図を入手")
+	await _key(KEY_M)
+	_check(state.mode == "map", "M で羊皮紙の地図を開く")
+	var before: Vector2 = world.hero.position
+	await _key(KEY_D, 0.1)
+	_check(world.hero.position == before, "地図表示中は移動しない")
+	await _key(KEY_M)
+	_check(state.mode == "play", "M で羊皮紙をたたむ")
+	await _pad(JOY_BUTTON_BACK)
+	_check(state.mode == "map", "パッド Back で羊皮紙を開く")
+	await _pad(JOY_BUTTON_START)
+	_check(state.mode == "play", "Start で羊皮紙をたたむ")
+	main.start_new()
+	await _button("案内を省く", true)
+	_check(state.mode == "play" and state.has_flag("map-owned"), "初回案内をパッドで省ける")
 	await _movement_and_menu()
 	await _field_interactions()
 	await _dungeon_gates()
@@ -32,6 +55,8 @@ func _run() -> void:
 	main.queue_free()
 	await process_frame
 	await process_frame
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_SAVE_PATH))
+	OS.set_environment("ACTIONADVENTURE_SAVE_PATH", "")
 	if failures.is_empty():
 		print("integration OK: %d checks" % checks)
 		quit(0)
@@ -109,7 +134,7 @@ func _field_interactions() -> void:
 	await _key(KEY_ESCAPE)
 	state.damage(2)
 	await _key(KEY_TAB)
-	await _button("回復薬を使う", true)
+	await _button("回復薬", true)
 	_check(state.hp == state.max_hp and state.potions == 0, "メニューから薬を消費して回復")
 	for room_index: int in range(6):
 		await _room(room_index, Vector2(1180, 384))
@@ -151,11 +176,11 @@ func _dungeon_gates() -> void:
 	state.coins = 15
 	await _room(1, Vector2(450, 290))
 	await _key(KEY_E)
-	await _button("爆弾 3 個", true)
+	await _button("爆弾3個", true)
 	_check(state.coins == 5 and state.bombs == 7, "店で爆弾を補充")
 	await _key(KEY_ESCAPE)
 	await _key(KEY_TAB)
-	await _button("ブーメラン", true)
+	await _button("風の輪", true)
 	_check(state.tool == "boomerang", "持ち物から風の輪に装備変更")
 	await _key(KEY_TAB)
 	await _button("爆弾", false)
@@ -187,13 +212,14 @@ func _dungeon_gates() -> void:
 	_check(state.hp == health - 1 and world.hero.position.y == 384,
 		"穴でダメージを受け安全な足場へ戻る")
 	await _key(KEY_TAB)
-	await _button("記録する", false)
-	_check(state.has_save() and main.notice == "旅を記録しました。", "持ち物画面から保存")
+	await _button("旅を石版に記録", false)
+	_check(state.has_save(TEST_SAVE_PATH) and main.notice == "旅を記録しました。",
+		"検証専用パスへ持ち物画面から保存")
 	var saved: Dictionary = state.snapshot()
 	await _key(KEY_TAB)
 	await _button("タイトルへ", true)
 	_check(state.mode == "title", "持ち物画面からタイトルへ")
-	await _button("つづきから", false)
+	await _button("刻まれた旅を続ける", false)
 	_check(state.mode == "play" and state.room == saved.room, "タイトルから保存した部屋へ復帰")
 	_check(state.bombs == saved.bombs and state.flags == saved.flags
 		and state.unlocked == saved.unlocked,
@@ -232,13 +258,15 @@ func _enemy_patterns() -> void:
 	await _pause(0.15)
 	_check(world.projectiles.size() == 8, "ボス後半は短い周期で8方向の弾幕")
 	await _room(2, Vector2(750, 390))
+	enemy = world.enemies[0]
 	state.hp = state.max_hp
 	world.invulnerable = 0
-	world.hero.position = world.enemies[0].position - Vector2(30, 0)
+	world.hero.position = enemy.position - Vector2(30, 0)
 	before = world.hero.position
 	await _pause(0.1)
-	_check(state.hp == state.max_hp - 1 and world.hero.position.distance_to(before) > 30,
-		"接触ダメージにノックバックがある")
+	var distance_before: float = before.distance_to(enemy.position)
+	_check(state.hp == state.max_hp - 1 and world.hero.position.distance_to(enemy.position) \
+		> distance_before + 30, "接触ダメージで敵から離れる方向へノックバック")
 	world.hero.position = world.enemies[0].position - Vector2(30, 0)
 	await _pause(0.1)
 	_check(state.hp == state.max_hp - 1 and world.invulnerable > 0, "無敵時間中は連続ダメージを受けない")
@@ -261,8 +289,15 @@ func _combat_and_results() -> void:
 	world.facing = Vector2.RIGHT
 	enemy = world.enemies[0]
 	enemy.hp = 1
-	await _key(KEY_J)
-	_check(enemy.dead and world.enemies.size() == 4, "分裂する敵の撃破で小敵2体が出現")
+	state.boomerang_owned = true
+	state.tool = "boomerang"
+	await _key(KEY_K)
+	await _pause(0.18)
+	var spawned_are_alive: bool = world.enemies.size() == 4
+	for spawned: Node2D in world.enemies.slice(2):
+		spawned_are_alive = spawned_are_alive and not spawned.dead and spawned.hp == 1
+	_check(enemy.dead and spawned_are_alive,
+		"風の輪で分裂敵を倒しても同一フレームの小敵へ二重命中しない")
 	await _room(2, Vector2(750, 390))
 	state.hp = 1
 	world.invulnerable = 0
@@ -282,14 +317,22 @@ func _combat_and_results() -> void:
 	await _key(KEY_E)
 	_check(state.mode == "ending" and state.has_flag("treasure"), "宝を調べて結末へ")
 	await _key(KEY_ENTER)
-	_check(state.mode == "play" and state.room == 0 and state.opened.is_empty(), "結末から新たな旅へ")
+	_check(state.mode == "dialogue" and state.room == 0 and state.opened.is_empty(),
+		"結末から新たな旅の初回案内へ")
+	await _button("案内を省く", false)
 	await _key(KEY_TAB)
 	await _button("タイトルへ", false)
 	await _pad(JOY_BUTTON_A)
-	_check(state.mode == "play", "パッド A でタイトルから開始")
+	_check(state.mode == "dialogue", "パッド A でタイトルから初回案内を開始")
+	await _button("案内を省く", true)
+	_check(state.mode == "play", "パッドで初回案内を省いてプレイへ進む")
 
 
 func _regressions() -> void:
+	world.enter_room(1, Vector2(200, 384), true)
+	_check(not world.actors.visible, "画面切替中は遷移先キャラを隠す")
+	await _pause(0.45)
+	_check(world.actors.visible, "画面切替完了後に遷移先キャラを表示")
 	await _room(2, Vector2(100, 384))
 	state.hp = 1
 	world.invulnerable = 0
@@ -314,13 +357,13 @@ func _regressions() -> void:
 	state.potions = 99
 	state.coins = 25
 	await _key(KEY_E)
-	await _button("爆弾 3 個", false)
+	await _button("爆弾3個", false)
 	_check(state.bombs == 98 and state.coins == 25, "上限を超える爆弾購入は代金を消費せず拒否")
 	await _button("回復薬", true)
 	_check(state.potions == 99 and state.coins == 25, "薬の所持上限で購入代金を消費しない")
 	state.bombs = 96
 	state.potions = 98
-	await _button("爆弾 3 個", true)
+	await _button("爆弾3個", true)
 	_check(state.bombs == 99 and state.coins == 15, "所持上限ちょうどまで爆弾を購入できる")
 	await _button("回復薬", false)
 	_check(state.potions == 99 and state.coins == 0, "所持上限ちょうどまで薬を購入できる")
@@ -353,7 +396,10 @@ func _button(prefix: String, controller: bool) -> void:
 	_check(found != null and not found.disabled, "操作可能なボタン: " + prefix)
 	if found == null or found.disabled:
 		return
+	# 再構築直後の既定ボタンも遅延でフォーカスを要求するため、その後で検査対象へ確定する。
+	await process_frame
 	found.grab_focus()
+	await process_frame
 	if controller:
 		await _pad(JOY_BUTTON_A)
 	else:

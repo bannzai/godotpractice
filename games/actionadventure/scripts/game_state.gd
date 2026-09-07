@@ -2,7 +2,7 @@ extends Node
 ## 探索の進行を保持する。消費型操作は、入力イベントごとの効果を表すため冪等でない。
 
 const SAVE_PATH: String = "user://adventure.json"
-const MODES: Array[String] = ["title", "play", "gameover", "ending", "menu", "dialogue"]
+const MODES: Array[String] = ["title", "play", "gameover", "ending", "menu", "map", "dialogue"]
 const REWARDS: Array[String] = ["boomerang", "bombs", "key", "heart", "coins", "treasure"]
 const INTEGER_LIMITS: Dictionary = {
 	"room": [0, 11], "checkpoint": [0, 11], "hp": [0, 24], "max_hp": [3, 24],
@@ -91,8 +91,8 @@ func load_game(path: String = SAVE_PATH) -> bool:
 	return restore(_read_save(path))
 
 
-func has_save() -> bool:
-	return _valid_snapshot(_read_save(SAVE_PATH))
+func has_save(path: String = SAVE_PATH) -> bool:
+	return _valid_snapshot(_read_save(path))
 
 
 func damage(amount: int) -> bool:

@@ -17,7 +17,7 @@ func setup(character: String) -> void:
 	if is_instance_valid(sprite):
 		return
 	sprite = AnimatedSprite2D.new()
-	var sheet: Texture2D = load("res://assets/characters/%s.svg" % kind)
+	var sheet: Texture2D = load("res://assets/characters/%s.png" % kind)
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	for row: int in range(MOTIONS.size()):
@@ -28,9 +28,10 @@ func setup(character: String) -> void:
 		for col: int in range(4):
 			var atlas := AtlasTexture.new()
 			atlas.atlas = sheet
-			atlas.region = Rect2(col * 96, row * 96, 96, 96)
+			atlas.region = Rect2(col * 56, row * 56, 56, 56)
 			frames.add_frame(motion, atlas)
 	sprite.sprite_frames = frames
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(sprite)
 	sprite.play("idle")
 	if kind == "boss":
