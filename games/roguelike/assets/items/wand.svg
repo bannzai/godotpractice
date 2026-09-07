@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs>
-<linearGradient id="cloth" x2="0.8" y2="1"><stop stop-color="#59a6a4"/><stop offset=".45" stop-color="#245963"/><stop offset="1" stop-color="#112637"/></linearGradient>
-<linearGradient id="gold" x2=".7" y2="1"><stop stop-color="#fff0ac"/><stop offset=".45" stop-color="#d8a454"/><stop offset="1" stop-color="#755333"/></linearGradient>
-<linearGradient id="stone" x2=".8" y2="1"><stop stop-color="#607e82"/><stop offset=".5" stop-color="#304955"/><stop offset="1" stop-color="#142633"/></linearGradient>
-<linearGradient id="bone" x2=".7" y2="1"><stop stop-color="#eee5bd"/><stop offset="1" stop-color="#7c8c86"/></linearGradient>
-<radialGradient id="glow"><stop stop-color="#ffe299" stop-opacity=".7"/><stop offset=".3" stop-color="#c89950" stop-opacity=".2"/><stop offset="1" stop-color="#be8d47" stop-opacity="0"/></radialGradient>
-</defs><ellipse cx="32" cy="56" rx="22" ry="5" fill="#081523" stroke="none" stroke-width="1"/><path d="M15 56L43 20" fill="none" stroke="#96774f" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/><path d="M19 49L39 22" fill="none" stroke="#dcc586" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M34 19L35 7 50 5 56 18 47 29Z" fill="url(#gold)" stroke="#101c28" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M45 9l7 7 -7 7 -7 -7Z" fill="#9febd6" stroke="#183c43" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/></svg>

@@ -105,6 +105,11 @@ map={
 "events":[Object(InputEventKey,"physical_keycode":77),Object(InputEventJoypadButton,"button_index":4)]
 }
 
+help={
+"deadzone":0.5,
+"events":[Object(InputEventKey,"physical_keycode":47),Object(InputEventJoypadButton,"button_index":6)]
+}
+
 fullscreen={
 "deadzone":0.5,
 "events":[Object(InputEventKey,"physical_keycode":4194342)]

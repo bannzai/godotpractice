@@ -85,6 +85,20 @@ for index,(name,bpm,root,tone,motif,drums) in enumerate(tracks):
     save(name,buf)
     print(name,round(length,2),'秒')
 
+# 低い機械唸り、周期の違う水滴、活字端末の短いクリックを一つの環境層にする。
+ambient_rng=random.Random(1205);ambient_length=12;ambient=array.array('f',[0])*int(ambient_length*RATE)
+for i in range(len(ambient)):
+    t=i/RATE
+    hum=(math.sin(TAU*41*t)*.12+math.sin(TAU*57*t+.7)*.07)*(.75+.25*math.sin(TAU*t/7))
+    hiss=ambient_rng.uniform(-1,1)*.014*(.5+.5*math.sin(TAU*t/5)**2)
+    ambient[i]=hum+hiss
+for moment,note in [(1.2,86),(3.8,79),(6.1,91),(9.4,83),(11.1,88)]:
+    add(ambient,instrument(note,.48,'bell',.34),moment)
+for moment in [0.4,2.7,5.2,7.8,10.3]:
+    add(ambient,percussion(.045,'hat',ambient_rng),moment,.22)
+save('ambience',ambient)
+print('ambience',ambient_length,'秒')
+
 rng=random.Random(231)
 for name,notes,tone,dur in [
 ('hit',[43,62],'pluck',.25),('hurt',[54,42],'reed',.4),
