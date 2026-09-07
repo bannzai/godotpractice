@@ -61,10 +61,11 @@ func _menu_input() -> void:
 		{"time": 2.25, "code": KEY_F, "pressed": false},
 		{"time": 2.7, "code": KEY_J, "pressed": true},
 		{"time": 2.75, "code": KEY_J, "pressed": false},
+		# Movie Maker は実時間より速く進むため、実時間350msの長押し判定へ十分な間隔を取る。
 		{"time": 3.0, "code": KEY_F, "pressed": true},
-		{"time": 3.5, "code": KEY_F, "pressed": false},
-		{"time": 4.1, "code": KEY_ENTER, "pressed": true},
-		{"time": 4.15, "code": KEY_ENTER, "pressed": false},
+		{"time": 4.5, "code": KEY_F, "pressed": false},
+		{"time": 5.1, "code": KEY_ENTER, "pressed": true},
+		{"time": 5.15, "code": KEY_ENTER, "pressed": false},
 	]
 	if _menu_step >= events.size() or _elapsed < float(events[_menu_step].time):
 		return
