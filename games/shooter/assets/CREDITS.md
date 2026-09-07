@@ -4,13 +4,21 @@
 
 ## フォント (`assets/fonts/`)
 
-- **素材名**: Noto Sans JP (`NotoSansJP.ttf`, `OFL.txt`)
+- **素材名**: Train One (`TrainOne-Regular.ttf`, `OFL.txt`)
+- **作者**: The Train Project Authors（Copyright 2020）
+- **入手 URL**: https://fonts.google.com/specimen/Train+One
+- **ライセンス**: SIL Open Font License 1.1
+- **クレジット表記**: **必要**
+- **改変**: なし
+- **備考**: 著作権表示とライセンス全文を `fonts/OFL.txt` に保持。Google Fonts の一次配布ファイルを game-asset-search skill で取得した。
+
+- **素材名**: Noto Sans JP（旧画面用・ランタイムでは未使用。`NotoSansJP.ttf`, `NotoSansJP-OFL.txt`）
 - **作者**: Adobe（Copyright 2014–2021）
 - **入手 URL**: https://fonts.google.com/specimen/Noto+Sans+JP
 - **ライセンス**: SIL Open Font License 1.1
 - **クレジット表記**: **必要**
 - **改変**: ファイル名を NotoSansJP[wght].ttf から NotoSansJP.ttf に変更。フォント本体は未改変。
-- **備考**: 著作権表示・Reserved Font Name Source・ライセンス全文を fonts/OFL.txt に保持。フォント単体の販売不可。
+- **備考**: 変更前画像の再現用にファイルを保持し、著作権表示・Reserved Font Name Source・ライセンス全文を `fonts/NotoSansJP-OFL.txt` に分離した。ゲームとエクスポートからは参照しない。
 
 ## 画像 (`assets/sprites/`)
 
