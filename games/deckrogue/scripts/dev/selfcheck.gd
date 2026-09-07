@@ -86,9 +86,12 @@ func _check_asset_directory(path: String, credits: String) -> void:
 # 外部のSVG描画器では正常でもGodotでコマが空白になった不具合を検出する。
 func _check_animation_images() -> void:
 	var directory: DirAccess = DirAccess.open("res://assets/art")
+	var sheet_count: int = 0
 	for filename: String in directory.get_files():
-		if not filename.ends_with("_sheet.svg"):
+		_check(filename.get_extension() != "svg", "版画素材に手続き SVG を残さない: " + filename)
+		if not filename.ends_with("_sheet.png"):
 			continue
+		sheet_count += 1
 		var texture: Texture2D = load("res://assets/art/" + filename)
 		var picture: Image = texture.get_image()
 		_check(picture.get_size() == Vector2i(1536, 1600), filename + " のシート寸法")
@@ -100,6 +103,7 @@ func _check_animation_images() -> void:
 					"%s の動作%d コマ%dに絵がある" % [filename, row, column])
 				distinct_frames[hash(frame.get_data())] = true
 			_check(distinct_frames.size() >= 3, filename + " の各動作に異なるポーズがある")
+	_check(sheet_count == 7, "7キャラクターの PNG アニメーションシート")
 
 
 func _check_catalog() -> void:
