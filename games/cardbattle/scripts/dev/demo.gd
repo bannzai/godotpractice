@@ -1,8 +1,8 @@
 extends SceneTree
-## 通常の新規決闘を実入力だけで操作する26秒の録画。盤面・乱数・ルールは書き換えない。
+## 通常の新規決闘を実入力だけで操作する36秒の録画。盤面・乱数・ルールは書き換えない。
 
 const Catalog = preload("res://scripts/card_catalog.gd")
-const FRAMES: int = 780
+const FRAMES: int = 1080
 
 var main: Control
 var utility_turn: int = -1
@@ -21,7 +21,11 @@ func _run() -> void:
 		await RenderingServer.frame_post_draw
 		if frame == 30:
 			_click("deck0")
-		if frame > 45 and frame < FRAMES - 135 and frame % 9 == 0:
+		if frame == 45:
+			_click("round0")
+		if frame == 60:
+			_click("tutorial_skip")
+		if frame > 75 and frame < FRAMES - 135 and frame % 9 == 0:
 			_step()
 		if main.screen == "duel":
 			for event: Dictionary in main.state.events:
@@ -35,7 +39,7 @@ func _run() -> void:
 		push_error("プレイ録画: 実入力による召喚・攻撃が不足: %s" % seen)
 		quit(1)
 		return
-	print("プレイ録画 OK: 26秒、実入力の召喚・攻撃、到達ターン %d" % main.state.turn)
+	print("プレイ録画 OK: 36秒、実入力の召喚・攻撃、到達ターン %d" % main.state.turn)
 	await main.audio.shutdown()
 	quit(0)
 
@@ -100,7 +104,9 @@ func _select_hand(index: int) -> void:
 	if main.hand_page != int(index / 7.0):
 		_click("nexthand")
 	else:
-		_click("hand%d" % index)
+		var card: Button = main.content.get_node("hand%d" % index)
+		card.grab_focus()
+		_key(KEY_ENTER)
 
 
 func _available(node_name: String) -> bool:

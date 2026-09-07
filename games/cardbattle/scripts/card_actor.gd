@@ -43,7 +43,7 @@ func setup(id: String, display_size: Vector2) -> void:
 	var monster: bool = Catalog.card(id).type == "monster"
 	family = int(id.substr(1)) % 12 if monster else 4
 	handedness = -1.0 if monster and int(id.substr(1)) >= 12 else 1.0
-	body.texture = load("res://assets/art/cards/%s.svg" % id) as Texture2D
+	body.texture = load("res://assets/art/generated/%s.png" % id) as Texture2D
 	body.scale = CANVAS / body.texture.get_size()
 	body.offset = -body.texture.get_size() * 0.5
 	_load_parts()
@@ -127,27 +127,11 @@ func _ensure_nodes() -> void:
 
 
 func _load_parts() -> void:
-	var monster: bool = Catalog.card(card_id).type == "monster"
-	head.visible = monster
-	accent.visible = monster
-	backdrop.visible = monster
-	if not monster:
-		return
-	var directory: String = "res://assets/art/characters/%s/" % card_id
-	body.texture = load(directory + "body.svg") as Texture2D
-	body.scale = Vector2.ONE
-	body.offset = -CANVAS * 0.5
-	head.texture = load(directory + "head.svg") as Texture2D
-	head.position = HEAD_PIVOTS.get(card_id, Vector2(160, 84)) - CANVAS * 0.5
-	head.offset = -CANVAS * 0.5 - head.position
-	accent.texture = load(directory + "accent.svg") as Texture2D
-	accent.position = Vector2(40, 25) if family in [0, 1, 7] else Vector2(0, 8)
-	accent.offset = -CANVAS * 0.5 - accent.position
-	var behind: bool = card_id in [
-		"m02", "m03", "m05", "m08", "m10", "m15", "m17", "m20", "m22",
-	]
-	rig.move_child(accent, 0 if behind else rig.get_child_count() - 1)
-	backdrop.texture = load(directory + "background.svg") as Texture2D
+	# 画像生成した完成原画を一枚のセルとして動かし、前ラウンドの5動作を維持する。
+	# 部位別SVGは過去の素材比較と既存データ互換のため残すが、表示には重ねない。
+	head.visible = false
+	accent.visible = false
+	backdrop.visible = false
 
 
 func _build_animations() -> void:

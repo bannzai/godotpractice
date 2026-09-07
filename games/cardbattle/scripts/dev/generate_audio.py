@@ -197,6 +197,30 @@ def effects() -> None:
         write(name, buffer, .78)
 
 
+def ambience() -> None:
+    """暖炉、紙、振り子を模した12秒の継ぎ目のない室内環境音を作る。"""
+    duration = 12.0
+    buffer = empty(duration)
+    room = array("f")
+    for index in range(round(duration * RATE)):
+        time = index / RATE
+        value = (.30 * math.sin(TAU * 55 * time)
+                 + .10 * math.sin(TAU * 110 * time)
+                 + .06 * math.sin(TAU * 220 * time))
+        room.append(value)
+    mix(buffer, room, 0, .09)
+    for index, moment in enumerate((.7, 2.2, 3.8, 5.1, 6.9, 8.4, 10.1, 11.2)):
+        crackle = sweep(.18, 520, 1700, 810 + index, True)
+        mix(buffer, crackle, moment, .055, -.65 + (index % 4) * .43)
+    for index, moment in enumerate((1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5)):
+        tick = voice("pluck", 84 if index % 2 == 0 else 79, .12)
+        mix(buffer, tick, moment, .035, -.22 if index % 2 == 0 else .22)
+    for index, moment in enumerate((4.0, 9.6)):
+        rustle = sweep(.55, 900, 160, 1200 + index, False)
+        mix(buffer, rustle, moment, .045, -.45 if index == 0 else .45)
+    write("ambience", buffer, .46)
+
+
 def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     music("title", 84,
@@ -215,6 +239,7 @@ def main() -> None:
           ((45, 48, 52), (41, 45, 48), (43, 47, 50), (45, 48, 52)),
           ((69, -1, 64, -1), (65, -1, 60, -1), (62, -1, 59, -1), (57, -1, -1, -1)), 4)
     effects()
+    ambience()
 
 
 if __name__ == "__main__":

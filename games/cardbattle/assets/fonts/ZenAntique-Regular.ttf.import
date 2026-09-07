@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://bpw7cwm3v4e6y"
-path="res://.godot/imported/NotoSansJP.ttf-2659246e986fc2d136c17e42de851678.fontdata"
+uid="uid://dhvlpstc3j8qw"
+path="res://.godot/imported/ZenAntique-Regular.ttf-b9e3716a02e2a3c38427bc54bea56e4e.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/NotoSansJP.ttf"
-dest_files=["res://.godot/imported/NotoSansJP.ttf-2659246e986fc2d136c17e42de851678.fontdata"]
+source_file="res://assets/fonts/ZenAntique-Regular.ttf"
+dest_files=["res://.godot/imported/ZenAntique-Regular.ttf-b9e3716a02e2a3c38427bc54bea56e4e.fontdata"]
 
 [params]
 

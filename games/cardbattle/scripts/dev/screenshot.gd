@@ -39,15 +39,46 @@ func _opening() -> bool:
 	if not await _capture("help"):
 		return false
 	main.content.get_node("closehelp").pressed.emit()
+	return await _open_tournament_scene()
+
+
+func _open_tournament_scene() -> bool:
 	main.content.get_node("deck0").grab_focus()
 	await _key(KEY_ENTER)
-	if not _check(main.screen == "duel", "Enterでタイトルから決闘に進める"):
+	if not _check(main.screen == "tournament", "Enterで招待状からトーナメント表に進める"):
 		return false
 	await create_timer(0.5).timeout
-	if not await _capture("opening"):
+	if not await _capture("tournament"):
+		return false
+	main.content.get_node("round0").grab_focus()
+	await _key(KEY_ENTER)
+	return await _tutorial_scenes()
+
+
+func _tutorial_scenes() -> bool:
+	if not _check(main.screen == "duel" and main.show_tutorial, "初戦で指南が開く"):
+		return false
+	await create_timer(0.55).timeout
+	if not await _capture("tutorial-phase"):
 		return false
 	await _key(KEY_N)
-	await create_timer(0.6).timeout
+	if not await _settle():
+		return false
+	return await _tutorial_card_steps()
+
+
+func _tutorial_card_steps() -> bool:
+	main.content.get_node("tutorial_next").pressed.emit()
+	if not await _capture("tutorial-cards"):
+		return false
+	main.content.get_node("tutorial_next").pressed.emit()
+	if not await _capture("tutorial-battle"):
+		return false
+	main.content.get_node("tutorial_skip").pressed.emit()
+	if not _check(main.tutorial_seen and not main.show_tutorial, "指南を途中でも閉じられる"):
+		return false
+	if not await _capture("opening"):
+		return false
 	return _check(main.state.phase == "main", "Nでドローしてメインへ進める")
 
 
@@ -57,6 +88,12 @@ func _battle() -> bool:
 	main.state.advance_phase()
 	main.state.players[0].hand = ["m00", "m08", "boost", "draw", "snare", "destroy", "m09"]
 	main._render()
+	if not await _capture("availability"):
+		return false
+	return await _summon_scene()
+
+
+func _summon_scene() -> bool:
 	main.content.get_node("hand0").grab_focus()
 	await _pad(JOY_BUTTON_A)
 	if not _check(main.selected_zone == "hand", "ゲームパッドAで手札を選べる"):
@@ -86,6 +123,8 @@ func _attack_scene() -> bool:
 	if not _check(main.state.phase == "battle", "ゲームパッドYでバトルに進める"):
 		return false
 	main.content.get_node("monster0_1").pressed.emit()
+	if not await _capture("battle-preview"):
+		return false
 	main.content.get_node("monster1_0").pressed.emit()
 	var retained: Node = main.content.get_node("monster1_0")
 	await _key(KEY_ESCAPE)
@@ -114,14 +153,22 @@ func _results() -> bool:
 		return false
 	if not await _capture("victory"):
 		return false
-	return await _replay_scene()
-
-
-func _replay_scene() -> bool:
-	main.content.get_node("retry").grab_focus()
-	await _pad(JOY_BUTTON_A)
-	if not _check(main.screen == "duel" and main.state.winner == -1, "パッドAで再戦できる"):
+	main.content.get_node("continue").pressed.emit()
+	if not _check(
+		main.screen == "tournament"
+		and main.tournament_round == 1
+		and not main.content.get_node("round1").disabled,
+		"勝利後に次の対戦札が開く"
+	):
 		return false
+	await create_timer(0.55).timeout
+	if not await _capture("tournament-unlocked"):
+		return false
+	main.content.get_node("round1").pressed.emit()
+	return await _defeat_and_replay()
+
+
+func _defeat_and_replay() -> bool:
 	main.state.players[0].deck.clear()
 	main._next_phase()
 	if not await _settle():
@@ -130,6 +177,18 @@ func _replay_scene() -> bool:
 	if not _check(main.screen == "result" and main.state.winner == 1, "ドロー不能で敗北結果へ進む"):
 		return false
 	if not await _capture("defeat"):
+		return false
+	return await _replay_after_defeat()
+
+
+func _replay_after_defeat() -> bool:
+	main.content.get_node("retry").grab_focus()
+	await _pad(JOY_BUTTON_A)
+	if not _check(main.screen == "duel" and main.state.winner == -1, "パッドAで再戦できる"):
+		return false
+	main.state.players[0].deck.clear()
+	main._next_phase()
+	if not await _settle():
 		return false
 	main.content.get_node("title").pressed.emit()
 	if not _check(main.screen == "title", "結果からタイトルへ戻る"):
@@ -178,7 +237,10 @@ func _check(condition: bool, label: String) -> bool:
 
 
 func _capture(label: String) -> bool:
+	# 直前の _render で解放予約した旧 Control が描画サーバーから外れるまで2フレーム待つ。
 	await process_frame
+	await process_frame
+	await create_timer(0.12).timeout
 	await RenderingServer.frame_post_draw
 	var path: String = "res://tmp/screenshot-%s.png" % label
 	var status: Error = root.get_texture().get_image().save_png(path)

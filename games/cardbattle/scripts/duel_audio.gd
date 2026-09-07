@@ -19,13 +19,16 @@ const EFFECTS: Dictionary = {
 	"trap": preload("res://assets/audio/trap.wav"),
 	"transition": preload("res://assets/audio/transition.wav"),
 }
+const AMBIENCE = preload("res://assets/audio/ambience.wav")
 const RELEASE_FRAMES: int = 16
 const MUSIC_VOLUME_DB: float = -11.0
+const AMBIENCE_VOLUME_DB: float = -27.0
 
 var stopped: bool = false
 var scene: String = ""
 var music_players: Array[AudioStreamPlayer] = []
 var effect_players: Array[AudioStreamPlayer] = []
+var ambience_player: AudioStreamPlayer
 var active_music: int = 0
 var fade: Tween
 var has_played: bool = false
@@ -49,6 +52,17 @@ func _ready() -> void:
 		player.volume_db = -8.0
 		add_child(player)
 		effect_players.append(player)
+	ambience_player = AudioStreamPlayer.new()
+	ambience_player.volume_db = AMBIENCE_VOLUME_DB
+	var ambience_stream: AudioStreamWAV = AMBIENCE.duplicate()
+	ambience_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	ambience_stream.loop_begin = 0
+	ambience_stream.loop_end = roundi(ambience_stream.get_length() * ambience_stream.mix_rate)
+	ambience_player.stream = ambience_stream
+	add_child(ambience_player)
+	if not stopped:
+		ambience_player.play()
+		has_played = true
 
 
 func _exit_tree() -> void:
@@ -101,6 +115,9 @@ func stop_audio() -> void:
 	for player: AudioStreamPlayer in music_players + effect_players:
 		player.stop()
 		player.stream = null
+	if is_instance_valid(ambience_player):
+		ambience_player.stop()
+		ambience_player.stream = null
 	set_process(false)
 
 
