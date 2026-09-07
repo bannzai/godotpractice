@@ -24,6 +24,7 @@ var _room_label: Label
 var _objective_label: Label
 var _notice_label: Label
 var _tool_label: Label
+var _dialogue_title_label: Label
 var _dialogue_label: Label
 var _tool_buttons: Dictionary = {}
 var _tool_preview_label: Label
@@ -55,6 +56,7 @@ func refresh() -> void:
 	if _mode == "menu":
 		_refresh_tools()
 	if _mode == "dialogue" and is_instance_valid(_dialogue_label):
+		_dialogue_title_label.text = _host.dialogue_title
 		_dialogue_label.text = _host.dialogue_text
 
 
@@ -337,7 +339,7 @@ func _show_tool_preview(kind: String) -> void:
 
 func _dialogue() -> void:
 	_panel(Rect2(132, 404, 1016, 264), Color("353d2f"), STONE_LIGHT)
-	_label(_host.dialogue_title, Rect2(174, 426, 900, 36), 26, GOLD)
+	_dialogue_title_label = _label(_host.dialogue_title, Rect2(174, 426, 900, 36), 26, GOLD)
 	_dialogue_label = _label(_host.dialogue_text, Rect2(174, 474, 916, 80), 21, PAPER)
 	_dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if _host.shop_open:
