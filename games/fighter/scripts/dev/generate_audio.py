@@ -214,6 +214,42 @@ def result_music():
     write_audio("result.wav", score.samples)
 
 
+def crowd_ambience():
+    """固定乱数の歓声・手拍子・笛を重ねた、アーケード会場の環境音を作る。"""
+    duration = 12.0
+    samples = [0.0] * round(duration * RATE)
+    noise = random.Random(1992)
+    low = 0.0
+    previous = 0.0
+    for index in range(len(samples)):
+        t = index / RATE
+        raw = noise.uniform(-1, 1)
+        low += (raw - low) * 0.018
+        band = raw - previous
+        previous = raw
+        swell = 0.15 + 0.06 * math.sin(TAU * t / 4.7) + 0.035 * math.sin(TAU * t / 1.9)
+        samples[index] = (low * 2.1 + band * 0.09) * swell
+
+    # 離れた観客の声、手拍子、ホイッスルを決定的な位置へ散らす。
+    for event in range(28):
+        start = (event * 0.419 + (event % 5) * 0.113) % duration
+        length = 0.17 + (event % 4) * 0.035
+        frequency = 185 + (event % 7) * 29
+        for index in range(round(length * RATE)):
+            t = index / RATE
+            envelope = math.sin(math.pi * t / length) ** 1.8
+            voice = math.sin(TAU * (frequency * t + 42 * t * t))
+            target = (round(start * RATE) + index) % len(samples)
+            samples[target] += voice * envelope * 0.055
+    for start in (1.1, 3.75, 6.3, 8.95, 10.8):
+        for offset in (0.0, 0.12):
+            pulse = drum("clap", 920 + round(start * 10) + round(offset * 100))
+            begin = round((start + offset) * RATE)
+            for index, value in enumerate(pulse):
+                samples[(begin + index) % len(samples)] += value * 0.07
+    write_audio("crowd.wav", samples)
+
+
 def effects():
     """衝撃・金属共鳴・空気の流れに、決定音と KO の低い余韻を加える。"""
     noise = random.Random(731)
@@ -256,7 +292,8 @@ def main():
     arena_music()
     final_music()
     result_music()
-    print("fighter audio OK: 独自制作 BGM 4 曲・効果音 5 種")
+    crowd_ambience()
+    print("fighter audio OK: 独自制作 BGM 4 曲・環境音 1 種・効果音 5 種")
 
 
 if __name__ == "__main__":

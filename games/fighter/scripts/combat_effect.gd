@@ -10,7 +10,7 @@ var strength: float = 1.0
 func _ready() -> void:
 	z_index = 30
 	var particles: CPUParticles2D = CPUParticles2D.new()
-	particles.texture = preload("res://assets/effects/spark.svg")
+	particles.texture = preload("res://assets/effects/spark.png")
 	particles.amount = 12 if blocked else 22
 	particles.lifetime = 0.42
 	particles.one_shot = true
@@ -31,8 +31,8 @@ func _ready() -> void:
 	add_child(particles)
 	particles.emitting = true
 	var burst: Sprite2D = Sprite2D.new()
-	burst.texture = preload("res://assets/effects/guard.svg") if blocked else \
-		preload("res://assets/effects/impact.svg")
+	burst.texture = preload("res://assets/effects/guard.png") if blocked else \
+		preload("res://assets/effects/impact.png")
 	burst.modulate = tint
 	burst.scale = Vector2.ONE * 0.16
 	add_child(burst)

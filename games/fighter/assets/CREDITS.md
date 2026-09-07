@@ -1,63 +1,56 @@
 # 素材クレジット
 
-外部素材 (画像・音声・フォント) を `assets/` に追加する時に記録する。記録の項目とルールは `.claude/rules/coding-rules-assets-license.md` (propagate-coding-rules skill で castle から配布) を参照。
+このゲームで使う外部素材と独自生成物を記録する。外部素材はすべて public リポジトリへの同梱と改変が可能な CC0 または OFL-1.1 である。確認日: 2026-09-07。
 
-## 画像 (`assets/`)
+## CC0 キャラクター: Brawler Asset Character 'Vigilante' SMS
 
-- **素材名**: 燈環闘技の背景・紋章・装甲闘士 (`stage.svg`, `emblem.svg`, `portrait-teal.svg`, `portrait-amber.svg`)
+- **作者**: Chasersgaming
+- **入手 URL**: https://opengameart.org/content/brawler-asset-character-vigilante-sms
+- **ライセンス**: CC0 1.0 / Public Domain。クレジット表記は不要。
+- **同梱した原素材**: `Renegade_Idle_1_strip4.png`, `Renegade_Walk_1_strip4.png`, `Renegade_Run_1_strip4.png`, `Renegade_Daze_strip4.png`, `Renegade_Punch_1.png`, `Renegade_Punch_2.png`, `Renegade_Kick_1.png`, `Renegade_Kick_2.png`, `Renegade_Hurt.png`, `Renegade_Knock_Out.png`
+- **改変**: `generate_pixel_assets.py` で原寸の画素を nearest-neighbor 拡大し、青と橙をシアン系へ色替えした。既存フレームの組み合わせ・位置ずらし・回転・縦つぶしで、蒼電の22動作×8フレームと `portrait-teal.png` を作った。
+
+## CC0 キャラクター: RPG Asset Character 'Soldier' SMS
+
+- **作者**: Chasersgaming
+- **入手 URL**: https://opengameart.org/content/rpg-asset-character-soldier-sms
+- **ライセンス**: CC0 1.0 / Public Domain。クレジット表記は不要。
+- **同梱した原素材**: `SMS_Soldier_IDLE_EAST_strip4.png`, `SMS_Soldier_WALK_EAST_strip4.png`, `SMS_Soldier_RUN_EAST_strip4.png`, `SMS_Soldier_ATTACKPUNCH_EAST.png`, `SMS_Soldier_ATTACKKICK_EAST.png`, `SMS_Soldier_HITHURT_EAST.png`, `SMS_Soldier_JUMP_EAST.png`, `SMS_Soldier_AVATAR_ANGRY.png`
+- **改変**: `generate_pixel_assets.py` で原寸の画素を nearest-neighbor 拡大し、黄緑を橙・深紅へ色替えした。既存フレームの組み合わせ・位置ずらし・回転・縦つぶしで、紅蓮の22動作×8フレームと `portrait-amber.png` を作った。
+
+## CC0 背景: Brawler Asset Tile Set 'Market Street' SMS
+
+- **作者**: Chasersgaming
+- **入手 URL**: https://opengameart.org/content/brawler-asset-tile-set-market-street-sms
+- **ライセンス**: CC0 1.0 / Public Domain。クレジット表記は不要。
+- **同梱した原素材**: `SMS_C_Street_16x16_128_x128.png`, `SMS_Sprites.png`
+- **改変**: `generate_pixel_assets.py` で nearest-neighbor 拡大・左右反転・会場別の色調補正を行い、付属の街頭小物と独自作画の観客・床・照明・看板を合成して `tokyo.png`, `seoul.png`, `rio.png` を作った。
+
+## フォント: Dela Gothic One
+
+- **作者**: The Dela Gothic Project Authors
+- **入手 URL**: https://github.com/google/fonts/tree/main/ofl/delagothicone
+- **ライセンス**: SIL Open Font License 1.1。著作権表示とライセンス全文の同梱が必要。
+- **同梱ファイル**: `DelaGothicOne-Regular.ttf`, `OFL.txt`
+- **改変**: フォントファイルは無改変。ゲーム内の文字描画と `title-logo.png`・会場画像内の見出し生成に使用した。Copyright 2020 The Dela Gothic Project Authors (https://github.com/syakuzen/DelaGothic)。
+
+## CC0 素材から生成したドット絵と独自 UI
+
+- **生成手段**: Pillow を使う `scripts/dev/generate_pixel_assets.py`。同じ入力から同じ PNG を生成し、内容が同じファイルは書き直さない。
+- **生成物**: `teal-sheet.png`, `amber-sheet.png`, `teal-frames.tres`, `amber-frames.tres`, `portrait-teal.png`, `portrait-amber.png`, `tokyo.png`, `seoul.png`, `rio.png`, `world-map.png`, `title-logo.png`, `emblem.png`, `health-frame.png`, `round-medal.png`, `spark.png`, `impact.png`, `guard.png`, `wave-teal.png`, `wave-amber.png`
+- **生成内容**: CC0 のキャラクターと街を90年代アーケード格闘風に色替え・再構成し、世界地図、飛行機経路用の背景、筐体風 HUD、四角い光線・打撃・防御エフェクトを画素単位で独自作画した。既存作品の名称・画像・音・ロゴは使っていない。
+- **補助素材**: `fighter-flash.gdshader`, `vignette.gdshader`, `fighter-theme.tres` は本プロジェクト用に独自実装した。スキャンライン、被弾明滅、筐体風の配色・ボタンを構成する。
+
+## 独自生成音声
+
+- **素材名**: `hit.wav`, `guard.wav`, `special.wav`, `confirm.wav`, `ko.wav`, `title.wav`, `arena.wav`, `final.wav`, `result.wav`, `crowd.wav`
 - **作者**: 本プロジェクトで Codex を用いて独自制作
-- **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/assets
-- **ライセンス**: 独自制作素材（外部素材の流用なし）
-- **クレジット表記**: **不要**
-- **改変**: なし
-- **備考**: 画像生成サービスは使用せず、SVG の図形とパスを独自に記述。生成物であることを理由に CC0 とはしていない。
-- **生成**: Codex による SVG ソース作成 / プロンプトの要点: 夕暮れの工業都市、円形闘技場、青緑と橙の装甲闘士。既存作品の名称・画像・ロゴを使わず、幾何図形から作画。
+- **生成手段**: Python 標準ライブラリだけを使う `scripts/dev/generate_audio.py`。固定乱数ノイズ、正弦波、倍音、FM、非整数倍の共鳴を合成し、同じ PCM を再生成する。第三者の録音・楽曲・音色サンプルは使っていない。
+- **生成内容**: タイトル96 BPM、対戦128 BPM、最終ラウンド160 BPM、結果112 BPMの4曲、打撃・防御・必殺技・決定・KOの5効果音、遠い声・手拍子・笛を重ねた会場環境音を生成した。
+- **ライセンス**: 独自制作素材。外部素材の流用なし。クレジット表記は不要。
 
-## 音声 (`assets/audio/`)
+## 独自制作物の扱い
 
-- **素材名**: 燈環闘技の打撃音・防御音・特殊攻撃音・競技場曲 (`hit.wav`, `guard.wav`, `special.wav`, `arena.wav`, `title.wav`, `final.wav`, `result.wav`, `confirm.wav`, `ko.wav`)
-- **作者**: 本プロジェクトで Codex を用いて独自制作
-- **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/scripts/dev/generate_audio.py
-- **ライセンス**: 独自制作素材（外部素材の流用なし）
-- **クレジット表記**: **不要**
-- **改変**: なし
-- **備考**: scripts/dev/generate_audio.py で同一データに再生成可能。第三者の録音、楽曲、音色サンプルは使用していない。
-- **生成**: Python 標準ライブラリによる数学的音声合成 / プロンプトの要点: 固定乱数ノイズのドラム、倍音・FM・非整数倍の共鳴による独自のベース・ブラス・ベル・パッドを合成。タイトル96 BPM、対戦128 BPM、最終ラウンド160 BPM、結果112 BPMで音色・旋律・ドラムパターンを分けた。
-
-## フォント (`assets/fonts/`)
-
-- **素材名**: Noto Sans JP (`font.ttf`, `OFL.txt`)
-- **作者**: Adobe、Google、Noto プロジェクト
-- **入手 URL**: https://fonts.google.com/specimen/Noto+Sans+JP
-- **ライセンス**: OFL-1.1
-- **クレジット表記**: **必要**
-- **改変**: NotoSansJP[wght].ttf を font.ttf にファイル名変更。フォントデータは変更なし。
-- **備考**: Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name Source。同梱する fonts/OFL.txt に取得元の著作権表示と SIL Open Font License 1.1 全文を保持。取得元: https://github.com/google/fonts/tree/main/ofl/notosansjp。フォント単体では販売しない。
-
-## 独自制作素材の生成条件
-
-SVG と音声合成スクリプトは Codex が本プロジェクト用に生成したもの。OpenAI 利用規約の Content / Ownership of content は、適用法で許される範囲で、利用者と OpenAI の間では出力を利用者が所有すると定める。第三者素材への権利を与えるものではなく、本素材は第三者の図案・録音を取り込んでいない。CC0 などの追加ライセンスはここでは付与していない。
-
-確認日: 2026-09-06
+独自 UI、シェーダ、音声合成スクリプトは Codex が本プロジェクト用に生成した。OpenAI 利用規約の Content / Ownership of content は、適用法で許される範囲で、利用者と OpenAI の間では出力を利用者が所有すると定める。第三者素材への権利を与えるものではなく、本素材は上記 CC0・OFL 素材以外の第三者素材を取り込んでいない。CC0 などの追加ライセンスは付与していない。
 
 https://openai.com/policies/terms-of-use/
-
-## 第2ラウンドの舞台・UI・演出 (`assets/stage/`, `assets/ui/`, `assets/effects/`)
-
-- **素材名**: 多層の黄昏闘技場 (`sky.svg`, `city.svg`, `arena.svg`, `haze.svg`)、打撃と防御と飛び道具 (`spark.svg`, `impact.svg`, `guard.svg`, `wave-teal.svg`, `wave-amber.svg`)、ロゴとHUD (`title-logo.svg`, `health-frame.svg`, `round-medal.svg`, `fighter-theme.tres`)、画面周縁の陰影 (`vignette.gdshader`)
-- **作者**: 本プロジェクトでCodexを用いて独自制作
-- **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/scripts/dev/generate_stage.py
-- **ライセンス**: 独自制作素材。ロゴの文字輪郭は同梱Noto Sans JP（OFL-1.1）に由来する図版。フォントの利用条件と全文は上記フォント欄を参照。
-- **クレジット表記**: 独自図案は不要。フォントの著作権表示とOFL全文は配布物へ同梱。
-- **改変**: 同梱フォントの文字をfontToolsでSVGの輪郭に変換。フォントファイルは変更なし。
-- **生成**: CodexによるSVG/Python/GDScript/シェーダのソース作成。青緑・琥珀・濃紺の独自の都市闘技場、発光粒子、キャラごとに形が異なる燈波。画像生成サービスや第三者の図案は使用せず、同じスクリプトから同一SVGを再生成できる。
-
-## 第2ラウンドの闘士 (`assets/characters/`)
-
-- **素材名**: 蒼と燈の独立スプライトシートとアニメーション定義 (`teal-sheet.svg`, `amber-sheet.svg`, `teal-frames.tres`, `amber-frames.tres`)、被弾の明滅 (`fighter-flash.gdshader`)、上記の `portrait-teal.svg`, `portrait-amber.svg` の改訂
-- **作者**: 本プロジェクトでCodexを用いて独自制作
-- **入手 URL**: https://github.com/bannzai/godotpractice/tree/main/games/fighter/scripts/dev/generate_characters.py
-- **ライセンス**: 独自制作素材（外部素材の流用なし）。上記の独自制作素材の生成条件に従う。
-- **クレジット表記**: 不要
-- **改変**: 第1ラウンドの共通デザインを、顔・服装・体格・装備の異なる2人へ描き直した。
-- **生成**: PythonによるSVG作画。蒼のスカーフと軽装、燈の大型籠手・肩鎧を別のパスで描く。キャラごとに22動作×8フレームを出力。原作の図案・画像・ロゴは使用していない。
