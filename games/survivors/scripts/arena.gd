@@ -29,13 +29,6 @@ func setup(run: Node, art: Dictionary, face: Font) -> void:
 	effects_layer = Effects.new()
 	effects_layer.face = face
 	add_child(effects_layer)
-	var atmosphere := ColorRect.new()
-	atmosphere.size = Vector2(1280, 720)
-	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var shader := ShaderMaterial.new()
-	shader.shader = load("res://shaders/forest_atmosphere.gdshader")
-	atmosphere.material = shader
-	add_child(atmosphere)
 	state.effect_requested.connect(_effect)
 	state.sound_requested.connect(_sound)
 
@@ -140,39 +133,90 @@ func _sound(cue: String) -> void:
 func _draw() -> void:
 	if state == null:
 		return
-	draw_rect(Rect2(-20, -20, 1320, 760), Color("102c36"))
-	var offset: Vector2 = state.player_pos if state.phase != "title" else Vector2(time * 5, 0)
-	var tile := Vector2(fposmod(-offset.x, 256.0), fposmod(-offset.y, 256.0))
-	for y: int in range(-1, 4):
-		for x: int in range(-1, 6):
-			draw_texture_rect(
-				textures.floor, Rect2(tile + Vector2(x, y) * 256, Vector2(256, 256)), false
-			)
-	_layer("forest-far", offset * 0.12, Color(1, 1, 1, 0.72))
-	_layer("mist", offset * 0.25 + Vector2(time * 5, 0), Color(1, 1, 1, 0.24))
+	var offset: Vector2 = (
+		state.player_pos if state.phase != "title" else Vector2(time * 18.0, time * 8.0)
+	)
+	_draw_synthwave_world(offset)
 	if state.phase != "title":
-		draw_rect(
-			Rect2(screen(Vector2.ONE * -Rules.WORLD_LIMIT), Vector2.ONE * Rules.WORLD_LIMIT * 2),
-			Color("63846c"),
-			false,
-			3
-		)
 		_draw_objects()
-	_layer("forest-near", offset * 0.42, Color(1, 1, 1, 0.52))
-	for i: int in range(36):
-		var point := Vector2(
-			fposmod(i * 173 + sin(time + i) * 16 - offset.x * 0.35, 1280),
-			fposmod(i * 89 + time * 5 - offset.y * 0.35, 720)
-		)
-		draw_circle(point, 1.8, Color(0.9, 1.0, 0.7, 0.26 + sin(i + time) * 0.2))
+	_draw_tracking_noise(offset)
 
 
-func _layer(key: String, offset: Vector2, tint: Color) -> void:
-	var x: float = fposmod(-offset.x, 1280.0)
-	for index: int in range(-1, 1):
-		draw_texture_rect(
-			textures[key], Rect2(x + index * 1280, -offset.y * 0.08, 1280, 760), false, tint
+func _draw_synthwave_world(offset: Vector2) -> void:
+	var progress: float = (
+		fposmod(time / 45.0, 1.0)
+		if state.phase == "title"
+		else clampf(state.elapsed / Rules.DURATION, 0.0, 1.0)
+	)
+	var horizon_y: float = 248.0 - progress * 28.0
+	var sky_top := Color("08051f").lerp(Color("021f31"), progress)
+	var sky_horizon := Color("72136f").lerp(Color("087f83"), progress)
+	for band: int in range(18):
+		var fraction: float = float(band) / 17.0
+		var band_y: float = horizon_y * fraction
+		draw_rect(
+			Rect2(0, band_y, 1280, horizon_y / 17.0 + 1.0),
+			sky_top.lerp(sky_horizon, pow(fraction, 1.3))
 		)
+	var ground_top := Color("16062b").lerp(Color("031d2c"), progress)
+	var ground_bottom := Color("05030f").lerp(Color("050b17"), progress)
+	for band: int in range(18):
+		var fraction: float = float(band) / 17.0
+		var band_y: float = horizon_y + (720.0 - horizon_y) * fraction
+		draw_rect(
+			Rect2(0, band_y, 1280, (720.0 - horizon_y) / 17.0 + 1.0),
+			ground_top.lerp(ground_bottom, fraction)
+		)
+	_draw_striped_sun(progress, horizon_y)
+	_draw_infinite_grid(offset, horizon_y, progress)
+
+
+func _draw_striped_sun(progress: float, horizon_y: float) -> void:
+	var center := Vector2(1000.0 - progress * 110.0, horizon_y - 18.0 - progress * 42.0)
+	var radius: float = 86.0 + progress * 18.0
+	var sun_color := Color("ff3cae").lerp(Color("ffbd57"), progress)
+	for stripe: int in range(-6, 7):
+		var local_y: float = float(stripe) * 13.0
+		if absf(local_y) >= radius:
+			continue
+		var half_width: float = sqrt(radius * radius - local_y * local_y)
+		draw_line(
+			center + Vector2(-half_width, local_y),
+			center + Vector2(half_width, local_y),
+			sun_color,
+			8.0,
+			true
+		)
+	draw_arc(center, radius + 8.0, PI, TAU, 64, Color(sun_color, 0.24), 5.0, true)
+
+
+func _draw_infinite_grid(offset: Vector2, horizon_y: float, progress: float) -> void:
+	var cyan := Color("21e6e6").lerp(Color("41ffd1"), progress)
+	var magenta := Color("f51acb").lerp(Color("8a3ffc"), progress)
+	var lane_offset: float = fposmod(offset.x, 128.0)
+	var vanishing_x: float = 640.0 - fposmod(offset.x * 0.06 + 64.0, 128.0) + 64.0
+	for index: int in range(-8, 9):
+		var bottom_x: float = 640.0 + float(index) * 128.0 - lane_offset
+		var color: Color = magenta if index % 4 == 0 else cyan
+		color.a = 0.38 if index % 4 == 0 else 0.28
+		draw_line(Vector2(vanishing_x, horizon_y), Vector2(bottom_x, 720), color, 1.5, true)
+	var travel: float = fposmod(offset.y / 920.0, 1.0)
+	for index: int in range(19):
+		var depth: float = fposmod((float(index) + travel) / 19.0, 1.0)
+		var y: float = horizon_y + pow(depth, 2.35) * (720.0 - horizon_y)
+		var line_color := Color(cyan, 0.08 + depth * 0.42)
+		draw_line(Vector2(0, y), Vector2(1280, y), line_color, 1.0 + depth * 1.7, true)
+	draw_line(Vector2(0, horizon_y), Vector2(1280, horizon_y), Color(magenta, 0.62), 3.0)
+
+
+func _draw_tracking_noise(offset: Vector2) -> void:
+	for index: int in range(17):
+		var y: float = fposmod(float(index * 97) + time * (9.0 + index % 3) - offset.y * 0.03, 720.0)
+		var x: float = fposmod(float(index * 211) - offset.x * 0.05, 1280.0)
+		var length: float = 18.0 + float(index % 5) * 14.0
+		var color := Color("21e6e6") if index % 2 == 0 else Color("ff2ecf")
+		color.a = 0.08 + float(index % 3) * 0.025
+		draw_line(Vector2(x, y), Vector2(x + length, y), color, 1.0)
 
 
 func _draw_objects() -> void:

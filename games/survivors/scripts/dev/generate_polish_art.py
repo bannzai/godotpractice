@@ -464,7 +464,7 @@ def make_logo():
     from fontTools.pens.svgPathPen import SVGPathPen
     from fontTools.ttLib import TTFont
 
-    font = TTFont(ROOT / 'assets/fonts/font.ttf')
+    font = TTFont(ROOT / 'assets/fonts/RocknRollOne-Regular.ttf')
     glyphs = font.getGlyphSet()
     cmap = font.getBestCmap()
     units = font['head'].unitsPerEm

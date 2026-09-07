@@ -5,7 +5,9 @@ extends SceneTree
 const Actor = preload("res://scripts/actor_visual.gd")
 const MOTIONS: Array[String] = ["idle", "move", "attack", "hurt", "death"]
 const MOTION_NAMES: Array[String] = ["待機", "移動", "攻撃", "被弾", "死亡"]
-const ACTOR_NAMES: Array[String] = ["灯守", "葉の精", "夜羽", "石の巨獣", "夜の主"]
+const ACTOR_NAMES: Array[String] = [
+	"ネオンランナー", "グリッチモス", "データハウンド", "センチネル", "エクリプス"
+]
 
 var main: Node
 var state: Node
@@ -42,6 +44,15 @@ func _capture_scenes() -> void:
 	await _capture("transition-title-play-middle")
 	await create_timer(0.65).timeout
 	await _capture("transition-title-play-end")
+	await _capture_tutorial()
+	state.start_run(77)
+	state.elapsed = 470.0
+	state.player_pos = Vector2(1_000_000, -1_000_000)
+	main.set_process(false)
+	await create_timer(0.15).timeout
+	await _capture("infinite-grid")
+	main.set_process(true)
+	state.start_run(77)
 	_prepare_battle()
 	await create_timer(0.15).timeout
 	main.set_process(false)
@@ -53,6 +64,8 @@ func _capture_scenes() -> void:
 	main.call("_refresh_screen")
 	await create_timer(0.6).timeout
 	await _capture("upgrade")
+	main.upgrade_focus = 1
+	await _capture("upgrade-highlight")
 	# 代表の強化画面を撮った後、残る経験値を解消して各画面を独立に撮る。
 	while state.phase == "upgrade":
 		state.choose_upgrade(0)
@@ -70,6 +83,21 @@ func _capture_scenes() -> void:
 	await create_timer(1.5).timeout
 	await _capture("defeat")
 	await _capture_endings()
+
+
+func _capture_tutorial() -> void:
+	main.tutorial_active = true
+	main.tutorial_seen = false
+	for step: int in range(3):
+		main.tutorial_step = step
+		main.tutorial_timer = 0.0
+		if step == 1 and state.gems.is_empty():
+			state.gems.append({"pos": state.player_pos + Vector2(170, 90), "value": 2})
+		main.call("_refresh_screen")
+		await create_timer(0.12).timeout
+		await _capture("tutorial-%s" % ["move", "collect", "level"][step])
+	main.call("_finish_tutorial")
+	main.call("_refresh_screen")
 
 
 # 再現可能な撮影状態を既存の戦場に設定するため、撮影シーケンス内で一回だけ実行する。
@@ -130,7 +158,7 @@ func _capture_actors() -> void:
 		var sheet := Control.new()
 		root.add_child(sheet)
 		var background := ColorRect.new()
-		background.color = Color("102b33")
+		background.color = Color("09051c")
 		background.size = Vector2(1280, 720)
 		sheet.add_child(background)
 		_label(sheet, ACTOR_NAMES[kind + 1] + " — アニメーション連続フレーム", Vector2(60, 30), 28)
@@ -166,9 +194,9 @@ func _label(parent: Node, value: String, at: Vector2, font_size: int) -> void:
 	var label := Label.new()
 	label.text = value
 	label.position = at
-	label.add_theme_font_override("font", load("res://assets/fonts/font.ttf"))
+	label.add_theme_font_override("font", load("res://assets/fonts/RocknRollOne-Regular.ttf"))
 	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", Color("f6efd6"))
+	label.add_theme_color_override("font_color", Color("f8f4ff"))
 	parent.add_child(label)
 
 
