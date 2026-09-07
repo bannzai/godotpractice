@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""星灯りのリズム便の独自 SVG / 音声を同じ入力から再生成する。外部サンプル不要。"""
+"""星灯りの祭り囃子の独自 SVG / 音声を同じ入力から再生成する。外部サンプル不要。"""
 from array import array
 import argparse
 from copy import deepcopy
@@ -255,6 +255,29 @@ def voice(kind, midi, seconds):
             value = (math.sin(phase)+.25*math.sin(2*phase)+.08*math.sin(3*phase))*min(1.,t/.006)*math.exp(-t*2)
         elif kind == 'pad':
             value = (math.sin(phase)+.3*math.sin(phase*1.004)+.14*math.sin(2*phase))*min(1.,t/.12)*.7
+        elif kind == 'taiko':
+            # 皮の低い基音、胴鳴り、打面の短いノイズを重ねる。
+            drop = f * (1.0 + 0.65 * math.exp(-t * 26))
+            body = math.sin(TAU * drop * t) + .42 * math.sin(TAU * drop * 1.53 * t)
+            value = (body * math.exp(-t * 8) + rng.uniform(-1, 1) * math.exp(-t * 42) * .3)
+        elif kind == 'rim':
+            # 縁を叩いた木の硬い立ち上がり。太鼓の面と音域・減衰を分ける。
+            value = (
+                math.sin(phase * 2.71) + .55 * math.sin(phase * 4.16)
+                + rng.uniform(-1, 1) * .2
+            ) * math.exp(-t * 38)
+        elif kind == 'fue':
+            breath = rng.uniform(-1, 1) * .055
+            value = (
+                math.sin(phase) + .22 * math.sin(2 * phase) + .11 * math.sin(3 * phase)
+                + breath
+            ) * attack * math.exp(-t * 1.6)
+        elif kind == 'shamisen':
+            pick = rng.uniform(-1, 1) * math.exp(-t * 52) * .32
+            value = (
+                math.sin(phase) + .48 * math.sin(2 * phase) + .22 * math.sin(3 * phase)
+                + pick
+            ) * math.exp(-t * 6.5) * attack
         elif kind == 'kick':
             value = math.sin(TAU*(46*t+9*(1-math.exp(-t*33))))*math.exp(-t*17)
         elif kind == 'snare':
@@ -302,7 +325,7 @@ def write_audio(name, buffer, stereo=True, ogg=True, fade=True):
     print(f'生成: {name} / {len(buffer)/RATE:.2f} 秒',flush=True)
 
 
-def song(name,bpm,seconds,root,pattern):
+def song(name,bpm,seconds,root,pattern,melody_kind='fue'):
     beat=60/bpm
     buffer=array('f',[0.])*round(seconds*RATE)
     chords=[0,5,9,7]
@@ -316,9 +339,9 @@ def song(name,bpm,seconds,root,pattern):
         energy=1. if b>=total*.58 else .75
         breakdown=total*.42<b<total*.51
         if b%4==0 or (b%4==2 and not breakdown):
-            mix(buffer,at,voice('kick',36,.35),.57)
+            mix(buffer,at,voice('taiko',38,.42),.57)
         if b%4 in (1,3):
-            mix(buffer,at,voice('snare',40,.19),.28 if breakdown else .42)
+            mix(buffer,at,voice('rim',67,.16),.25 if breakdown else .37)
         mix(buffer,at,voice('hat',40,.08),.09)
         if not breakdown:
             mix(buffer,at+beat*.5,voice('hat',40,.06),.055*energy)
@@ -331,7 +354,7 @@ def song(name,bpm,seconds,root,pattern):
         if b>=8 and not breakdown:
             degree=pattern[b%len(pattern)]
             melody=root+12+scale[degree]
-            mix(buffer,at,voice('lead' if name!='moonride' else 'bell',melody,round(beat*.75,3)),.24*energy)
+            mix(buffer,at,voice(melody_kind,melody,round(beat*.75,3)),.24*energy)
             mix(buffer,at+beat*.75,voice('bell',melody,round(beat*.4,3)),.05)
             if b%4==3 or b>total*.6:
                 second=root+12+scale[pattern[(b+3)%len(pattern)]]
@@ -344,6 +367,27 @@ def song(name,bpm,seconds,root,pattern):
     write_audio(name,buffer)
 
 
+def festival_ambience(seconds=24):
+    """ざわめき、拍子木、遠花火、風鈴を重ねた決定的な境内環境音を作る。"""
+    count = round(seconds * RATE)
+    buffer = array('f', [0.]) * count
+    rng = random.Random(4307)
+    # 声そのものには聞こえない帯域のざわめきを滑らかにし、環境の奥行きだけを足す。
+    murmur = 0.0
+    slow = 0.0
+    for i in range(count):
+        murmur = murmur * .965 + rng.uniform(-1, 1) * .035
+        slow = slow * .9994 + rng.uniform(-1, 1) * .0006
+        buffer[i] = murmur * .055 + slow * .09
+    for at in [1.6, 1.82, 7.4, 7.62, 14.1, 14.32, 20.2, 20.42]:
+        mix(buffer, at, voice('rim', 77, .13), .11)
+    for at, note in [(3.2, 88), (8.8, 91), (12.7, 86), (18.0, 93), (22.1, 89)]:
+        mix(buffer, at, voice('bell', note, 1.2), .075)
+    for at in [5.6, 16.4]:
+        mix(buffer, at, voice('taiko', 31, 1.3), .12)
+    write_audio('festival-ambience', buffer, fade=False)
+
+
 def jingle(name,notes,beat,kind='bell',ogg=True):
     seconds=len(notes)*beat+.65
     buffer=array('f',[0.])*round(seconds*RATE)
@@ -354,17 +398,18 @@ def jingle(name,notes,beat,kind='bell',ogg=True):
 
 
 def audio_assets():
-    song('starlight',112,72,60,[0,2,4,3,2,1,2,4,5,4,2,3,1,0,2,1])
-    song('moonride',128,75,62,[2,4,5,3,4,2,1,2,4,6,5,4,2,3,1,0])
-    song('comet',144,70,64,[0,3,2,5,4,3,6,5,2,4,3,6,7,5,4,2])
-    song('title',96,20,60,[0,2,4,2,5,4,2,1])
-    song('select',112,18,65,[2,4,2,1,0,2,3,4])
+    song('starlight',112,72,60,[0,2,4,3,2,1,2,4,5,4,2,3,1,0,2,1],'fue')
+    song('moonride',128,75,62,[2,4,5,3,4,2,1,2,4,6,5,4,2,3,1,0],'shamisen')
+    song('comet',144,70,64,[0,3,2,5,4,3,6,5,2,4,3,6,7,5,4,2],'fue')
+    song('title',96,20,60,[0,2,4,2,5,4,2,1],'shamisen')
+    song('select',112,18,65,[2,4,2,1,0,2,3,4],'fue')
+    festival_ambience()
     jingle('result-clear',[72,76,79,84,79,84],.22)
     jingle('result-fail',[67,64,62,60],.35,'lead')
-    jingle('hit-coral',[76],.065,'bell',False)
-    jingle('hit-mint',[84],.06,'lead',False)
-    jingle('hold',[72,76,79],.055,'bell',False)
-    jingle('fever',[72,76,79,84],.07,'bell',False)
+    jingle('hit-coral',[38],.09,'taiko',False)
+    jingle('hit-mint',[76],.07,'rim',False)
+    jingle('hold',[72,76,79],.055,'shamisen',False)
+    jingle('fever',[72,76,79,84],.07,'fue',False)
     jingle('miss',[45],.1,'bass',False)
 
 
