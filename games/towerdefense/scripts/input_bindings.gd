@@ -14,6 +14,7 @@ static func configure() -> void:
 	_bind("upgrade", [KEY_U], [JOY_BUTTON_LEFT_SHOULDER])
 	_bind("sell", [KEY_X], [JOY_BUTTON_B])
 	_bind("cancel", [KEY_ESCAPE], [JOY_BUTTON_START])
+	_bind("tutorial_skip", [KEY_Q], [JOY_BUTTON_BACK])
 	_bind("fullscreen", [KEY_F11], [])
 	for entry: Array in [["ui_left", JOY_AXIS_LEFT_X, -1.0],
 		["ui_right", JOY_AXIS_LEFT_X, 1.0], ["ui_up", JOY_AXIS_LEFT_Y, -1.0],

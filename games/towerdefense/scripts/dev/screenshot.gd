@@ -16,9 +16,11 @@ func _initialize() -> void:
 
 func _run() -> void:
 	root.size = Vector2i(1280, 720)
-	main = load("res://scenes/main.tscn").instantiate()
 	run = root.get_node("Run")
 	run.save_path = "res://tmp/screenshot-save.json"
+	run.tutorial_save_path = "res://tmp/screenshot-tutorial.json"
+	_remove_file(run.tutorial_save_path)
+	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await _capture_scenes()
 	await root.get_node("Sound").shutdown()
@@ -31,13 +33,34 @@ func _capture_scenes() -> void:
 	await _capture("title")
 	await _key(KEY_ENTER)
 	await create_timer(0.4).timeout
+	await _capture("map")
+	await _key(KEY_ENTER)
+	await create_timer(0.3).timeout
+	await _capture("tutorial-site-highlight")
+	await _key(KEY_RIGHT)
+	await _capture("tutorial-tower-highlight")
+	await _key(KEY_TAB)
+	main._update_hud(0.1)
+	await _capture("tutorial-build-preview")
+	var saved_gold: int = run.gold
+	run.gold = 0
+	main._update_hud(0.1)
+	await _capture("build-unavailable-reason")
+	run.gold = saved_gold
+	main._update_hud(0.1)
+	await _key(KEY_ENTER)
+	main._update_hud(0.1)
+	await _capture("tutorial-wave-highlight")
+	await _capture("upgrade-sell-preview")
 	await _capture("preparation")
+	await _key(KEY_SPACE)
 	main._pause()
 	await _capture("pause")
 	main._pause()
 	main.set_process(false)
 	_invest()
-	run.start_wave()
+	if not run.active:
+		run.start_wave()
 	for tick: int in range(190):
 		run.step(1.0 / 60.0)
 	main._reset_board()
@@ -144,8 +167,7 @@ func _gallery() -> void:
 		var actor: Node2D = Actor.new()
 		actor.position = point + Vector2(290, 107)
 		gallery.add_child(actor)
-		actor.setup(kind, false)
-		actor.sprite.scale = Vector2.ONE * 1.1
+		actor.setup(kind, index >= Catalog.TOWERS.size())
 		actors.append(actor)
 	var names: Array[String] = ["待機", "移動・建設", "攻撃・突破", "被弾", "消滅"]
 	for row: int in range(Actor.MOTIONS.size()):
@@ -180,3 +202,8 @@ func _key(code: Key) -> void:
 	event.pressed = false
 	Input.parse_input_event(event)
 	await process_frame
+
+
+func _remove_file(path: String) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
