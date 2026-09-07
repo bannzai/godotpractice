@@ -80,72 +80,58 @@ func _check_asset_directory(path: String, credits: String) -> void:
 
 
 func _check_ship_animations() -> void:
-	var sheets: Array[Texture2D] = []
+	var kind_signatures: Array[String] = []
 	for kind: String in ["player", "scout", "aim", "fan", "boss"]:
-		var sprite: AnimatedSprite2D = Ship.new()
+		var sprite: Node2D = Ship.new()
 		sprite.setup(kind)
 		_check(sprite.animation == &"idle" and sprite.is_playing(), kind + ": 初回は待機を再生")
-		var frames: SpriteFrames = sprite.sprite_frames
-		_check(frames != null, kind + ": フレーム資源が存在")
-		if frames == null:
-			sprite.free()
-			continue
-		var sheet: Texture2D = _check_ship_frames(frames, kind)
-		_check(sheet != null and sheet not in sheets, kind + ": 他の機種と独立した画像")
-		if sheet != null:
-			sheets.append(sheet)
+		_check(sprite.segment_count() >= 3, kind + ": 機種固有の線分を持つ")
+		_check(sprite.line_count() == Ship.MAX_SEGMENTS * 4, kind + ": 発光と色収差の4層を持つ")
+		for child: Node in sprite.get_children():
+			var line: Line2D = child as Line2D
+			_check(line != null, kind + ": 描画要素はLine2D")
+			if line != null:
+				var material: ShaderMaterial = line.material as ShaderMaterial
+				_check(material != null and material.shader != null, kind + ": 発光shaderを持つ")
+		var base_signature: String = sprite.frame_signature()
+		_check(base_signature not in kind_signatures, kind + ": 他機種と異なる輪郭")
+		kind_signatures.append(base_signature)
+		for pose: String in Ship.POSES:
+			sprite.set_pose(pose)
+			var frame_signatures: Array[String] = []
+			for index: int in range(Ship.FRAME_COUNT):
+				sprite.set_frame_and_progress(index, 0.0)
+				frame_signatures.append(sprite.frame_signature())
+			_check(frame_signatures.size() == 4, kind + "/" + pose + ": 連続4フレーム")
+			_check(_unique_strings(frame_signatures) == 4, kind + "/" + pose + ": 各フレームが変化")
 		sprite.set_pose("move")
-		sprite.frame = 2
+		sprite.set_frame_and_progress(2, 0.0)
 		sprite.setup(kind)
-		_check(sprite.sprite_frames == frames, kind + ": 再初期化で同じフレーム資源を保持")
-		_check(
-			sprite.animation == &"move" and sprite.frame == 2 and sprite.is_playing(),
-			kind + ": 再初期化で再生中の状態とフレームを巻き戻さない"
-		)
-		var second: AnimatedSprite2D = Ship.new()
-		second.setup(kind)
-		_check(second.sprite_frames == frames, kind + ": 同種の別個体もフレーム資源を共有")
-		# tree 外の Node は即時解放する。共有 SpriteFrames の所有は機体スクリプトに残す。
-		second.free()
+		_check(sprite.animation == &"move" and sprite.frame == 2, kind + ": 再初期化で状態とフレームを巻き戻さない")
 		sprite.free()
 
 
-func _check_ship_frames(frames: SpriteFrames, kind: String) -> Texture2D:
-	var sheet: Texture2D = null
-	var regions: Array[Rect2] = []
-	var cell: Vector2 = Vector2(256, 160) if kind == "boss" else Vector2(128, 128)
-	_check(frames.get_animation_names().size() == 5, kind + ": アニメーションは5状態")
-	for pose: String in ["idle", "move", "attack", "hit", "death"]:
-		var label: String = kind + "/" + pose
-		_check(frames.has_animation(pose), label + ": 状態が存在")
-		if not frames.has_animation(pose):
-			continue
-		_check(frames.get_frame_count(pose) == 4, label + ": 連続4フレームが存在")
-		_check(frames.get_animation_speed(pose) > 0, label + ": 再生速度は正")
-		if pose == "death":
-			_check(not frames.get_animation_loop(pose), label + ": 死亡は繰り返さない")
-		for index: int in range(frames.get_frame_count(pose)):
-			var atlas: AtlasTexture = frames.get_frame_texture(pose, index) as AtlasTexture
-			_check(atlas != null and atlas.atlas != null, label + ": シートから画像を切り出す")
-			if atlas == null or atlas.atlas == null:
-				continue
-			if sheet == null:
-				sheet = atlas.atlas
-			_check(atlas.atlas == sheet, label + ": 同一機種の全状態は1枚のシートに収まる")
-			var bounds: Rect2 = Rect2(Vector2.ZERO, atlas.atlas.get_size())
-			_check(atlas.region.size == cell, label + ": 切り出しサイズを保持")
-			_check(bounds.encloses(atlas.region), label + ": 切り出しがシート内に収まる")
-			for existing: Rect2 in regions:
-				_check(not existing.intersects(atlas.region), label + ": 各フレームは別領域")
-			regions.append(atlas.region)
-	_check(regions.size() == 20, kind + ": 全状態の20フレームを検証")
-	return sheet
+func _unique_strings(values: Array[String]) -> int:
+	var unique: Dictionary = {}
+	for value: String in values:
+		unique[value] = true
+	return unique.size()
 
 
 func _check_game_state() -> void:
 	var state: Node = StateScript.new()
 	state.save_path = TEST_SAVE
 	_check(state.mode == state.Mode.TITLE, "起動時はタイトル")
+	state.show_navigation()
+	_check(state.mode == state.Mode.NAVIGATION, "タイトルから航路図へ進む")
+	state.prepare_run_with_tutorial()
+	_check(state.mode == state.Mode.TUTORIAL, "初回出撃は計器チェックから始まる")
+	state.finish_tutorial()
+	_check(state.mode == state.Mode.PLAYING and state.tutorial_seen, "計器チェック完了で出撃")
+	state.show_title()
+	state.show_navigation()
+	state.prepare_run_with_tutorial()
+	_check(state.mode == state.Mode.PLAYING, "2回目以降は完了済みの計器チェックを省略")
 	state.reset_run()
 	_check(state.lives == 3 and state.bombs == 3 and state.power == 1, "開始時の装備")
 	state.add_score(120)
@@ -191,17 +177,27 @@ func _check_save_data() -> void:
 	var state: Node = StateScript.new()
 	state.save_path = TEST_SAVE
 	state.high_score = 43210
+	state.tutorial_seen = true
 	_check(state.save_high_score(), "最高得点の保存に成功する")
 	state.high_score = 0
+	state.tutorial_seen = false
 	state.load_high_score()
 	_check(state.high_score == 43210, "保存後に最高得点を復元する")
+	_check(state.tutorial_seen, "初回計器チェックの完了を復元する")
 	for payload: String in [
-		"broken", "[]", "null", "{}", '{"high_score":-1}',
-		'{"high_score":"9000"}', '{"high_score":1.5}',
-		'{"high_score":true}', '{"high_score":1000000000}',
+		"broken",
+		"[]",
+		"null",
+		"{}",
+		'{"high_score":-1}',
+		'{"high_score":"9000"}',
+		'{"high_score":1.5}',
+		'{"high_score":true}',
+		'{"high_score":1000000000}',
 	]:
 		_write_save(payload)
 		state.high_score = 0
+		state.tutorial_seen = false
 		state.load_high_score()
 		_check(state.high_score == 0, "不正な保存内容を安全に無視: " + payload)
 	_write_save('{"high_score":500}')

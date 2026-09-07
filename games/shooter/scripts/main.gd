@@ -35,6 +35,11 @@ var player_pose_time: float = 0.0
 var boss_pose: String = "idle"
 var boss_pose_time: float = 0.0
 var result_time: float = 0.0
+var tutorial_step: int = 0
+var tutorial_pulse: float = 0.0
+var scan_timer: float = 0.4
+var boss_chart_active: bool = false
+var boss_chart_time: float = 0.0
 var shake_offset: Vector2 = Vector2.ZERO
 var hitstop: float = 0.0
 var combat_effects: Node2D
@@ -63,7 +68,7 @@ func _ready() -> void:
 	music.volume_db = -13.0
 	music.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(music)
-	for sound: String in ["shot", "explosion", "item", "bomb"]:
+	for sound: String in ["shot", "explosion", "item", "bomb", "scan"]:
 		var voice: AudioStreamPlayer = AudioStreamPlayer.new()
 		voice.stream = load("res://assets/audio/%s.wav" % sound)
 		voice.volume_db = -19.0 if sound == "shot" else -9.0
@@ -91,12 +96,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			DisplayServer.WINDOW_MODE_WINDOWED if is_full else DisplayServer.WINDOW_MODE_FULLSCREEN
 		)
 		get_viewport().set_input_as_handled()
+	elif GameState.mode == GameState.Mode.TUTORIAL:
+		_handle_tutorial_input(event)
 	elif event.is_action_pressed("pause") and GameState.mode == GameState.Mode.PLAYING:
 		paused = not paused
 		music.stream_paused = paused
 		_sync_menu()
-	elif event.is_action_pressed("start") and GameState.mode != GameState.Mode.PLAYING:
-		start_run()
+	elif event.is_action_pressed("start"):
+		match GameState.mode:
+			GameState.Mode.TITLE:
+				show_navigation()
+			GameState.Mode.NAVIGATION:
+				confirm_route()
+			GameState.Mode.RESULT:
+				show_navigation()
 	elif event.is_action_pressed("bomb") and not paused:
 		trigger_bomb()
 
@@ -105,10 +118,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_node_ready():
 		request_close()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_node_ready():
-		if GameState.mode == GameState.Mode.PLAYING:
-			paused = true
-			music.stream_paused = true
-			_sync_menu()
+		_pause_from_focus_loss.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -123,11 +133,67 @@ func _process(delta: float) -> void:
 			advance(delta)
 	if previous_mode != GameState.mode:
 		_sync_menu()
+	tutorial_pulse += delta
+	_update_scan_sound(delta)
 	view.queue_redraw()
 
 
 func start_run() -> void:
 	GameState.reset_run()
+	_reset_world()
+
+
+func show_navigation() -> void:
+	GameState.show_navigation()
+	paused = false
+	combat_effects.clear_effects()
+	_play_music("title")
+	_fade_transition()
+	_sync_menu()
+
+
+func confirm_route() -> void:
+	GameState.prepare_run_with_tutorial()
+	_reset_world()
+	if GameState.mode == GameState.Mode.TUTORIAL:
+		tutorial_step = 0
+		_sync_menu()
+
+
+func complete_tutorial() -> void:
+	if GameState.mode != GameState.Mode.TUTORIAL:
+		return
+	GameState.finish_tutorial()
+	tutorial_step = 3
+	_fade_transition(0.78)
+	_sync_menu()
+
+
+func _handle_tutorial_input(event: InputEvent) -> void:
+	if event.is_action_pressed("start"):
+		complete_tutorial()
+		return
+	if (
+		tutorial_step == 0
+		and (
+			event.is_action_pressed("move_left")
+			or event.is_action_pressed("move_right")
+			or event.is_action_pressed("move_up")
+			or event.is_action_pressed("move_down")
+		)
+	):
+		tutorial_step = 1
+		view.queue_redraw()
+	elif tutorial_step == 1 and event.is_action_pressed("shoot"):
+		tutorial_step = 2
+		_sound("shot")
+		view.queue_redraw()
+	elif tutorial_step == 2 and event.is_action_pressed("bomb"):
+		_sound("bomb")
+		complete_tutorial()
+
+
+func _reset_world() -> void:
 	player = Vector2(640, 600)
 	enemies.clear()
 	bullets.clear()
@@ -137,6 +203,8 @@ func start_run() -> void:
 	wave_index = 0
 	boss_hp = 0
 	boss_active = false
+	boss_chart_active = false
+	boss_chart_time = 0.0
 	boss_timer = 0.0
 	shot_timer = 0.0
 	invulnerable = 2.0
@@ -148,6 +216,7 @@ func start_run() -> void:
 	_boss_hit_cooldown = 0.0
 	_boss_attack_time = 0.0
 	result_time = 0.0
+	scan_timer = 0.4
 	_visual_id = 0
 	hitstop = 0.0
 	_shake_strength = 0.0
@@ -190,6 +259,11 @@ func advance(delta: float) -> void:
 		result_time += delta
 	if GameState.mode != GameState.Mode.PLAYING:
 		return
+	if boss_chart_active:
+		boss_chart_time = maxf(0.0, boss_chart_time - delta)
+		if boss_chart_time <= 0.0:
+			_activate_boss()
+		return
 	GameState.elapsed += delta
 	invulnerable = maxf(0.0, invulnerable - delta)
 	var direction: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -204,17 +278,32 @@ func advance(delta: float) -> void:
 		spawn_enemy(waves[wave_index])
 		wave_index += 1
 	if GameState.elapsed >= Stage.BOSS_TIME and not boss_active:
-		boss_active = true
-		boss_hp = Stage.BOSS_HP
-		boss_pose = "idle"
-		boss_pose_time = 0.0
-		_shake_strength = 3.0
-		bullets = bullets.filter(func(bullet: Dictionary) -> bool: return bullet.friendly)
-		_play_music("boss")
+		_begin_boss_chart()
+		return
 	_update_enemies(delta)
 	_update_boss(delta)
 	_update_bullets(delta)
 	_update_items(delta)
+
+
+func _begin_boss_chart() -> void:
+	boss_chart_active = true
+	boss_chart_time = 3.2
+	enemies.clear()
+	bullets.clear()
+	items.clear()
+	_play_music("boss")
+	_shake_strength = 0.0
+	shake_offset = Vector2.ZERO
+
+
+func _activate_boss() -> void:
+	boss_chart_active = false
+	boss_active = true
+	boss_hp = Stage.BOSS_HP
+	boss_pose = "idle"
+	boss_pose_time = 0.0
+	_shake_strength = 3.0
 
 
 func fire_player() -> void:
@@ -434,6 +523,8 @@ func _play_music(track: String) -> void:
 
 
 func _sync_menu() -> void:
+	if not is_inside_tree():
+		return
 	previous_mode = GameState.mode
 	for button: Button in buttons:
 		button.hide()
@@ -443,9 +534,13 @@ func _sync_menu() -> void:
 		_add_button("飛行を続ける", Vector2(495, 382), resume_run)
 		_add_button("タイトルへ", Vector2(495, 447), return_title)
 	elif GameState.mode == GameState.Mode.TITLE:
-		_add_button("出撃する   Enter / A", Vector2(104, 463), start_run)
+		_add_button("航路図を開く  ENTER / A", Vector2(82, 536), show_navigation)
+	elif GameState.mode == GameState.Mode.NAVIGATION:
+		_add_button("選択航路へ進む  ENTER / A", Vector2(842, 602), confirm_route)
+	elif GameState.mode == GameState.Mode.TUTORIAL:
+		_add_button("計器チェックを省略  ENTER / A", Vector2(835, 640), complete_tutorial)
 	elif GameState.mode == GameState.Mode.RESULT:
-		_add_button("もう一度出撃", Vector2(495, 460), start_run)
+		_add_button("航路を再設定", Vector2(495, 460), show_navigation)
 		_add_button("タイトルへ", Vector2(495, 525), return_title)
 	if not buttons.is_empty():
 		buttons[0].grab_focus()
@@ -518,8 +613,29 @@ func _update_feedback(delta: float) -> void:
 	if not paused:
 		_shake_strength = move_toward(_shake_strength, 0.0, delta * 22.0)
 		shake_offset = Vector2(sin(animation_time * 83), cos(animation_time * 71)) * _shake_strength
-	combat_effects.visible = GameState.mode != GameState.Mode.TITLE
+	combat_effects.visible = GameState.mode in [GameState.Mode.PLAYING, GameState.Mode.RESULT]
 	combat_effects.set_presentation(shake_offset, boss_active, paused)
+
+
+func _update_scan_sound(delta: float) -> void:
+	if (
+		GameState.mode not in [GameState.Mode.NAVIGATION, GameState.Mode.TUTORIAL]
+		and not boss_chart_active
+	):
+		scan_timer = 0.4
+		return
+	scan_timer -= delta
+	if scan_timer <= 0.0:
+		_sound("scan")
+		scan_timer = 1.8
+
+
+func _pause_from_focus_loss() -> void:
+	if _closing or not is_inside_tree() or GameState.mode != GameState.Mode.PLAYING:
+		return
+	paused = true
+	music.stream_paused = true
+	_sync_menu()
 
 
 func _show_result() -> void:

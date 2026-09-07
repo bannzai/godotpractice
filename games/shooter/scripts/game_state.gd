@@ -1,7 +1,7 @@
 extends Node
 ## 画面をまたぐ進行状態と、端末に残す最高得点の保存先。
 
-enum Mode {TITLE, PLAYING, RESULT}
+enum Mode { TITLE, NAVIGATION, TUTORIAL, PLAYING, RESULT }
 
 const MAX_SCORE: int = 999999999
 const MAX_POWER: int = 3
@@ -15,6 +15,7 @@ var bombs: int = 3
 var power: int = 1
 var cleared: bool = false
 var elapsed: float = 0.0
+var tutorial_seen: bool = false
 var save_path: String = "user://shooter-save.json"
 
 
@@ -35,6 +36,24 @@ func reset_run() -> void:
 	cleared = false
 	elapsed = 0.0
 	mode = Mode.PLAYING
+
+
+func prepare_run_with_tutorial() -> void:
+	reset_run()
+	if not tutorial_seen:
+		mode = Mode.TUTORIAL
+
+
+func show_navigation() -> void:
+	if mode == Mode.PLAYING:
+		save_high_score()
+	mode = Mode.NAVIGATION
+
+
+func finish_tutorial() -> void:
+	tutorial_seen = true
+	mode = Mode.PLAYING
+	save_high_score()
 
 
 func show_title() -> void:
@@ -109,12 +128,15 @@ func load_high_score() -> void:
 	if not is_finite(number) or number < 0 or number > MAX_SCORE or floor(number) != number:
 		return
 	high_score = maxi(high_score, int(number))
+	var saved_tutorial: Variant = json.data.get("tutorial_seen", false)
+	if saved_tutorial is bool:
+		tutorial_seen = tutorial_seen or saved_tutorial
 
 
 func save_high_score() -> bool:
 	var file: FileAccess = FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
 		return false
-	file.store_string(JSON.stringify({"high_score": high_score}))
+	file.store_string(JSON.stringify({"high_score": high_score, "tutorial_seen": tutorial_seen}))
 	file.flush()
 	return file.get_error() == OK

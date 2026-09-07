@@ -1,5 +1,5 @@
 extends Node2D
-## 戦闘イベントごとに粒子とTweenを生成するため非冪等。clear_effectsで出撃前へ戻す。
+## 戦闘イベントごとに線片とTweenを生成するため非冪等。clear_effectsで出撃前へ戻す。
 
 const MINT: Color = Color("79f5d4")
 const GOLD: Color = Color("ffbc75")
@@ -9,7 +9,6 @@ const MAX_EFFECTS: int = 72
 var font: Font
 var content: Node2D
 var atmosphere: ColorRect
-var spark: GradientTexture2D
 
 
 func _ready() -> void:
@@ -22,16 +21,6 @@ func _ready() -> void:
 	content = Node2D.new()
 	content.position = -FIELD_ORIGIN
 	clip.add_child(content)
-	var gradient: Gradient = Gradient.new()
-	gradient.set_color(0, Color.WHITE)
-	gradient.set_color(1, Color(1, 1, 1, 0))
-	spark = GradientTexture2D.new()
-	spark.gradient = gradient
-	spark.width = 16
-	spark.height = 16
-	spark.fill = GradientTexture2D.FILL_RADIAL
-	spark.fill_from = Vector2(0.5, 0.5)
-	spark.fill_to = Vector2(1.0, 0.5)
 	atmosphere = ColorRect.new()
 	atmosphere.size = clip.size
 	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -95,29 +84,32 @@ func _burst(
 ) -> void:
 	if content.get_child_count() >= MAX_EFFECTS:
 		return
-	var particles: CPUParticles2D = CPUParticles2D.new()
-	particles.position = location
-	particles.amount = count
-	particles.lifetime = duration
-	particles.one_shot = true
-	particles.explosiveness = 1.0
-	particles.texture = spark
-	particles.spread = 180.0
-	particles.gravity = Vector2(0, 28)
-	particles.initial_velocity_min = speed * 0.45
-	particles.initial_velocity_max = speed
-	particles.damping_min = speed * 0.4
-	particles.damping_max = speed * 0.7
-	particles.scale_amount_min = size * 0.3
-	particles.scale_amount_max = size
-	particles.color = color
-	var fade: Gradient = Gradient.new()
-	fade.set_color(0, Color.WHITE)
-	fade.set_color(1, Color(1, 1, 1, 0))
-	particles.color_ramp = fade
-	particles.finished.connect(particles.queue_free)
-	content.add_child(particles)
-	particles.emitting = true
+	var burst: Node2D = Node2D.new()
+	burst.position = location
+	content.add_child(burst)
+	for index: int in range(mini(count, 42)):
+		var angle: float = float(index) * 2.399963 + location.x * 0.013
+		var direction: Vector2 = Vector2.from_angle(angle)
+		var length: float = (7.0 + float(index % 7) * 2.4) * size
+		var shard: Line2D = Line2D.new()
+		shard.points = PackedVector2Array([Vector2.ZERO, direction * length])
+		shard.default_color = color
+		shard.width = maxf(1.0, 2.4 * size)
+		shard.antialiased = true
+		burst.add_child(shard)
+		var distance: float = speed * duration * (0.35 + float(index % 9) * 0.055)
+		var tween: Tween = shard.create_tween().set_parallel()
+		(
+			tween
+			. tween_property(shard, "position", direction * distance, duration)
+			. set_trans(Tween.TRANS_QUAD)
+			. set_ease(Tween.EASE_OUT)
+		)
+		tween.tween_property(shard, "rotation", -1.0 + float(index % 5) * 0.5, duration)
+		tween.tween_property(shard, "modulate:a", 0.0, duration).set_delay(duration * 0.32)
+	var cleanup: Tween = burst.create_tween()
+	cleanup.tween_interval(duration + 0.05)
+	cleanup.tween_callback(burst.queue_free)
 
 
 func _ring(location: Vector2, color: Color, radius: float, duration: float) -> void:

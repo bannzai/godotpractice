@@ -68,7 +68,7 @@ screenshot: import
 
 # 操作を伴わない起動〜メインシーン表示を Movie Maker モードで録画して mp4 にする (起動直後の描画崩れ・真っ黒を
 # 検出する。headless は dummy レンダラで落ちるため描画付きで起動する)。真っ黒な動画を成功と誤認しないよう、
-# 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
+# 終了 1 秒前のフレームの平均輝度と最大輝度を検査する。黒地の線画は面積平均が低いため、明るい線の存在も併用する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
 	"$(GODOT)" $(GODOT_FLAGS) --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 --quit-after $(MOVIE_FRAMES) -- --capture-frames=$(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
@@ -77,8 +77,8 @@ movie: import
 	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
-	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
-	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:file=- -f null - \
+	  | awk -F= '/YAVG/ { avg = $$2 } /YMAX/ { max = $$2 } END { exit (avg >= 8 && max >= 128) ? 0 : 1 }'
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
@@ -115,8 +115,9 @@ build-web: import
 
 build-all: build-macos build-windows build-linux
 
-# 終盤の交戦へ入った初期条件から、実InputEventで操作する26秒の録画。
+# 終盤の交戦へ入った初期条件から、実InputEventで操作する最長35秒の録画。
 movie-play: import
+	rm -f $(LOG_DIR)/movie-play.avi $(LOG_DIR)/movie-play.mp4 $(LOG_DIR)/play-frame-*.png $(LOG_DIR)/play-last.png
 	"$(GODOT)" $(GODOT_FLAGS) --path . $(WINDOWED_FLAGS) --script res://scripts/dev/demo.gd --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 > $(LOG_DIR)/movie-play.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
 	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
