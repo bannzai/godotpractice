@@ -15,6 +15,9 @@ const CORNERS := [
 	[Vector3(1, 0, 1), Vector3(0, 0, 1), Vector3(0, 1, 1), Vector3(1, 1, 1)],
 	[Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(1, 1, 0), Vector3(0, 1, 0)]
 ]
+const FACE_UVS: Array[Vector2] = [
+	Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)
+]
 const COLORS := {
 	1: Color("76ad62"), 2: Color("8f6346"), 3: Color("899396"), 4: Color("885032"),
 	5: Color("478b5a"), 6: Color("dac28d"), 7: Color("3b91b9"), 8: Color("bd884f"),
@@ -39,7 +42,11 @@ func rebuild() -> void:
 	if _material == null:
 		_material = StandardMaterial3D.new()
 		_material.vertex_color_use_as_albedo = true
-		_material.roughness = 0.94
+		_material.albedo_texture = load("res://assets/textures/origami-paper.png")
+		_material.normal_enabled = true
+		_material.normal_texture = load("res://assets/textures/origami-fold-normal.png")
+		_material.normal_scale = 0.22
+		_material.roughness = 1.0
 	for x: int in range(0, Data.SIZE.x, CHUNK):
 		for z: int in range(0, Data.SIZE.z, CHUNK):
 			_build_chunk(Vector2i(x, z))
@@ -66,6 +73,7 @@ func _build_chunk(start: Vector2i) -> void:
 					count += 1
 	if count == 0:
 		return
+	surface.generate_tangents()
 	var mesh: ArrayMesh = surface.commit()
 	var visual := MeshInstance3D.new()
 	visual.mesh = mesh
@@ -90,14 +98,15 @@ func _emit_face(surface: SurfaceTool, collision: PackedVector3Array,
 		tint = tint.darkened(0.12 if side < 2 else 0.22)
 	if id == Data.GRASS and side != 2:
 		tint = Color("98714f")
-	for index: int in [0, 1, 2, 0, 2, 3]:
-		var vertex: Vector3 = Vector3(cell) + CORNERS[side][index]
+	for corner_index: int in [0, 1, 2, 0, 2, 3]:
+		var vertex: Vector3 = Vector3(cell) + CORNERS[side][corner_index]
 		if id == Data.WATER:
 			vertex.y -= 0.18
 		elif id == Data.TORCH:
-			vertex = Vector3(cell) + CORNERS[side][index] * Vector3(0.16, 0.85, 0.16) \
+			vertex = Vector3(cell) + CORNERS[side][corner_index] * Vector3(0.16, 0.85, 0.16) \
 				+ Vector3(0.42, 0, 0.42)
 		surface.set_normal(Vector3(NORMALS[side]))
+		surface.set_uv(FACE_UVS[corner_index])
 		surface.set_color(tint)
 		surface.add_vertex(vertex)
 		if data.is_solid(cell):

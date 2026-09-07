@@ -1,10 +1,10 @@
 [gd_resource type="Theme" load_steps=8 format=3]
 
-[ext_resource type="FontFile" path="res://assets/fonts/MPLUSRounded1c-Regular.ttf" id="1"]
+[ext_resource type="FontFile" path="res://assets/fonts/ZenMaruGothic-Regular.ttf" id="1"]
 
 [sub_resource type="StyleBoxFlat" id="Panel"]
 
-bg_color = Color(0.045, 0.103, 0.15, 0.96)
+bg_color = Color(0.94, 0.872, 0.694, 0.98)
 
 border_width_left = 1
 
@@ -14,15 +14,19 @@ border_width_right = 1
 
 border_width_bottom = 1
 
-border_color = Color(0.25, 0.42, 0.44, 0.9)
+border_color = Color(0.29, 0.204, 0.137, 0.9)
 
-corner_radius_top_left = 18
+corner_radius_top_left = 3
 
-corner_radius_top_right = 18
+corner_radius_top_right = 3
 
-corner_radius_bottom_left = 18
+corner_radius_bottom_left = 3
 
-corner_radius_bottom_right = 18
+corner_radius_bottom_right = 3
+
+shadow_color = Color(0.11, 0.075, 0.047, 0.35)
+
+shadow_size = 7
 
 content_margin_left = 20.0
 
@@ -34,7 +38,7 @@ content_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxFlat" id="Normal"]
 
-bg_color = Color(0.12, 0.27, 0.31, 1)
+bg_color = Color(0.972, 0.935, 0.82, 1)
 
 border_width_left = 1
 
@@ -44,15 +48,15 @@ border_width_right = 1
 
 border_width_bottom = 1
 
-border_color = Color(0.25, 0.42, 0.44, 0.9)
+border_color = Color(0.43, 0.302, 0.196, 0.9)
 
-corner_radius_top_left = 10
+corner_radius_top_left = 2
 
-corner_radius_top_right = 10
+corner_radius_top_right = 2
 
-corner_radius_bottom_left = 10
+corner_radius_bottom_left = 2
 
-corner_radius_bottom_right = 10
+corner_radius_bottom_right = 2
 
 content_margin_left = 20.0
 
@@ -64,7 +68,7 @@ content_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxFlat" id="Hover"]
 
-bg_color = Color(0.24, 0.41, 0.42, 1)
+bg_color = Color(1, 0.827, 0.435, 1)
 
 border_width_left = 2
 
@@ -74,15 +78,15 @@ border_width_right = 2
 
 border_width_bottom = 2
 
-border_color = Color(0.96, 0.79, 0.49, 1)
+border_color = Color(0.176, 0.337, 0.337, 1)
 
-corner_radius_top_left = 10
+corner_radius_top_left = 2
 
-corner_radius_top_right = 10
+corner_radius_top_right = 2
 
-corner_radius_bottom_left = 10
+corner_radius_bottom_left = 2
 
-corner_radius_bottom_right = 10
+corner_radius_bottom_right = 2
 
 content_margin_left = 20.0
 
@@ -94,7 +98,7 @@ content_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxFlat" id="Pressed"]
 
-bg_color = Color(0.1, 0.2, 0.25, 1)
+bg_color = Color(0.886, 0.662, 0.352, 1)
 
 border_width_left = 2
 
@@ -104,15 +108,15 @@ border_width_right = 2
 
 border_width_bottom = 2
 
-border_color = Color(0.96, 0.79, 0.49, 1)
+border_color = Color(0.176, 0.337, 0.337, 1)
 
-corner_radius_top_left = 10
+corner_radius_top_left = 2
 
-corner_radius_top_right = 10
+corner_radius_top_right = 2
 
-corner_radius_bottom_left = 10
+corner_radius_bottom_left = 2
 
-corner_radius_bottom_right = 10
+corner_radius_bottom_right = 2
 
 content_margin_left = 20.0
 
@@ -124,7 +128,7 @@ content_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxFlat" id="Disabled"]
 
-bg_color = Color(0.09, 0.16, 0.2, 0.9)
+bg_color = Color(0.72, 0.674, 0.56, 0.92)
 
 border_width_left = 1
 
@@ -134,15 +138,15 @@ border_width_right = 1
 
 border_width_bottom = 1
 
-border_color = Color(0.25, 0.42, 0.44, 0.9)
+border_color = Color(0.43, 0.302, 0.196, 0.65)
 
-corner_radius_top_left = 10
+corner_radius_top_left = 2
 
-corner_radius_top_right = 10
+corner_radius_top_right = 2
 
-corner_radius_bottom_left = 10
+corner_radius_bottom_left = 2
 
-corner_radius_bottom_right = 10
+corner_radius_bottom_right = 2
 
 content_margin_left = 20.0
 
@@ -154,7 +158,7 @@ content_margin_bottom = 12.0
 
 [sub_resource type="StyleBoxFlat" id="Progress"]
 
-bg_color = Color(0.9, 0.64, 0.36, 1)
+bg_color = Color(0.94, 0.55, 0.31, 1)
 
 border_width_left = 1
 
@@ -164,15 +168,15 @@ border_width_right = 1
 
 border_width_bottom = 1
 
-border_color = Color(0.25, 0.42, 0.44, 0.9)
+border_color = Color(0.43, 0.302, 0.196, 0.9)
 
-corner_radius_top_left = 10
+corner_radius_top_left = 2
 
-corner_radius_top_right = 10
+corner_radius_top_right = 2
 
-corner_radius_bottom_left = 10
+corner_radius_bottom_left = 2
 
-corner_radius_bottom_right = 10
+corner_radius_bottom_right = 2
 
 content_margin_left = 20.0
 
@@ -188,13 +192,13 @@ default_font = ExtResource("1")
 
 default_font_size = 18
 
-Button/colors/font_color = Color(0.96, 0.91, 0.78, 1)
+Button/colors/font_color = Color(0.14, 0.196, 0.196, 1)
 
-Button/colors/font_hover_color = Color(1, 0.94, 0.78, 1)
+Button/colors/font_hover_color = Color(0.11, 0.176, 0.176, 1)
 
-Button/colors/font_pressed_color = Color(1, 0.94, 0.78, 1)
+Button/colors/font_pressed_color = Color(0.11, 0.176, 0.176, 1)
 
-Button/colors/font_disabled_color = Color(0.39, 0.48, 0.49, 1)
+Button/colors/font_disabled_color = Color(0.39, 0.376, 0.325, 1)
 
 Button/styles/normal = SubResource("Normal")
 
@@ -206,9 +210,9 @@ Button/styles/focus = SubResource("Hover")
 
 Button/styles/disabled = SubResource("Disabled")
 
-Label/colors/font_color = Color(0.92, 0.93, 0.85, 1)
+Label/colors/font_color = Color(0.12, 0.176, 0.169, 1)
 
-Label/colors/font_shadow_color = Color(0.025, 0.07, 0.1, 0.5)
+Label/colors/font_shadow_color = Color(0, 0, 0, 0)
 
 Label/constants/shadow_offset_x = 1
 
