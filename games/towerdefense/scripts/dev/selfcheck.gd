@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
 	_check_catalog()
+	_check_navigation_and_tutorial()
 	_check_economy()
 	_check_target_and_special_attacks()
 	_check_victory_and_defeat()
@@ -99,6 +100,35 @@ func _check_catalog() -> void:
 				boss_count += int(group.count)
 				_check(wave_index == 9, "最終ウェーブにボス")
 	_check(boss_count == 1, "ボスは1体")
+
+
+func _check_navigation_and_tutorial() -> void:
+	var run: Node = State.new()
+	run.new_run()
+	run.build(0, "arrow")
+	run.to_map()
+	_check(run.phase == "map", "タイトルとプレイの間に正式な地図状態")
+	_check(run.towers.is_empty() and run.gold == Catalog.START_GOLD,
+		"地図へ入る時に戦闘状態を初期化")
+	_check(not run.build(0, "arrow") and not run.start_wave(), "地図では戦闘操作を拒否")
+	run.tutorial_save_path = "res://tmp/selfcheck-tutorial.json"
+	_remove_file(run.tutorial_save_path)
+	run.load_tutorial()
+	_check(not run.tutorial_seen, "指南記録がなければ未読")
+	_check(not State.parse_tutorial(null) and not State.parse_tutorial({"seen": "yes"}),
+		"不正な指南記録を未読として解釈")
+	run.mark_tutorial_seen()
+	run.mark_tutorial_seen()
+	run.tutorial_seen = false
+	run.load_tutorial()
+	_check(run.tutorial_seen, "指南完了の保存と再読込は冪等")
+	var file: FileAccess = FileAccess.open(run.tutorial_save_path, FileAccess.WRITE)
+	file.store_string("破損したJSON{")
+	file.close()
+	run.load_tutorial()
+	_check(not run.tutorial_seen, "壊れた指南記録から未読で復帰")
+	_remove_file(run.tutorial_save_path)
+	run.free()
 
 
 func _check_economy() -> void:
@@ -261,3 +291,8 @@ func _check_save() -> void:
 	run.load_best()
 	_check(run.best.stars == 3, "低い評価で最高記録を上書きしない")
 	run.free()
+
+
+func _remove_file(path: String) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

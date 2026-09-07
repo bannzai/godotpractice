@@ -15,6 +15,8 @@ var enemies: Array[Dictionary] = []
 var events: Array[Dictionary] = []
 var best: Dictionary = {"stars": 0, "wave": 0}
 var save_path: String = "user://grove_defense.json"
+var tutorial_seen: bool = false
+var tutorial_save_path: String = "user://grove_defense_tutorial.json"
 var _pending: Array[String] = []
 var _spawn_time: float = 0.0
 var _next_id: int = 0
@@ -39,6 +41,11 @@ func new_run() -> void:
 func to_title() -> void:
 	new_run()
 	phase = "title"
+
+
+func to_map() -> void:
+	new_run()
+	phase = "map"
 
 
 func tower_at(site: int) -> Dictionary:
@@ -242,6 +249,13 @@ static func parse_best(value: Variant) -> Dictionary:
 	return {"stars": clampi(int(rating), 0, 3), "wave": clampi(int(cleared), 0, 10)}
 
 
+static func parse_tutorial(value: Variant) -> bool:
+	if not value is Dictionary:
+		return false
+	var seen: Variant = value.get("seen", false)
+	return seen if seen is bool else false
+
+
 func load_best() -> void:
 	best = {"stars": 0, "wave": 0}
 	if not FileAccess.file_exists(save_path):
@@ -249,6 +263,23 @@ func load_best() -> void:
 	var parser: JSON = JSON.new()
 	if parser.parse(FileAccess.get_file_as_string(save_path)) == OK:
 		best = parse_best(parser.data)
+
+
+func load_tutorial() -> void:
+	tutorial_seen = false
+	if not FileAccess.file_exists(tutorial_save_path):
+		return
+	var parser: JSON = JSON.new()
+	if parser.parse(FileAccess.get_file_as_string(tutorial_save_path)) == OK:
+		tutorial_seen = parse_tutorial(parser.data)
+
+
+func mark_tutorial_seen() -> void:
+	# 同じ内容を上書きするだけなので、完了・スキップの重複通知に対して冪等。
+	tutorial_seen = true
+	var file: FileAccess = FileAccess.open(tutorial_save_path, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify({"seen": true}))
 
 
 func save_result() -> void:

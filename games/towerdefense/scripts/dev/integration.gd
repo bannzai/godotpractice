@@ -15,15 +15,24 @@ func _initialize() -> void:
 
 func _start() -> void:
 	root.size = Vector2i(1280, 720)
+	run = root.get_node("Run")
+	# 個人のセーブは上書きしない。結果と指南のfixtureは検証専用の保存先を使う。
+	run.save_path = "res://tmp/integration-save.json"
+	run.tutorial_save_path = "res://tmp/integration-tutorial.json"
+	_remove_file(run.tutorial_save_path)
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
-	run = root.get_node("Run")
-	# 個人のセーブは上書きしない。結果の fixture もこの検証専用の保存先を使う。
-	run.save_path = "res://tmp/integration-save.json"
 	await create_timer(0.3).timeout
 	_check(run.phase == "title", "起動時のタイトル")
 	await _key(KEY_ENTER)
-	_check(run.phase == "play", "Enter でゲーム開始")
+	_check(run.phase == "map", "Enter でタイトルから地図へ")
+	await _key(KEY_ESCAPE)
+	_check(run.phase == "title", "地図の Esc で表紙へ戻る")
+	await _key(KEY_ENTER)
+	await _key(KEY_ENTER)
+	_check(run.phase == "play", "地図の Enter でゲーム開始")
+	await _check_tutorial()
+	await _check_tutorial_skip()
 	await _check_keyboard_build()
 	await _check_pad_build()
 	await _check_stick()
@@ -41,6 +50,63 @@ func _start() -> void:
 	quit(1 if failed else 0)
 
 
+func _check_tutorial() -> void:
+	_check(main.tutorial_active, "初回プレイで指南を表示")
+	_check(main.tutorial_step == main.TutorialStep.SITE, "指南は地点選択から開始")
+	_check("光る空き地点" in main.tutorial_text.text, "地点選択の次操作を場面内に表示")
+	_check(main.build_button.disabled and "先に地点" in main.build_button.text,
+		"指南中は手順外の建設を理由付きで無効化")
+	_check(main.wave_button.disabled and "先に地点" in main.wave_button.text,
+		"指南中は手順外の襲来を理由付きで無効化")
+	await _key(KEY_RIGHT)
+	_check(main.tutorial_step == main.TutorialStep.TOWER, "地点選択後は紋章盾の選択へ")
+	_check(main.build_button.disabled and "先に紋章盾" in main.build_button.text,
+		"紋章盾の選択前は建設を無効化")
+	await _key(KEY_TAB)
+	_check(main.tutorial_step == main.TutorialStep.BUILD, "塔盾選択後は建設へ")
+	await process_frame
+	_check("建設後の金貨" in main.detail.text, "建設前に残金をプレビュー")
+	_check(main.tower_buttons[main.selected_kind].has_meta("tower_kind"),
+		"塔ボタンを紋章画像と結び付けられる")
+	var before: int = run.gold
+	await _key(KEY_ENTER)
+	_check(run.towers.size() == 1 and run.gold < before, "指南の実入力で塔を建設")
+	_check(main.tutorial_step == main.TutorialStep.WAVE, "建設後は襲来開始へ")
+	await process_frame
+	_check(main.upgrade_button.disabled and main.sell_button.disabled,
+		"指南完了前は強化と売却を無効化")
+	_check("強化後" in main.detail.text and "売却後" in main.detail.text,
+		"建設後に強化前後と売却後資金をプレビュー")
+	_check("次の敵" in main.preview.text, "襲来前に次の敵をプレビュー")
+	await _key(KEY_SPACE)
+	_check(run.active and not main.tutorial_active, "襲来開始で指南を完了")
+	_check(run.tutorial_seen and FileAccess.file_exists(run.tutorial_save_path),
+		"指南の既読を保存")
+	_reset_play_fixture()
+
+
+func _check_tutorial_skip() -> void:
+	run.to_title()
+	run.tutorial_seen = false
+	main._reset_board()
+	main._show_phase()
+	await _key(KEY_ENTER)
+	await _key(KEY_ENTER)
+	_check(main.tutorial_active, "未読なら再び指南を表示")
+	await _key(KEY_Q)
+	_check(not main.tutorial_active and run.tutorial_seen, "Q で指南をスキップ")
+	_reset_play_fixture()
+
+
+func _reset_play_fixture() -> void:
+	run.new_run()
+	main.selected_site = 0
+	main.selected_kind = 0
+	main.tutorial_active = false
+	main.tutorial_step = main.TutorialStep.DONE
+	main._reset_board()
+
+
 func _check_keyboard_build() -> void:
 	var initial_gold: int = run.gold
 	var site: int = main.selected_site
@@ -50,6 +116,9 @@ func _check_keyboard_build() -> void:
 	var after_build: int = run.gold
 	await _key(KEY_ENTER)
 	_check(run.towers.size() == 1 and run.gold == after_build, "建設済み地点への二重購入を拒否")
+	_check("地点に塔があります" in main.notice.text, "建設できない具体的な理由を表示")
+	_check(main.build_button.disabled and "地点に塔" in main.build_button.text,
+		"占有地点の建設ボタンに不可理由を表示")
 	await _key(KEY_U)
 	var tower: Dictionary = run.tower_at(site)
 	_check(not tower.is_empty() and tower.get("level") == 2, "U で塔を強化")
@@ -58,6 +127,13 @@ func _check_keyboard_build() -> void:
 	await _key(KEY_X)
 	_check(run.tower_at(site).is_empty(), "X で売却")
 	_check(run.gold == before_sell + Catalog.sell_value("arrow", 2), "強化費を含む売却額")
+	var restored_gold: int = run.gold
+	run.gold = 0
+	main._update_hud(0.1)
+	_check(main.build_button.disabled and "あと" in main.build_button.text,
+		"資金不足の必要金額を建設ボタンに表示")
+	run.gold = restored_gold
+	main._update_hud(0.1)
 	await _key(KEY_RIGHT)
 	_check(main.selected_site != site, "右キーで建設地点を移動")
 	await _key(KEY_LEFT)
@@ -146,7 +222,9 @@ func _check_results() -> void:
 	await _key(KEY_ESCAPE)
 	_check(run.phase == "title", "勝利結果から Esc でタイトルへ戻る")
 	await _click_first_button()
-	_check(run.phase == "play", "タイトルのボタンを実クリックして開始")
+	_check(run.phase == "map", "タイトルのボタンを実クリックして地図へ")
+	await _click_first_button()
+	_check(run.phase == "play", "地図のボタンを実クリックして開始")
 	run.phase = "win"
 	await create_timer(0.2).timeout
 	await _key(KEY_ENTER)
@@ -203,6 +281,11 @@ func _click_first_button() -> void:
 			await _click(button.global_position + button.size * 0.5)
 			return
 	_check(false, "タイトルに操作可能なボタンがある")
+
+
+func _remove_file(path: String) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _click_button(caption: String) -> void:

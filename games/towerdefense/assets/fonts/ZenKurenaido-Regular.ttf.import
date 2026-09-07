@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://buhbeqaa0d16"
-path="res://.godot/imported/font.ttf-39b250d5b3aa0fc62f2ec61dd6a2edd2.fontdata"
+uid="uid://bkonwtdbwu1wi"
+path="res://.godot/imported/ZenKurenaido-Regular.ttf-fb35ced544db99296a08d171d3f145a1.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/font.ttf"
-dest_files=["res://.godot/imported/font.ttf-39b250d5b3aa0fc62f2ec61dd6a2edd2.fontdata"]
+source_file="res://assets/fonts/ZenKurenaido-Regular.ttf"
+dest_files=["res://.godot/imported/ZenKurenaido-Regular.ttf-fb35ced544db99296a08d171d3f145a1.fontdata"]
 
 [params]
 

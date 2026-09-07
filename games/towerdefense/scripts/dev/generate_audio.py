@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""黄昏の灯砦の独自譜面と固定 seed から場面別 BGM / SE を再生成する。"""
+"""黄昏の灯砦の独自譜面と固定 seed から BGM / SE / 環境音を再生成する。"""
 
 from array import array
+import argparse
 from functools import lru_cache
+import io
+import json
 from pathlib import Path
 import math
 import random
@@ -10,9 +13,11 @@ import sys
 import wave
 
 
-ROOT = Path(__file__).resolve().parents[2] / "assets" / "audio"
+ASSETS_ROOT = Path(__file__).resolve().parents[2] / "assets"
 RATE = 22050
 TAU = math.tau
+MUSIC = ["title", "stage", "boss", "win", "lose"]
+EFFECTS = ["arrow", "mortar", "frost", "sun", "build", "hit", "death", "wave", "base"]
 
 
 @lru_cache(maxsize=256)
@@ -93,7 +98,7 @@ def mix(channels, values, start, gain, pan=0):
         channels[1][frame] += value * right
 
 
-def write_wav(name, channels, ambience=False):
+def write_wav(name, channels, output_root, ambience=False, peak_target=.84):
     """入力から常に同じ 16 bit stereo PCM を出力し、過大振幅を防ぐ。"""
     length = len(channels[0])
     if ambience:
@@ -104,7 +109,7 @@ def write_wav(name, channels, ambience=False):
                 for frame in range(length):
                     channels[side][frame] += dry[1 - side][(frame - offset) % length] * decay
     peak = max(abs(value) for channel in channels for value in channel)
-    gain = .84 / max(peak, .01)
+    gain = peak_target / max(peak, .01)
     pcm = array("h")
     for frame in range(length):
         edge = min(1, frame / (RATE * .008), (length - 1 - frame) / (RATE * .008))
@@ -112,15 +117,21 @@ def write_wav(name, channels, ambience=False):
             pcm.append(round(channels[side][frame] * gain * edge * 32767))
     if sys.byteorder != "little":
         pcm.byteswap()
-    ROOT.mkdir(parents=True, exist_ok=True)
-    with wave.open(str(ROOT / f"{name}.wav"), "wb") as output:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as output:
         output.setnchannels(2)
         output.setsampwidth(2)
         output.setframerate(RATE)
         output.writeframes(pcm.tobytes())
+    target = output_root / "audio" / f"{name}.wav"
+    content = buffer.getvalue()
+    if target.is_file() and target.read_bytes() == content:
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
 
 
-def make_music(name, bpm, chords, melody, lead, rhythm):
+def make_music(name, bpm, chords, melody, lead, rhythm, output_root):
     """8 小節。和声・旋律・伴奏の組み合わせを場面ごとに変える。"""
     beat = 60 / bpm
     channels = [array("f", [0]) * round(beat * 32 * RATE) for _ in range(2)]
@@ -155,14 +166,13 @@ def make_music(name, bpm, chords, melody, lead, rhythm):
         if rhythm in ("title", "map", "victory"):
             mix(channels, instrument("bell", chord[2] + 24, round(beat * 2.5, 4)),
                 start + beat * 2.5, .10, .55)
-    write_wav(name, channels, ambience=True)
+    write_wav(name, channels, output_root, ambience=True)
 
 
-def make_effects():
+def make_effects(output_root):
     """弦、爆風、氷の部分音、太陽砲の唸りを別々の包絡で合成する。"""
-    names = ['arrow', 'mortar', 'frost', 'sun', 'build', 'hit', 'death', 'wave', 'base']
     durations = [.24, .7, .65, .9, .55, .22, .58, 1.1, .8]
-    for ordinal, (name, duration) in enumerate(zip(names, durations)):
+    for ordinal, (name, duration) in enumerate(zip(EFFECTS, durations)):
         rng = random.Random(3939 + ordinal)
         channels = [array('f', [0]) * round(duration * RATE) for _ in range(2)]
         previous = 0
@@ -211,23 +221,128 @@ def make_effects():
             value *= min(1,time/.003,(duration-time)/.03)
             channels[0][frame] = value*math.sqrt(.6-ratio*.2)
             channels[1][frame] = value*math.sqrt(.4+ratio*.2)
-        write_wav(name, channels)
+        write_wav(name, channels, output_root)
+
+
+def circular_average(values, radius):
+    """輪としてつながる移動平均を返し、風の端点にも継ぎ目を作らない。"""
+    length = len(values)
+    width = radius * 2 + 1
+    total = sum(values[index % length] for index in range(-radius, radius + 1))
+    result = array("f")
+    for index in range(length):
+        result.append(total / width)
+        total += values[(index + radius + 1) % length]
+        total -= values[(index - radius) % length]
+    return result
+
+
+def noise_burst(seed, duration, kind):
+    """旗布・焚き火・木材ごとの短い音を固定 seed で作る。"""
+    rng = random.Random(seed)
+    values = array("f")
+    previous = 0.0
+    for frame in range(round(duration * RATE)):
+        time = frame / RATE
+        ratio = time / duration
+        noise = rng.uniform(-1, 1)
+        if kind == "cloth":
+            envelope = math.sin(math.pi * ratio) ** 2 * math.exp(-time * 5)
+            value = ((noise - previous) * .44 + math.sin(TAU * 73 * time) * .10)
+            value *= envelope
+        elif kind == "fire":
+            envelope = math.exp(-time * 85)
+            value = (noise - previous) * envelope
+        else:
+            frequency = 118 - 54 * ratio
+            phase = TAU * (frequency * time - 27 * time * time)
+            envelope = math.sin(math.pi * ratio) ** 1.6
+            value = (math.sin(phase) + .28 * math.sin(phase * 2.03)) * envelope
+        previous = noise
+        values.append(value)
+    return values
+
+
+def make_ambience(output_root):
+    """風、旗布、焚き火、木の軋みを一周16秒の循環バッファへ合成する。"""
+    duration = 16.0
+    length = round(duration * RATE)
+    rng = random.Random(6741)
+    raw = array("f", (rng.uniform(-1, 1) for _ in range(length)))
+    broad = circular_average(raw, 24)
+    low = circular_average(raw, 210)
+    channels = [array("f", [0]) * length for _ in range(2)]
+    stereo_offset = round(.37 * RATE)
+    for frame in range(length):
+        time = frame / RATE
+        breath = .66 + .20 * math.sin(TAU * time / duration * 3)
+        breath += .14 * math.sin(TAU * time / duration * 7 + .8)
+        left = (broad[frame] * 2.5 + low[frame] * 4.2) * breath
+        right_frame = (frame + stereo_offset) % length
+        right = (broad[right_frame] * 2.5 + low[right_frame] * 4.2) * breath
+        channels[0][frame] = left * .12
+        channels[1][frame] = right * .12
+    for index in range(14):
+        start = index * duration / 14 + rng.uniform(-.22, .22)
+        pan = -.65 if index % 2 == 0 else .65
+        mix(channels, noise_burst(7100 + index, .23, "cloth"), start, .18, pan)
+    for index in range(34):
+        start = index * duration / 34 + rng.uniform(-.16, .16)
+        mix(channels, noise_burst(7300 + index, .065, "fire"), start, .075,
+            rng.uniform(-.18, .18))
+    for index, start in enumerate([1.8, 5.1, 8.7, 12.4, 14.8]):
+        pan = -.45 if index % 2 == 0 else .42
+        mix(channels, noise_burst(7500 + index, 1.05, "wood"), start, .095, pan)
+    write_wav("ambience", channels, output_root, peak_target=.58)
+
+
+def asset_spec():
+    """手続き素材検査が利用する生成物の定義を返す。"""
+    return {
+        "rate": RATE,
+        "images": [],
+        "audio": [
+            {"path": f"audio/{name}.wav", "loop": True, "stereo": True}
+            for name in MUSIC + ["ambience"]
+        ] + [
+            {"path": f"audio/{name}.wav", "loop": False, "stereo": True}
+            for name in EFFECTS
+        ],
+    }
+
+
+def parse_args():
+    """出力先と検査用 spec の表示を受け取る。"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out-dir", type=Path, default=ASSETS_ROOT)
+    parser.add_argument("--print-spec", action="store_true")
+    return parser.parse_args()
 
 
 def main():
-    """各場面の独自旋律を上書き再生成し、同じバイト列を得る。"""
+    """各場面の独自旋律を再生成し、同じ内容ならファイルを書き直さない。"""
+    args = parse_args()
+    if args.print_spec:
+        print(json.dumps(asset_spec(), ensure_ascii=False, separators=(",", ":")))
+        return
     make_music('title', 86, [(55,59,62),(52,55,59),(48,52,55),(50,54,57)],
-               [79,0,74,76, 79,83,81,0, 79,76,74,72, 74,78,81,0], 'flute', 'title')
+               [79,0,74,76, 79,83,81,0, 79,76,74,72, 74,78,81,0], 'flute', 'title',
+               args.out_dir)
     make_music('stage', 118, [(52,55,59),(48,52,55),(55,59,62),(50,54,57)],
-               [76,79,83,79, 76,72,79,76, 74,79,83,86, 81,78,74,78], 'pluck', 'battle')
+               [76,79,83,79, 76,72,79,76, 74,79,83,86, 81,78,74,78], 'pluck', 'battle',
+               args.out_dir)
     make_music('boss', 146, [(40,43,47),(41,45,48),(38,42,45),(47,51,54)],
-               [64,67,71,70, 65,69,72,69, 66,69,74,73, 71,75,78,75], 'brass', 'boss')
+               [64,67,71,70, 65,69,72,69, 66,69,74,73, 71,75,78,75], 'brass', 'boss',
+               args.out_dir)
     make_music('win', 108, [(55,59,62),(60,64,67),(52,55,59),(50,54,57)],
-               [79,83,86,91, 88,86,84,83, 83,79,76,79, 81,86,83,79], 'flute', 'victory')
+               [79,83,86,91, 88,86,84,83, 83,79,76,79, 81,86,83,79], 'flute', 'victory',
+               args.out_dir)
     make_music('lose', 64, [(52,55,59),(48,52,55),(45,48,52),(47,51,54)],
-               [79,0,76,0, 76,72,0,71, 72,0,69,0, 71,66,0,0], 'bell', 'result')
-    make_effects()
-    print('独自 BGM 5 曲、効果音 9 点を生成しました（22050 Hz / stereo PCM）。')
+               [79,0,76,0, 76,72,0,71, 72,0,69,0, 71,66,0,0], 'bell', 'result',
+               args.out_dir)
+    make_effects(args.out_dir)
+    make_ambience(args.out_dir)
+    print('独自 BGM 5 曲、効果音 9 点、環境音 1 点を生成しました（22050 Hz / stereo PCM）。')
 
 
 if __name__ == '__main__':

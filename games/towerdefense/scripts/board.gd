@@ -8,15 +8,15 @@ const Ui := preload("res://scripts/ui.gd")
 var run: Node
 var selected_site: int = 0
 var selected_kind: String = "arrow"
+var preview_tower_kind: String = ""
+var show_build_preview: bool = true
 var enemy_nodes: Dictionary = {}
 var tower_nodes: Dictionary = {}
 var clock: float = 0.0
 var shots: Array[Dictionary] = []
 var rings: Array[Dictionary] = []
-var foreground: Sprite2D
 var backdrop: Sprite2D
-var base_texture: Texture2D
-var site_texture: Texture2D
+var preview_actor: Node2D
 var shake: float = 0.0
 var gallery: bool = false
 var lantern: PointLight2D
@@ -24,19 +24,23 @@ var lantern: PointLight2D
 
 func _ready() -> void:
 	run = get_node("/root/Run")
+	var backing := Polygon2D.new()
+	backing.polygon = PackedVector2Array([
+		Vector2.ZERO, Vector2(960, 0), Vector2(960, 720), Vector2(0, 720),
+	])
+	backing.color = Ui.PARCHMENT_DARK
+	backing.z_index = -11
+	add_child(backing)
 	backdrop = Sprite2D.new()
-	backdrop.texture = load("res://assets/background.svg")
+	backdrop.texture = load("res://assets/tapestry/landscape.png")
 	backdrop.centered = false
+	var landscape_size := Vector2(backdrop.texture.get_width(), backdrop.texture.get_height())
+	var landscape_scale: float = 960.0 / landscape_size.x
+	backdrop.scale = Vector2.ONE * landscape_scale
+	backdrop.position = Vector2(0, (720.0 - landscape_size.y * landscape_scale) * 0.5)
 	backdrop.z_index = -10
+	backdrop.modulate = Color(1.0, 0.96, 0.88, 0.84)
 	add_child(backdrop)
-	foreground = Sprite2D.new()
-	foreground.texture = load("res://assets/foreground.svg")
-	foreground.centered = false
-	foreground.z_index = 5
-	foreground.modulate.a = 0.65
-	add_child(foreground)
-	base_texture = load("res://assets/base.svg")
-	site_texture = load("res://assets/ui/site.svg")
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color("ffe1a1"))
 	gradient.set_color(1, Color(1, 0.8, 0.4, 0))
@@ -58,8 +62,6 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	clock += delta
 	lantern.energy = 0.3 + sin(clock * 2.1) * 0.035
-	backdrop.position.x = sin(clock * 0.13) * 4 - 4
-	foreground.position.x = sin(clock * 0.22) * 9 - 9
 	shake = maxf(0.0, shake - delta * 18)
 	position = Vector2(sin(clock * 95), cos(clock * 83)) * shake
 	for group: Array[Dictionary] in [shots, rings]:
@@ -69,6 +71,7 @@ func _process(delta: float) -> void:
 				group.remove_at(index)
 	if not gallery:
 		_sync_actors()
+		_sync_build_preview()
 	queue_redraw()
 
 
@@ -104,6 +107,40 @@ func _sync_actors() -> void:
 			if is_instance_valid(actor):
 				actor.act("death")
 			enemy_nodes.erase(id)
+
+
+## 選択中の空き地点へ、建設後の姿と資金不足を半透明で予告する。
+func _sync_build_preview() -> void:
+	var preview_kind: String = _effective_preview_kind()
+	var visible: bool = show_build_preview and run.phase == "play" and not gallery
+	visible = visible and selected_site >= 0 and selected_site < Catalog.SITES.size()
+	visible = visible and Catalog.TOWERS.has(preview_kind)
+	visible = visible and run.tower_at(selected_site).is_empty()
+	if not visible:
+		_clear_build_preview()
+		return
+	if not is_instance_valid(preview_actor) or preview_actor.kind != preview_kind:
+		_clear_build_preview()
+		preview_actor = Actor.new()
+		preview_actor.z_index = 3
+		add_child(preview_actor)
+		preview_actor.setup(preview_kind)
+	preview_actor.position = Catalog.SITES[selected_site] + Vector2(0, -17)
+	var can_afford: bool = run.gold >= int(Catalog.TOWERS[preview_kind].cost)
+	var pulse: float = 0.30 + sin(clock * 4.0) * 0.06
+	preview_actor.modulate = Color(1.0, 1.0, 1.0, pulse) if can_afford \
+		else Color(0.9, 0.45, 0.36, pulse * 0.8)
+
+
+func _clear_build_preview() -> void:
+	if is_instance_valid(preview_actor):
+		preview_actor.queue_free()
+	preview_actor = null
+
+
+func _effective_preview_kind() -> String:
+	var value: String = preview_tower_kind if not preview_tower_kind.is_empty() else selected_kind
+	return value if Catalog.TOWERS.has(value) else selected_kind
 
 
 # 戦闘イベントごとに一つの演出を開始する。
@@ -177,7 +214,7 @@ func popup(point: Vector2, text: String, color: Color) -> void:
 	var node := Label.new()
 	node.text = text
 	node.position = point + Vector2(-22, -45)
-	node.add_theme_font_override("font", load("res://assets/fonts/font.ttf"))
+	node.add_theme_font_override("font", load("res://assets/fonts/ZenKurenaido-Regular.ttf"))
 	node.add_theme_font_size_override("font_size", 20)
 	node.add_theme_color_override("font_color", color)
 	node.add_theme_color_override("font_outline_color", Ui.INK)
@@ -193,12 +230,13 @@ func popup(point: Vector2, text: String, color: Color) -> void:
 func _draw() -> void:
 	if gallery or run == null:
 		return
-	_draw_path()
+	_draw_tapestry_frame()
 	if run.phase == "title":
 		return
+	_draw_path()
 	for index: int in range(Catalog.SITES.size()):
+		_draw_site_marker(index)
 		var point: Vector2 = Catalog.SITES[index]
-		draw_texture_rect(site_texture, Rect2(point - Vector2(40, 24), Vector2(80, 48)), false)
 		if index == selected_site:
 			var tower: Dictionary = run.tower_at(index)
 			var stats: Dictionary = Catalog.tower_stats(selected_kind, 1)
@@ -211,7 +249,7 @@ func _draw() -> void:
 		if not tower.is_empty():
 			for level: int in range(int(tower.level)):
 				draw_circle(point + Vector2(-8 + level * 8, 22), 2.8, Ui.GOLD)
-	draw_texture_rect(base_texture, Rect2(863, 390, 115, 144), false)
+	_draw_base_emblem()
 	for enemy: Dictionary in run.enemies:
 		var point: Vector2 = enemy.position + Vector2(-22, -52)
 		draw_style_box(Ui.box(Color("112d33"), Color("224441")), Rect2(point, Vector2(44, 7)))
@@ -220,21 +258,99 @@ func _draw() -> void:
 	_draw_effects()
 
 
+## 1枚の布の外周と、左の夜から右の夜明けへ続く章の結び目を描く。
+func _draw_tapestry_frame() -> void:
+	draw_rect(Rect2(8, 8, 944, 704), Ui.THREAD_BROWN, false, 5)
+	draw_rect(Rect2(15, 15, 930, 690), Ui.GOLD, false, 2)
+	for x: int in range(22, 944, 18):
+		draw_line(Vector2(x, 10), Vector2(x + 8, 17), Ui.THREAD_RED, 2)
+		draw_line(Vector2(x, 710), Vector2(x + 8, 703), Ui.THREAD_BLUE, 2)
+	for y: int in range(24, 700, 18):
+		draw_line(Vector2(10, y), Vector2(17, y + 8), Ui.THREAD_OLIVE, 2)
+		draw_line(Vector2(950, y), Vector2(943, y + 8), Ui.THREAD_RED, 2)
+	for chapter_x: float in [318.0, 638.0]:
+		draw_circle(Vector2(chapter_x, 20), 7, Ui.PAPER)
+		draw_arc(Vector2(chapter_x, 20), 7, 0, TAU, 12, Ui.THREAD_BROWN, 2)
+		draw_line(
+			Vector2(chapter_x - 5, 15), Vector2(chapter_x + 5, 25), Ui.THREAD_RED, 2
+		)
+		draw_line(
+			Vector2(chapter_x + 5, 15), Vector2(chapter_x - 5, 25), Ui.THREAD_BLUE, 2
+		)
+
+
+## 空き・資金不足・占有を色だけでなく、＋・斜線・四角の刺繍記号でも区別する。
+func _draw_site_marker(index: int) -> void:
+	var point: Vector2 = Catalog.SITES[index]
+	var tower: Dictionary = run.tower_at(index)
+	var occupied := not tower.is_empty()
+	var preview_kind: String = _effective_preview_kind()
+	var cost: int = int(Catalog.TOWERS[preview_kind].cost)
+	var can_afford: bool = run.gold >= cost
+	var thread_color := Ui.THREAD_BROWN
+	if not occupied:
+		thread_color = Ui.THREAD_OLIVE if can_afford else Ui.THREAD_RED
+	var diamond := PackedVector2Array([
+		point + Vector2(0, -27),
+		point + Vector2(35, 0),
+		point + Vector2(0, 27),
+		point + Vector2(-35, 0),
+		point + Vector2(0, -27),
+	])
+	draw_colored_polygon(diamond, Color(Ui.PAPER, 0.78))
+	draw_polyline(diamond, thread_color, 3, true)
+	if occupied:
+		draw_rect(Rect2(point - Vector2(9, 8), Vector2(18, 16)), thread_color, false, 3)
+		draw_line(point + Vector2(-7, 1), point + Vector2(7, 1), thread_color, 2)
+	elif can_afford:
+		draw_line(point + Vector2(-9, 0), point + Vector2(9, 0), thread_color, 4)
+		draw_line(point + Vector2(0, -9), point + Vector2(0, 9), thread_color, 4)
+	else:
+		draw_circle(point, 9, thread_color, false, 3, true)
+		draw_line(point + Vector2(-10, 10), point + Vector2(10, -10), thread_color, 4)
+	if index == selected_site:
+		var pulse: float = 4.0 + sin(clock * 4.0) * 2.0
+		var selected_diamond := PackedVector2Array([
+			point + Vector2(0, -34 - pulse),
+			point + Vector2(42 + pulse, 0),
+			point + Vector2(0, 34 + pulse),
+			point + Vector2(-42 - pulse, 0),
+			point + Vector2(0, -34 - pulse),
+		])
+		draw_polyline(selected_diamond, Ui.GOLD, 4, true)
+
+
+func _draw_base_emblem() -> void:
+	var point := Vector2(925, 500)
+	var shield := PackedVector2Array([
+		point + Vector2(-24, -37),
+		point + Vector2(24, -37),
+		point + Vector2(25, 5),
+		point + Vector2(0, 35),
+		point + Vector2(-25, 5),
+		point + Vector2(-24, -37),
+	])
+	draw_colored_polygon(shield, Color(Ui.THREAD_BLUE, 0.86))
+	draw_polyline(shield, Ui.GOLD, 4, true)
+	draw_line(point + Vector2(0, 21), point + Vector2(0, -18), Ui.PAPER, 4)
+	draw_circle(point + Vector2(0, -21), 7 + sin(clock * 3.0), Ui.GOLD)
+
+
 func _draw_path() -> void:
-	for layer: Array in [[66.0, Color("30443e")], [58.0, Color("8c8363")],
-		[49.0, Color("baa27b")], [40.0, Color("c6b28a")]]:
+	for layer: Array in [[38.0, Ui.THREAD_BROWN], [33.0, Ui.GOLD],
+		[27.0, Ui.PAPER], [21.0, Ui.PARCHMENT_DARK]]:
 		draw_polyline(PackedVector2Array(Catalog.PATH), layer[1], layer[0], true)
 		for point: Vector2 in Catalog.PATH:
 			draw_circle(point, layer[0] / 2.0, layer[1])
-	for index: int in range(12, int(Catalog.path_length()), 39):
+	for index: int in range(12, int(Catalog.path_length()), 28):
 		var point: Vector2 = Catalog.path_position(index)
-		draw_line(point + Vector2(-4, 10), point + Vector2(4, 8), Color("b49b76"), 2)
+		draw_line(point + Vector2(-4, 8), point + Vector2(4, 6), Ui.THREAD_BROWN, 2)
 	for distance: int in range(70, int(Catalog.path_length()), 270):
 		var point: Vector2 = Catalog.path_position(distance)
 		var direction: Vector2 = (Catalog.path_position(distance + 8) - point).normalized()
 		var side: Vector2 = direction.orthogonal() * 5
 		draw_polyline(PackedVector2Array([point - direction * 5 + side,
-			point + direction * 3, point - direction * 5 - side]), Color("9a835f"), 2, true)
+			point + direction * 3, point - direction * 5 - side]), Ui.THREAD_RED, 2, true)
 
 
 func _draw_effects() -> void:

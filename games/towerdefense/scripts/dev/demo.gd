@@ -19,11 +19,13 @@ func _initialize() -> void:
 
 func _start() -> void:
 	root.size = Vector2i(1280, 720)
-	main = load("res://scenes/main.tscn").instantiate()
-	root.add_child(main)
 	run = root.get_node("Run")
 	run.save_path = "res://tmp/demo-save.json"
-	print("録画開始: 30 秒、通常の初期状態から実キー入力で建設・強化・防衛")
+	run.tutorial_save_path = "res://tmp/demo-tutorial.json"
+	_remove_file(run.tutorial_save_path)
+	main = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	print("録画開始: 30 秒、表紙・地図・指南から実キー入力で建設・強化・防衛")
 	for frame: int in range(FRAME_LIMIT):
 		frames = frame
 		_event(frame)
@@ -42,28 +44,41 @@ func _event(frame: int) -> void:
 		30: _key(KEY_ENTER, true)
 		32: _key(KEY_ENTER, false)
 		60:
-			_check(run.phase == "play", "Enter でタイトルから開始")
+			_check(run.phase == "map", "Enter でタイトルから地図へ")
 			_key(KEY_ENTER, true)
 		62: _key(KEY_ENTER, false)
 		90: _key(KEY_RIGHT, true)
 		92: _key(KEY_RIGHT, false)
 		105: _key(KEY_TAB, true)
 		107: _key(KEY_TAB, false)
-		120: _key(KEY_ENTER, true)
-		122: _key(KEY_ENTER, false)
-		150:
+		111: _key(KEY_TAB, true)
+		113: _key(KEY_TAB, false)
+		117: _key(KEY_TAB, true)
+		119: _key(KEY_TAB, false)
+		123: _key(KEY_TAB, true)
+		125: _key(KEY_TAB, false)
+		135: _key(KEY_ENTER, true)
+		137: _key(KEY_ENTER, false)
+		165: _key(KEY_SPACE, true)
+		167: _key(KEY_SPACE, false)
+		170: _key(KEY_U, true)
+		172: _key(KEY_U, false)
+		180: _key(KEY_RIGHT, true)
+		182: _key(KEY_RIGHT, false)
+		195: _key(KEY_TAB, true)
+		197: _key(KEY_TAB, false)
+		210: _key(KEY_ENTER, true)
+		212: _key(KEY_ENTER, false)
+		225: _key(KEY_F, true)
+		227: _key(KEY_F, false)
+		240:
 			built = run.towers.size() >= 2
-			_key(KEY_U, true)
-		152: _key(KEY_U, false)
-		165:
 			for tower: Dictionary in run.towers:
 				if int(tower.level) > 1:
 					upgraded = true
-			_key(KEY_SPACE, true)
-		167: _key(KEY_SPACE, false)
-		195: _key(KEY_F, true)
-		197: _key(KEY_F, false)
-		240: _check(run.speed == 3, "F の実入力で 3 倍速")
+			_check(run.phase == "play", "地図からプレイへ遷移")
+			_check(not main.tutorial_active and run.tutorial_seen, "実入力で指南を完了")
+			_check(run.speed == 3, "F の実入力で 3 倍速")
 		FRAME_LIMIT - 15: main.stop_audio()
 	# 敵を全滅させた後も通常のウェーブ開始操作だけで録画を続ける。
 	if frame > 250 and frame < FRAME_LIMIT - 30 and frame % 60 == 0:
@@ -88,3 +103,8 @@ func _check(condition: bool, description: String) -> void:
 	if not condition:
 		failed = true
 		push_error("demo FAIL: " + description)
+
+
+func _remove_file(path: String) -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
