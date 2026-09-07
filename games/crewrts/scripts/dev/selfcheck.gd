@@ -73,7 +73,15 @@ func _check_asset_directory(path: String, credits: String) -> void:
 
 func _check_simulation() -> void:
 	var game: Node = Simulation.new()
+	game.show_map()
+	_check(game.phase == "map", "表紙から島の絵地図へ進める")
 	game.start_day()
+	_check(game.tutorial_page == 0 and not game.tutorial_seen, "初回だけ操作ノートを開く")
+	game.advance_tutorial()
+	game.advance_tutorial()
+	_check(game.tutorial_page == 2, "操作ノートを順にめくる")
+	game.skip_tutorial()
+	_check(game.tutorial_page == -1 and game.tutorial_seen, "操作ノートを閉じて探索を始める")
 	_check(game.crew.size() == 30 and game.following_count() == 30, "30 体で開始")
 	_check(game.remaining == 300.0 and game.collected == 0, "初期時刻と回収数")
 	game.dismiss()

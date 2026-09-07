@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://c4av4m1e8wdu8"
-path="res://.godot/imported/MPLUSRounded1c-Regular.ttf-c1fb9122389aafc31b52ab31bae2f90d.fontdata"
+uid="uid://d3la8b45u1xmy"
+path="res://.godot/imported/KleeOne-Regular.ttf-f9e083b8b5b52b23fac51f9fc7b01dec.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/MPLUSRounded1c-Regular.ttf"
-dest_files=["res://.godot/imported/MPLUSRounded1c-Regular.ttf-c1fb9122389aafc31b52ab31bae2f90d.fontdata"]
+source_file="res://assets/fonts/KleeOne-Regular.ttf"
+dest_files=["res://.godot/imported/KleeOne-Regular.ttf-f9e083b8b5b52b23fac51f9fc7b01dec.fontdata"]
 
 [params]
 
