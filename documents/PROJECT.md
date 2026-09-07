@@ -16,7 +16,7 @@
 
 ## 対象ゲーム
 
-1 ゲーム = `games/<slug>/` の 1 Godot プロジェクト = 1 worktree (ブランチ `game/<slug>`) = 1 作業者。仕様と受け入れ条件は各 issue を正とする。
+1 ゲーム = `games/<slug>/` の 1 Godot プロジェクト = 1 worktree (ブランチ `game/<slug>`) = 1 作業者。作業者に渡すのは「作って欲しいゲーム」(元ネタとジャンル) だけで、issue に書かれた受け入れ条件・見た目の基準・検証方法は配らない (配った結果、全ゲームの画面構成が同じになった。PR #87 以降の運用)。
 
 | slug | 元ネタ (名称・素材は使わない) | ジャンル | 次元 | issue |
 | --- | --- | --- | --- | --- |
@@ -30,12 +30,12 @@
 | rollball | 塊魂 | 巻き込み 3D アクション | 3D | #9 |
 | crewrts | ピクミン | 仲間を率いる 3D アクション RTS | 3D | #10 |
 
-品質の基準: タイトル → プレイ → 結果のループが成立し、画像・BGM・SE が入って「ゲームとして成立する」こと。素材は「それっぽければよい」で完全な再現は求めない (issue #1)。
+品質の基準 (issue #1 の原文): 「クオリティについては画像や BGM・SE も使ってゲームとして成立するようにしてください。なお、素材部分についてはそれっぽければ良くて完コピじゃなくていいです」。画面構成 (タイトル → プレイ → 結果など) は指定しない。
 
 ## 運用
 
 - **司令塔**: tmux セッション `godotpractice` の window 0 で動く Claude Code (Fable)。各 worktree の進捗を `tmux capture-pane` で監視し、必要なら `tmux send-keys` で介入する。`documents/knowledge/*.md` に溜まった知見をまとめて bannzai/castle に issue として起票する (skill・rules・ツールへの反映は castle 側で行う)
-- **作業者**: 各 worktree で動く Codex CLI (GPT-6 Astra)。`tmux-branch-setup --codex game/<slug>` で起動する。issue の受け入れ条件をすべて満たすまで作業を止めない (途中で判断を仰ぐ必要が出たら、判断が要る点を `documents/knowledge/<slug>.md` と PR に書いて、他の項目を進める)
+- **作業者**: 各 worktree で動く Codex CLI (GPT-6 Astra)。`tmux-branch-setup --codex game/<slug>` で起動し、作って欲しいゲームだけを渡す。画面構成・見た目・検証方法は作業者がゲームごとに決める
 - **ブランチと PR**: 作業者は `game/<slug>` にこまめに commit・push し、早い段階で draft PR を作って進捗を反映する。受け入れ条件を満たしたら ready for review にする。PR のマージは司令塔またはユーザーが行い、作業者は行わない
 - **変更範囲**: 作業者は `games/<slug>/` と `documents/knowledge/<slug>.md` の外を変更しない (ルートの AGENTS.md・Makefile・`.github/`・他のゲームは共有物で、司令塔が別 PR で変える)。ゲーム間でファイルが重ならないため、worktree 間の衝突は起きない
 - **知見の流れ**: 作業者 → `documents/knowledge/<slug>.md` (ゲームの PR に含める) → 司令塔が横断して読み、castle の issue へ (skill の改善・rules の追加・ツールの新設)。godot-development skill の `references/pitfalls.md` が Godot のハマりどころの集約先
@@ -50,8 +50,8 @@
 | レンダラ | GL Compatibility (3D のゲームも) | CI の Xvfb + Mesa llvmpipe と Web エクスポート (WebGL 2) の両方で描画できる。Forward+ は Vulkan 前提でソフトウェア GL で動かない |
 | リポジトリ構成 | モノレポ。`games/<slug>/` に独立した Godot プロジェクト、ルートに共有物 (AGENTS.md・Makefile・CI・rules・documents) | 1 リポジトリで worktree を並べ、知見を 1 箇所 (`documents/knowledge/`) に集める。ゲームごとにファイルが分かれるため並列作業で衝突しない |
 | 配布ターゲット | Windows (x86_64) / macOS (universal) / Linux (x86_64) のデスクトップエクスポート + 動作確認専用の Web エクスポート | Steam 向けの構成を素振りする。Web は webtunnel での動作確認にだけ使う |
-| 検証 | 各ゲームの Makefile (import / check / selfcheck / lint / test / screenshot / movie / build-*)。ルートの Makefile が全ゲームへ委譲する | 手順は [AGENTS.md](../AGENTS.md)「検証方法」。雛形は godot-development skill の `scaffold-project.sh` (bannzai/suicagamecopy の固定 commit) を基にし、screenshot / movie / build-web を足した |
-| CI | GitHub Actions (ubuntu)。PR では変更のあったゲームだけ、共有物の変更と main への push では全ゲームを matrix で検証する | public リポジトリのため Linux ランナーで完結させる。9 ゲーム全部を毎回回すと時間と枠を消費する |
+| 検証 | 作業者がゲームごとに決める (共通の Makefile target・雛形は配らない)。ルートの Makefile は `make list` と `make <slug>-run` の委譲だけを提供する | 共通の検証手順を配ると作り方まで揃ってしまう (PR #87 の経緯) |
+| CI・コードレビュー | 行わない。PR は CI の結果やレビューを待たずにマージする | ユーザーの指示 (2026-09-07)。`.github/workflows/` の CI は残っているが結果を待たない |
 | GHA 上の動作確認 | CI の `screenshot-and-movie` job (Xvfb + llvmpipe。撮影と録画の artifact) と、webtunnel の caller workflow (`browser-session.yml`。Web エクスポートを runner 上の Chromium で開く) | 調査 https://github.com/bannzai/castle/issues/891 で 3 経路とも成立を実測済み。webtunnel 経路の前提は下記「未検証事項」 |
 | 素材 | フリー素材 (CC0 優先) と生成物。原作素材は使わない。記録は各ゲームの `assets/CREDITS.md` | public リポジトリで商標・著作権の問題を作らない。探し方・生成・記録は game-asset-search skill |
 | Steamworks / ストア / 課金 / 法務 | 対象外 | リリースしない (issue #1) |
