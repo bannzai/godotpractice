@@ -88,3 +88,17 @@ Godot 4.7 の WAV importer は今回の長い音源を QOA へ圧縮した。`Au
 `game-asset-search` には、SVG・PCMの手続き生成とは別に「画像ファイルを作らず、ColorRect / Polygon2D等のエンジン標準図形で完結させる」経路と、第三者素材を使わないコード描画をCREDITSへ記録する例があるとよい。現行の `check-procedural-assets.sh` はファイル生成物の再現性検査には効くが、コード描画の禁止ノードや画像参照の混入は検査しない。
 
 `godot-development` には、contentをフェードするゲームのscreenshot.gdで「画面遷移時間を待ってから撮る」例、初回チュートリアルの各段階・スキップ・操作可能／不可能表示を実入力で検査する例を追加できる。固定秒数より画面状態の成立を待つ方が堅いが、Tweenの完成状態には描画時間の待機も必要だった。
+
+## 2026-09-08: 結晶の庭の新規実装
+
+今回の開始時点では `games/blockpuzzle/` が存在しなかったため、新しい独立したゲームを作成した。上記は過去の実装の知見として保持し、今回の実装の起動・仕様は `games/blockpuzzle/README.md` を参照する。
+
+- Godot 4.7 のウィンドウ非アクティブ化は `InputEventWindowFocusOut` という型では扱えない。`_notification` の `NOTIFICATION_APPLICATION_FOCUS_OUT` で一時停止する。
+- 描画付きの `SceneTree` 検証では `Input.parse_input_event` に押下と解放を渡し、フレームを進めると、本体の入力処理を通して移動・回転・即落下・再開を確認できる。撮影は `RenderingServer.frame_post_draw` 後の viewport 画像を使った。
+- 音を再生中の撮影スクリプトで即座に `quit()` すると、今回の macOS / Godot 4.7 では `AudioStreamWAV` と `AudioStreamPlaybackWAV` の残留警告が発生した。音声を stop し、0.1 秒後にシーンを解放してから終了すると警告が消えた。
+- sandbox 内の editor import は exit 0 でも `user://` とエディター設定保存の ERROR が出た。必要な通常権限で実行し直したログではエラー・警告がないことを確認した。exit code だけで成功判定しない。
+- 消去前の盤面を短時間保持してから重力と次の消去判定へ進むと、同時消去と連鎖の段階を見せられる。検証では同じ fixture から消去待ち・重力後の二連鎖を再現した。
+
+### 今回の skill 化候補
+
+Godot の描画付き入力検証に「音声の停止と終了処理」「実プレイの保存先を触らないテスト用保存先」「入力イベントと盤面 fixture を併用した連鎖撮影」を追加する候補。共有 skill 自体はこの作業では変更していない。
