@@ -6,6 +6,22 @@ const KINDS: Array[String] = [
 	"enemy_sword", "enemy_lance"
 ]
 const POSES: Array[String] = ["idle", "select", "move", "attack", "hurt", "dodge", "defeat"]
+const ALLY_ATLAS_PATH: String = "res://assets/generated/allies-atlas.png"
+const ENEMY_ATLAS_PATH: String = "res://assets/generated/enemies-atlas.png"
+const ATLAS_COLUMNS: int = 5
+const LEGACY_ART_SIZE := Vector2(192.0, 224.0)
+const ATLAS_INDEX: Dictionary = {
+	"sword": 0,
+	"lance": 1,
+	"axe": 2,
+	"bow": 3,
+	"healer": 4,
+	"enemy_sword": 2,
+	"archer": 1,
+	"raider": 0,
+	"enemy_lance": 3,
+	"boss": 4,
+}
 
 var kind: String = "sword"
 var enemy: bool = false
@@ -27,8 +43,37 @@ func configure(value: String, is_enemy: bool = false) -> void:
 	_ensure_nodes()
 	kind = value if value in KINDS else "sword"
 	enemy = is_enemy
-	body_sprite.texture = load("res://assets/units/%s_body.svg" % kind)
-	weapon_sprite.texture = load("res://assets/units/%s_weapon.svg" % kind)
+	var atlas_path: String = (
+		ALLY_ATLAS_PATH if kind in ["sword", "lance", "axe", "bow", "healer"]
+		else ENEMY_ATLAS_PATH
+	)
+	var atlas: Texture2D = load(atlas_path) as Texture2D
+	var region: Rect2 = _atlas_region(atlas, ATLAS_INDEX[kind])
+	var portrait := AtlasTexture.new()
+	portrait.atlas = atlas
+	portrait.region = region
+	portrait.filter_clip = true
+	body_sprite.texture = portrait
+	# 画像生成アトラスの縦横比を保ったまま、従来の192x224以内へ収める。
+	# Body自体はAnimationPlayerが拡縮するため、基準倍率は子Spriteへ持たせる。
+	var fit: float = minf(LEGACY_ART_SIZE.x / region.size.x, LEGACY_ART_SIZE.y / region.size.y)
+	body_sprite.scale = Vector2.ONE * fit
+	body_sprite.material = _gold_outline_material()
+	# 一枚絵でも既存の武器回転トラックが同じNodePathを参照できる構造を残す。
+	weapon_sprite.texture = null
+
+
+static func _atlas_region(atlas: Texture2D, index: int) -> Rect2:
+	var atlas_width: float = float(atlas.get_width())
+	var left: int = roundi(atlas_width * float(index) / ATLAS_COLUMNS)
+	var right: int = roundi(atlas_width * float(index + 1) / ATLAS_COLUMNS)
+	return Rect2(left, 0, right - left, atlas.get_height())
+
+
+static func _gold_outline_material() -> ShaderMaterial:
+	var result := ShaderMaterial.new()
+	result.shader = load("res://assets/shaders/gold_outline.gdshader")
+	return result
 
 
 func play_pose(value: String) -> void:
