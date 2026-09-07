@@ -25,7 +25,7 @@ func _run() -> void:
 		_operate(frame)
 		if city.phase == "result" and city.state.outcome == "clear":
 			saw_clear = true
-		if frame == 4 * FPS:
+		if frame == 7 * FPS:
 			built_houses = city.state.tiles[16 * 32 + 8].kind == "residential"
 			built_houses = built_houses and city.state.tiles[16 * 32 + 10].kind == "residential"
 		if frame == FPS * DURATION - 12:
@@ -40,20 +40,22 @@ func _run() -> void:
 
 
 func _operate(frame: int) -> void:
-	if frame in [30, 33, 660, 663]:
-		_key(KEY_ENTER, frame in [30, 660])
-	if frame in [60, 63]:
-		_key(KEY_SPACE, frame == 60)
-	if frame in [90, 95, 100]:
-		_point(Vector2i(8 + (frame - 90) / 5, 16))
-		if frame == 90:
+	# タイトルから開始し、3枚の手書き注記を実入力で進める。
+	for start_frame: int in [30, 60, 90, 120, 780]:
+		if frame in [start_frame, start_frame + 3]:
+			_key(KEY_ENTER, frame == start_frame)
+	if frame in [150, 153]:
+		_key(KEY_SPACE, frame == 150)
+	if frame in [180, 185, 190]:
+		_point(Vector2i(8 + (frame - 180) / 5, 16))
+		if frame == 180:
 			_mouse(true)
-	if frame == 105:
+	if frame == 195:
 		_mouse(false)
-	for seconds: int in [4, 6, 8, 10, 12, 14, 16, 18, 20]:
+	for seconds: int in [8, 10, 12, 14, 16, 18, 20, 22, 24]:
 		if frame in [seconds * FPS, seconds * FPS + 3]:
 			_key(KEY_N, frame == seconds * FPS)
-	for seconds: int in [9, 11, 13, 15, 17]:
+	for seconds: int in [11, 13, 15, 17, 19]:
 		if frame in [seconds * FPS, seconds * FPS + 3]:
 			_key(KEY_O, frame == seconds * FPS)
 

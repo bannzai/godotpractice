@@ -17,7 +17,19 @@ WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpRelia
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
 
-.PHONY: import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
+.PHONY: generate-assets check-assets import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
+
+# 固定 seed から音楽・環境音・効果音を再生成する。同一バイトは書き直さない
+generate-assets:
+	python3 scripts/dev/generate_assets.py --out-dir assets
+
+# 別ディレクトリへ再生成し、リポジトリ内の10音とバイト列が一致することを検査する
+check-assets:
+	@mkdir -p $(LOG_DIR)/generated-assets
+	python3 scripts/dev/generate_assets.py --out-dir $(LOG_DIR)/generated-assets
+	@for name in title town city result ambience build click demolish month alert; do \
+		cmp assets/audio/$$name.wav $(LOG_DIR)/generated-assets/audio/$$name.wav; \
+	done
 
 # アセットのインポート (初回・素材追加後)。.godot/ を生成する
 import:
@@ -55,7 +67,7 @@ lint:
 	gdlint scripts/
 
 # ローカル検証の一括実行 (CI と同じ内容)
-test: lint check selfcheck integration
+test: check-assets lint check selfcheck integration
 
 # 実際の描画で代表画面を撮影する (headless の check / selfcheck では見た目の崩れを検出できない)。
 # 撮影する画面の並びは scripts/dev/screenshot.gd の _capture_scenes()。撮影した PNG は目視してから完了報告する

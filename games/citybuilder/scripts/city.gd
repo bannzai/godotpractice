@@ -13,6 +13,8 @@ var analysis: Dictionary = {}
 var phase: String = "title"
 var speed: int = 1
 var elapsed: float = 0.0
+var tutorial_active: bool = false
+var tutorial_step: int = 0
 var save_path: String = SAVE_PATH
 var saving_enabled: bool = true
 
@@ -36,7 +38,9 @@ func start_city() -> void:
 	state = Sim.new_city()
 	analysis = Sim.analyze(state)
 	elapsed = 0.0
-	speed = 1
+	speed = 0
+	tutorial_active = true
+	tutorial_step = 0
 	set_phase("playing")
 	changed.emit()
 
@@ -61,9 +65,31 @@ func next_month() -> void:
 		set_phase("result")
 
 
+func advance_now() -> void:
+	elapsed = 0.0
+	next_month()
+
+
+func advance_tutorial() -> bool:
+	if not tutorial_active:
+		return false
+	if tutorial_step < 2:
+		tutorial_step += 1
+		return true
+	finish_tutorial()
+	return false
+
+
+func finish_tutorial() -> void:
+	tutorial_active = false
+	tutorial_step = 0
+	speed = 1
+	changed.emit()
+
+
 func build(cell: Vector2i, kind: String) -> bool:
 	if phase != "playing" or not Sim.can_place(state, cell, kind):
-		notice.emit("ここには建設できません。空き地・資金・水辺を確認")
+		notice.emit(Sim.placement_reason(state, cell, kind))
 		return false
 	state = Sim.place(state, cell, kind)
 	analysis = Sim.analyze(state)
@@ -118,6 +144,8 @@ func resume_city() -> bool:
 	analysis = Sim.analyze(state)
 	elapsed = 0.0
 	speed = 1
+	tutorial_active = false
+	tutorial_step = 0
 	set_phase("playing" if state.outcome == "playing" else "result")
 	changed.emit()
 	return true

@@ -41,8 +41,11 @@ func _run() -> void:
 	await _capture_scenes()
 	if is_instance_valid(_main):
 		_main.queue_free()
+		for frame: int in range(2):
+			await process_frame
 	await root.get_node("Sound").shutdown()
-	await process_frame
+	for frame: int in range(2):
+		await process_frame
 	quit(0 if _success else 1)
 
 
@@ -54,9 +57,27 @@ func _capture_scenes() -> void:
 	root.add_child(_main)
 	await _shot("title", 0.5)
 	_city.start_city()
+	await _shot("tutorial-road", 0.25)
+	_main._advance_tutorial()
+	await _shot("tutorial-preview", 0.25)
+	_main._advance_tutorial()
+	await _shot("tutorial-time", 0.25)
+	_main._advance_tutorial()
 	_city.speed = 0
 	_main._refresh()
+	_main.view.cursor = Vector2i(12, 12)
+	_main._update_selection()
 	await _shot("initial-city", 0.5)
+	await _shot("placement-valid-preview", 0.15)
+	_main.view.cursor = Vector2i(12, 14)
+	_main._update_selection()
+	await _shot("placement-invalid-reason", 0.15)
+	_main.view.cursor = Vector2i(12, 12)
+	_main._update_selection()
+	_main._center_map()
+	await _shot("overview", 0.25)
+	_main.view.focus_cell(Vector2i(12, 16), 1.05)
+	_main._refresh()
 	for month: int in range(3):
 		_city.next_month()
 	await _shot("growth", 0.25)
@@ -137,11 +158,11 @@ func _capture_galleries() -> void:
 		var gallery: Control = Control.new()
 		gallery.theme = UI.make_theme()
 		root.add_child(gallery)
-		UI.panel(gallery, Rect2(0, 0, 1280, 720), Color("eeeada"))
-		UI.label(gallery, "街の図鑑  /  " + ACTION_NAMES[action], Rect2(28, 18, 1220, 50), 30, UI.INK)
-		UI.label(gallery, "全13画像の開始・途中・終了を、同じ倍率で比較", Rect2(28, 70, 1220, 30), 18, UI.INK)
+		UI.blueprint_surface(gallery, Rect2(0, 0, 1280, 720), UI.BLUE)
+		UI.label(gallery, "街の線画図鑑  /  " + ACTION_NAMES[action], Rect2(28, 18, 1220, 50), 30, UI.PAPER)
+		UI.label(gallery, "全13線画の開始・途中・終了を、同じ倍率で比較", Rect2(28, 70, 1220, 30), 18, UI.CYAN)
 		for column: int in range(ACTORS.size()):
-			UI.label(gallery, ACTOR_NAMES[column], Rect2(31 + column * 94, 112, 94, 28), 13, UI.INK)
+			UI.label(gallery, ACTOR_NAMES[column], Rect2(31 + column * 94, 112, 94, 28), 13, UI.PAPER)
 		for row: int in range(3):
 			var progress: float = row * 0.5
 			UI.label(
@@ -149,11 +170,11 @@ func _capture_galleries() -> void:
 				["開始 0%", "途中 50%", "終了 100%"][row],
 				Rect2(28, 158 + row * 178, 220, 25),
 				14,
-				UI.INK
+				UI.CYAN
 			)
 			for column: int in range(ACTORS.size()):
 				UI.panel(
-					gallery, Rect2(26 + column * 94, 190 + row * 178, 87, 130), Color("d5dacb")
+					gallery, Rect2(26 + column * 94, 190 + row * 178, 87, 130), Color("063b68d9")
 				)
 				var actor: Node2D = Actor.new()
 				gallery.add_child(actor)

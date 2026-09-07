@@ -1,9 +1,23 @@
 extends Node
-## BGM の切替は同じ曲なら再開しない。SE は操作ごとの発音なので非冪等。
+## BGM と環境音の切替は同じ場面なら再開しない。SE は操作ごとの発音なので非冪等。
 
 signal shutdown_finished
 
+const ROOM_VOLUME_DB: Dictionary = {
+	"title": -29.0,
+	"town": -25.0,
+	"city": -22.0,
+	"result": -30.0,
+}
+const ROOM_PITCH: Dictionary = {
+	"title": 0.90,
+	"town": 1.00,
+	"city": 1.08,
+	"result": 0.86,
+}
+
 var music: AudioStreamPlayer
+var room: AudioStreamPlayer
 var effects: Array[AudioStreamPlayer] = []
 var current_track: String = ""
 var muted: bool = false
@@ -21,6 +35,9 @@ func _ready() -> void:
 	music = AudioStreamPlayer.new()
 	music.volume_db = -12
 	add_child(music)
+	room = AudioStreamPlayer.new()
+	room.volume_db = -25
+	add_child(room)
 	for index: int in range(4):
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -8
@@ -35,12 +52,12 @@ func track(name: String) -> void:
 	if current_track == name:
 		return
 	current_track = name
-	var stream: AudioStreamWAV = load("res://assets/audio/" + name + ".wav")
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_end = int(stream.get_length() * stream.mix_rate)
-	music.stream = stream
+	music.stream = _looped_stream("res://assets/audio/" + name + ".wav")
+	room.stream = _looped_stream("res://assets/audio/ambience.wav")
+	_apply_mix()
 	if not muted:
 		music.play()
+		room.play()
 		has_played = true
 
 
@@ -65,16 +82,33 @@ func set_muted(value: bool) -> void:
 		current_track = ""
 		if not previous.is_empty():
 			track(previous)
+	_apply_mix()
+
+
+func _apply_mix() -> void:
+	if not is_instance_valid(music) or not is_instance_valid(room):
+		return
 	music.volume_db = -80 if muted else -12
+	room.volume_db = -80 if muted else float(ROOM_VOLUME_DB.get(current_track, -26.0))
+	room.pitch_scale = float(ROOM_PITCH.get(current_track, 1.0))
 	for player: AudioStreamPlayer in effects:
 		player.volume_db = -80 if muted else -8
 
 
+func _looped_stream(path: String) -> AudioStreamWAV:
+	var stream: AudioStreamWAV = load(path)
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_end = int(stream.get_length() * stream.mix_rate)
+	return stream
+
+
 func stop_all() -> void:
-	if not is_instance_valid(music):
-		return
-	music.stop()
-	music.stream = null
+	if is_instance_valid(music):
+		music.stop()
+		music.stream = null
+	if is_instance_valid(room):
+		room.stop()
+		room.stream = null
 	for player: AudioStreamPlayer in effects:
 		player.stop()
 		player.stream = null
