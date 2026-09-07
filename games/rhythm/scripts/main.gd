@@ -19,6 +19,7 @@ var state: Node
 var stage: Node2D
 var page: Control
 var music: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var sfx: Array[AudioStreamPlayer] = []
 var transition: ColorRect
 var score_label: Label
@@ -31,7 +32,7 @@ var offset_label: Label
 var preview_button: Button
 var result_score: Label
 var song_buttons: Array[Button] = []
-var combo_lanterns: Array[TextureRect] = []
+var combo_lanterns: Array[Sprite2D] = []
 var force_audio: bool = false
 var closing: bool = false
 var previewing: bool = false
@@ -71,6 +72,11 @@ func _ready() -> void:
 	music.volume_db = -4
 	music.finished.connect(_music_finished)
 	add_child(music)
+	ambience = AudioStreamPlayer.new()
+	ambience.name = "FestivalAmbience"
+	ambience.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+	ambience.volume_db = -17
+	add_child(ambience)
 	for index: int in range(8):
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()
 		player.volume_db = -8
@@ -174,14 +180,14 @@ func _panel(rect: Rect2, color: Color = Color("192d47")) -> Panel:
 	return panel
 
 
-func _paper_texture(path: String, rect: Rect2) -> TextureRect:
-	var image: TextureRect = TextureRect.new()
+func _paper_texture(path: String, rect: Rect2) -> Sprite2D:
+	var image: Sprite2D = Sprite2D.new()
 	image.texture = load(path)
-	image.position = rect.position
-	image.size = rect.size
-	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	image.position = rect.position + rect.size / 2.0
+	var scale_factor: float = minf(
+		rect.size.x / image.texture.get_width(), rect.size.y / image.texture.get_height()
+	)
+	image.scale = Vector2.ONE * scale_factor
 	var paper: ShaderMaterial = ShaderMaterial.new()
 	paper.shader = load("res://shaders/paper_shadow.gdshader")
 	image.material = paper
@@ -218,6 +224,7 @@ func _show_screen() -> void:
 			_result()
 			_play_music("result-clear" if state.cleared else "result-fail")
 			stage.celebrate()
+	_play_ambience()
 	transition.color.a = 0.65
 	var tween: Tween = create_tween()
 	tween.tween_property(transition, "color:a", 0.0, 0.32)
@@ -460,7 +467,7 @@ func _play() -> void:
 	combo_label = _label("0 連", Rect2(250, 594, 185, 52), 30)
 	_label("コンボ提灯", Rect2(250, 642, 185, 28), 17, SUN)
 	for index: int in range(6):
-		var lantern: TextureRect = _paper_texture(
+		var lantern: Sprite2D = _paper_texture(
 			"res://assets/generated/combo-lantern.png", Rect2(430 + index * 55, 574, 48, 58)
 		)
 		lantern.modulate = Color(0.4, 0.4, 0.45, 0.24)
@@ -734,6 +741,17 @@ func _play_music(id: String, from: float = 0.0) -> void:
 	music.play(from)
 
 
+func _play_ambience() -> void:
+	if ambience.playing:
+		return
+	if not force_audio and AudioServer.get_driver_name() == "Dummy" and not OS.has_feature("movie"):
+		return
+	ambience.stream = load("res://assets/audio/festival-ambience.ogg")
+	if ambience.stream is AudioStreamOggVorbis:
+		ambience.stream.loop = true
+	ambience.play()
+
+
 func _play_sfx(id: String) -> void:
 	if (
 		closing
@@ -767,6 +785,9 @@ func stop_audio() -> void:
 	if music != null:
 		music.stop()
 		music.stream = null
+	if ambience != null:
+		ambience.stop()
+		ambience.stream = null
 	for player: AudioStreamPlayer in sfx:
 		player.stop()
 		player.stream = null
