@@ -1,5 +1,7 @@
 extends Node3D
 
+const ClaySurface = preload("res://scripts/visuals/clay_surface.gd")
+
 const WOOD: Color = Color("bc895b")
 const DARK_WOOD: Color = Color("78523f")
 const TEAL: Color = Color("76b5b0")
@@ -21,9 +23,6 @@ const FURNITURE: Array[Dictionary] = [
 	{"kind": 2, "position": Vector3(-11.5, 0.0, 2.5), "size": Vector3(3.0, 1.6, 5.0)},
 	{"kind": 3, "position": Vector3(11.6, 0.0, 5.0), "size": Vector3(2.0, 2.6, 4.0)},
 ]
-
-static var _materials: Dictionary = {}
-
 
 # Godot がシーンに追加した一度だけ、床・家具・照明の子ノードを構築する。
 func _ready() -> void:
@@ -65,6 +64,7 @@ static func item_layout() -> Array[Dictionary]:
 # 呼び出し側がシーンに追加するため、毎回独立した表示ノードを返す。
 static func make_item_visual(item_size: float, kind: int, _color: Color) -> Node3D:
 	var visual: Node3D = ITEM_SCENES[posmod(kind, ITEM_SCENES.size())].instantiate()
+	ClaySurface.style_tree(visual)
 	visual.scale = Vector3.ONE * item_size
 	return visual
 
@@ -267,21 +267,11 @@ func _build_lighting() -> void:
 	add_child(sun)
 
 
-# 再利用可能な材質を色ごとに保持し、小物ごとの材質生成を避ける。
-static func _material(color: Color) -> StandardMaterial3D:
-	if not _materials.has(color):
-		var material: StandardMaterial3D = StandardMaterial3D.new()
-		material.albedo_color = color
-		material.roughness = 0.88
-		_materials[color] = material
-	return _materials[color]
-
-
 # 呼び出しごとに指定した親へ新しい形状を追加する生成関数。
 static func _mesh(parent: Node3D, mesh: Mesh, point: Vector3, color: Color) -> MeshInstance3D:
 	var instance: MeshInstance3D = MeshInstance3D.new()
 	instance.mesh = mesh
-	instance.material_override = _material(color)
+	ClaySurface.style_mesh(instance, color)
 	instance.position = point
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(instance)

@@ -4,13 +4,13 @@
 
 ## フォント (`assets/fonts/`)
 
-- **素材名**: M PLUS Rounded 1c Medium (`MPLUSRounded1c-Medium.ttf`, `OFL.txt`)
-- **作者**: Coji Morishita, M+ Fonts Project / Copyright 2016 The Rounded M+ Project Authors.
-- **入手 URL**: https://fonts.google.com/specimen/M+PLUS+Rounded+1c
-- **ライセンス**: OFL-1.1
+- **素材名**: Kosugi Maru Regular (`KosugiMaru-Regular.ttf`, `LICENSE.txt`)
+- **作者**: MOTOYA / Copyright 2010 The Kosugi Maru Project Authors (https://github.com/googlefonts/kosugi-maru)
+- **入手 URL**: https://fonts.google.com/specimen/Kosugi+Maru
+- **ライセンス**: Apache License 2.0
 - **クレジット表記**: **必要**
 - **改変**: なし
-- **備考**: フォントは無改変。OFL.txt に著作権表示と SIL Open Font License 1.1 の全文を保持。Google Fonts の METADATA.pb およびフォント内 name テーブルで作者・ライセンスを確認。画面内の作者表記は不要。
+- **備考**: フォントは無改変。Google Fonts の `apache/kosugimaru` にあるライセンス全文を `LICENSE.txt` として保持し、METADATA.pb の作者・ライセンス・上流コミットを確認。作業指示では OFL とされていたが、公式配布は Apache-2.0 のため実際の条件を記録する。画面内の作者表記は不要。
 
 ## オリジナル音源 (`assets/audio/`)
 

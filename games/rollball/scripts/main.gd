@@ -5,6 +5,7 @@ const Room = preload("res://scripts/room.gd")
 const Hud = preload("res://scripts/hud.gd")
 const Effects = preload("res://scripts/effects.gd")
 const BallScene = preload("res://assets/models/ball.tscn")
+const ClaySurface = preload("res://scripts/visuals/clay_surface.gd")
 
 var room: Node3D
 var items: Node3D
@@ -169,6 +170,7 @@ func _create_ball() -> void:
 	rolling = Node3D.new()
 	ball.add_child(rolling)
 	core = BallScene.instantiate()
+	ClaySurface.style_tree(core)
 	rolling.add_child(core)
 
 

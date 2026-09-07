@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://dqfgw4c0evu3j"
-path="res://.godot/imported/MPLUSRounded1c-Medium.ttf-502201cb7493346fb6dba9c0132b4817.fontdata"
+uid="uid://u1ansbdnb6i8"
+path="res://.godot/imported/KosugiMaru-Regular.ttf-daf894efa40d27a1a728acffdc326fa4.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/MPLUSRounded1c-Medium.ttf"
-dest_files=["res://.godot/imported/MPLUSRounded1c-Medium.ttf-502201cb7493346fb6dba9c0132b4817.fontdata"]
+source_file="res://assets/fonts/KosugiMaru-Regular.ttf"
+dest_files=["res://.godot/imported/KosugiMaru-Regular.ttf-daf894efa40d27a1a728acffdc326fa4.fontdata"]
 
 [params]
 
