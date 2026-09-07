@@ -4,13 +4,13 @@
 
 ## フォント (`assets/fonts/`)
 
-- **素材名**: Zen Old Mincho Regular (`ZenOldMincho-Regular.ttf`, `OFL.txt`)
-- **作者**: The Zen Old Mincho Project Authors
-- **入手 URL**: https://fonts.google.com/specimen/Zen+Old+Mincho
+- **素材名**: New Tegomin Regular (`NewTegomin-Regular.ttf`, `OFL.txt`)
+- **作者**: The New Tegomin Project Authors
+- **入手 URL**: https://fonts.google.com/specimen/New+Tegomin
 - **ライセンス**: OFL-1.1
 - **クレジット表記**: **必要**
 - **改変**: なし
-- **備考**: 著作権表示とライセンス全文を fonts/OFL.txt に同梱。フォントは改変していない。
+- **備考**: Copyright 2020 The New Tegomin Project Authors (https://github.com/nagamaki008/NewTegomin)。著作権表示とライセンス全文を fonts/OFL.txt に同梱。フォントは改変していない。
 
 ## 独自画像 (`assets/art/`)
 

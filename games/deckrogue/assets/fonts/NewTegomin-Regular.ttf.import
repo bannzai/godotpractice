@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://ij1iye6fnwq"
-path="res://.godot/imported/ZenOldMincho-Regular.ttf-e7055a0acadd3a588e50ecda288362af.fontdata"
+uid="uid://bbchyai7ccnqj"
+path="res://.godot/imported/NewTegomin-Regular.ttf-64d2064160e81f05b88afa00dba3da97.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/ZenOldMincho-Regular.ttf"
-dest_files=["res://.godot/imported/ZenOldMincho-Regular.ttf-e7055a0acadd3a588e50ecda288362af.fontdata"]
+source_file="res://assets/fonts/NewTegomin-Regular.ttf"
+dest_files=["res://.godot/imported/NewTegomin-Regular.ttf-64d2064160e81f05b88afa00dba3da97.fontdata"]
 
 [params]
 
