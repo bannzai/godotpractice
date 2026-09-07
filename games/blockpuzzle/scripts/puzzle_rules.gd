@@ -169,13 +169,15 @@ static func add_nuisance(board: Array, count: int, start_column: int = 0) -> Dic
 
 
 static func parse_records(value: Variant) -> Dictionary:
-	var records: Dictionary = {"high_score": 0, "best_chain": 0}
+	var records: Dictionary = {"high_score": 0, "best_chain": 0, "tutorial_seen": false}
 	if not value is Dictionary:
 		return records
-	for key: String in records:
+	for key: String in ["high_score", "best_chain"]:
 		var raw: Variant = value.get(key)
 		if (raw is int or raw is float) and is_finite(float(raw)):
 			records[key] = int(clampf(float(raw), 0.0, 1000000000.0))
+	if value.get("tutorial_seen") is bool:
+		records.tutorial_seen = value.tutorial_seen
 	records.best_chain = mini(records.best_chain, (WIDTH * HEIGHT) >> 2)
 	return records
 
