@@ -439,6 +439,7 @@ func _finish_tutorial(skipped: bool) -> void:
 
 
 func _result() -> void:
+	Ui.panel(screen, Rect2(960, 0, 320, 720), Ui.box(Ui.PARCHMENT_DARK, Ui.THREAD_BROWN, 3))
 	Ui.panel(screen, Rect2(300, 135, 680, 448))
 	Ui.label(screen, "夜明けの灯" if phase == "win" else "灯は、またともせる。",
 		Vector2(355, 173), 43, Ui.GOLD)
