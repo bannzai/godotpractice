@@ -533,7 +533,10 @@ def ui_icon(name: str) -> Canvas:
         canvas.line(20, 40, 76, 40, LIGHT, 2)
         return canvas
     canvas = Canvas(16, 16)
-    if name == "capture_ball":
+    if name == "cursor":
+        canvas.triangle(((2, 1), (2, 14), (14, 8)), PALE)
+        canvas.triangle(((4, 4), (4, 11), (11, 8)), DARK)
+    elif name == "capture_ball":
         canvas.circle(8, 8, 7, DARK)
         canvas.circle(8, 8, 5, PALE)
         canvas.rect(2, 6, 12, 4, MID)
@@ -682,7 +685,10 @@ def build_assets(tiny_source, rpg_source) -> dict[str, Canvas]:
     ):
         assets[f"world/{name}.png"] = world_prop(name)
     assets["world/region_map.png"] = region_map()
-    for name in ("capture_ball", "emblem", "logo", "potion", "type_fire", "type_water", "type_leaf"):
+    for name in (
+        "capture_ball", "cursor", "emblem", "logo", "potion",
+        "type_fire", "type_water", "type_leaf",
+    ):
         assets[f"ui/{name}.png"] = ui_icon(name)
     for name in ("projectile_fire", "projectile_water", "projectile_leaf", "spark"):
         assets[f"effects/{name}.png"] = effect(name)

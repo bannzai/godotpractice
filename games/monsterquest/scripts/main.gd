@@ -295,7 +295,7 @@ func _focus_choice(button: Button) -> void:
 
 func _choice_focused(button: Button) -> void:
 	focused_choice = button
-	button.text = "▶ " + str(button.get_meta("choice_text", button.text))
+	button.icon = load(PIXEL_ROOT + "ui/cursor.png") as Texture2D
 	choice_preview = str(button.get_meta("choice_preview", ""))
 	if is_instance_valid(choice_preview_label) and not choice_preview.is_empty():
 		choice_preview_label.text = choice_preview
@@ -306,7 +306,7 @@ func _choice_focused(button: Button) -> void:
 
 
 func _choice_unfocused(button: Button) -> void:
-	button.text = str(button.get_meta("choice_text", button.text.trim_prefix("▶ ")))
+	button.icon = null
 	if focused_choice == button:
 		focused_choice = null
 
@@ -381,7 +381,7 @@ func _show_title() -> void:
 		false,
 		"操作、捕獲、タイプ相性と素材情報を読む。"
 	)
-	_label_at("▶ 選択中", Rect2(88, 552, 160, 30), 17, PAPER)
+	_label_at("> 選択中", Rect2(88, 552, 160, 30), 17, PAPER)
 	choice_preview_label = _label_at(
 		"選択肢を決定すると、その内容へ進みます。",
 		Rect2(88, 588, 452, 50),
@@ -401,11 +401,11 @@ func _show_help() -> void:
 	_label_at("調査隊のてびき", Rect2(104, 98, 1000, 60), 36, PAPER)
 	_label_at(
 		(
-			"▶ 町の東門から小径へ。草むらを歩いて仲間を探す。\n"
-			+ "▶ 相手の HP が少ないほど、ボールで捕まえやすい。\n"
-			+ "▶ 炎 → 草 → 水 → 炎 は効果ばつぐん。逆は半分。\n"
-			+ "▶ 回復の家で全回復と補充。７体目からは預かりへ。\n"
-			+ "▶ 育てた仲間で町の隊長に勝つと、調査は大成功。\n\n"
+			"> 町の東門から小径へ。草むらを歩いて仲間を探す。\n"
+			+ "> 相手の HP が少ないほど、ボールで捕まえやすい。\n"
+			+ "> 炎 → 草 → 水 → 炎 は効果ばつぐん。逆は半分。\n"
+			+ "> 回復の家で全回復と補充。７体目からは預かりへ。\n"
+			+ "> 育てた仲間で町の隊長に勝つと、調査は大成功。\n\n"
 			+ "歩く：矢印 / WASD / 方向パッド / 左スティック\n"
 			+ "話す：Enter / Space / A　旅支度：Esc / Tab / Start　全画面：F11\n\n"
 			+ "書体：DotGothic16（OFL 1.1）。\n"
@@ -477,7 +477,7 @@ func _show_field() -> void:
 		)
 		_health_bar(lead, Rect2(840, 420, 390, 16))
 	_window(Rect2(24, 548, 1232, 148))
-	_label_at("▶ 次の調査", Rect2(48, 564, 200, 30), 19, GOLD)
+	_label_at("> 次の調査", Rect2(48, 564, 200, 30), 19, GOLD)
 	_label_at(field_context_text(), Rect2(48, 598, 1184, 56), 22, PAPER)
 	_label_at("Esc / Start：旅支度と地方図", Rect2(48, 658, 560, 26), 16, GOLD)
 	if not notice.is_empty() and not tutorial_active:
@@ -507,13 +507,13 @@ func field_context_text() -> String:
 		if (Game.cell - Vector2i(18, 6)).length() <= 1.0:
 			return "A / Enter：隊長に挑む　相手は Lv.8・水タイプ / 草が有利"
 		if Game.party.size() + Game.storage.size() >= 2:
-			return "町の北東にいる隊長へ。▶ の場所で A / Enter。"
-		return "東門の ▶ をめざし、小径の草むらで仲間を探そう。"
+			return "町の北東にいる隊長へ。> の場所で A / Enter。"
+		return "東門の > をめざし、小径の草むらで仲間を探そう。"
 	if Game.zone == "route":
 		return "草むらを歩くと野生の仲間に出会う。弱らせるほど捕まえやすい。"
 	if Game.zone == "clinic":
-		return "全回復と補充が完了。A / Enter：もう一度回復　南の ▶：町へ"
-	return "A / Enter：調査記録を保存　南の ▶：町へ"
+		return "全回復と補充が完了。A / Enter：もう一度回復　南の >：町へ"
+	return "A / Enter：調査記録を保存　南の >：町へ"
 
 
 func _show_tutorial() -> void:
@@ -655,7 +655,7 @@ func _show_menu() -> void:
 		member_button.disabled = monster.hp <= 0
 	_picture(Game.party[Game.active_index].species, Rect2(760, 166, 160, 160))
 	choice_preview_label = _label_at(
-		choice_preview if not choice_preview.is_empty() else "▶ 仲間を選ぶと、ここに結果を表示。",
+		choice_preview if not choice_preview.is_empty() else "> 仲間を選ぶと、ここに結果を表示。",
 		Rect2(640, 348, 520, 70),
 		20,
 		PAPER
@@ -886,7 +886,7 @@ func _show_battle() -> void:
 	)
 	battle_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	battle_preview_label = _label_at(
-		"▶ 技を選ぶと、威力と相性を表示。",
+		"> 技を選ぶと、威力と相性を表示。",
 		Rect2(48, 566, 602, 100),
 		19,
 		GOLD

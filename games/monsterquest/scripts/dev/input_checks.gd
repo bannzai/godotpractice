@@ -125,7 +125,7 @@ static func _check_focused_choice(check: Callable, main: Control, label: String)
 	check.call(is_instance_valid(main.focused_choice) and main.focused_choice.has_focus(),
 		label + "をハイライト")
 	check.call(is_instance_valid(main.focused_choice)
-		and main.focused_choice.text.begins_with("▶ "), label + "に選択カーソルを表示")
+		and main.focused_choice.icon != null, label + "にドット絵の選択カーソルを表示")
 
 
 static func _find_button(parent: Node, caption: String) -> Button:

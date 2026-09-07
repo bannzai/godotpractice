@@ -100,7 +100,7 @@ func _run() -> void:
 	_check(saw_region_map and saw_region_preview,
 		"旅支度から地方図を開き、移動先プレビューと現在地の不可理由を表示した")
 	_check(saw_route and returned_town, "地方図の実入力で小径へ移動し、町へ戻った")
-	_check(saw_choice_highlight, "選択中の項目を ▶ でハイライトした")
+	_check(saw_choice_highlight, "選択中の項目をドット絵カーソルでハイライトした")
 	_check(walked_to_captain, "実際の移動入力で隊長の南隣に到着した")
 	_check(saw_dialogue, "隊長との対話を実入力で開いた")
 	_check(saw_battle, "隊長との戦闘へ実入力で進んだ")
@@ -151,7 +151,7 @@ func _observe() -> void:
 	saw_route = saw_route or (game.mode == "field" and game.zone == "route")
 	returned_town = returned_town or (saw_route and game.mode == "field" and game.zone == "town")
 	saw_choice_highlight = saw_choice_highlight or (
-		is_instance_valid(main.focused_choice) and main.focused_choice.text.begins_with("▶ ")
+		is_instance_valid(main.focused_choice) and main.focused_choice.icon != null
 	)
 	walked_to_captain = walked_to_captain or (
 		returned_town and game.mode == "field" and game.cell == Vector2i(18, 7)

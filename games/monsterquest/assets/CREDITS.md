@@ -156,7 +156,7 @@
 
 ## 第3ラウンドの4階調UI・戦闘演出 (`assets/pixel/ui/`, `assets/pixel/effects/`)
 
-- **素材名**: 道具・属性・紋章・ロゴ (`capture_ball.png`, `emblem.png`, `logo.png`, `potion.png`, `type_fire.png`, `type_leaf.png`, `type_water.png`)
+- **素材名**: 選択カーソル・道具・属性・紋章・ロゴ (`cursor.png`, `capture_ball.png`, `emblem.png`, `logo.png`, `potion.png`, `type_fire.png`, `type_leaf.png`, `type_water.png`)
 - **作者**: 本プロジェクトで制作（Codex支援）
 - **入手 URL**: https://github.com/bannzai/godotpractice
 - **ライセンス**: 本プロジェクトのオリジナル生成物（CC0の付与なし）

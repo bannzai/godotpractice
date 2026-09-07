@@ -102,7 +102,7 @@ func _capture_combat() -> bool:
 	await main.begin_battle("sprout", 5, false)
 	captured = (await _capture("battle", 0.65)) and captured
 	_check(is_instance_valid(main.focused_choice)
-		and main.focused_choice.text.begins_with("▶ "), "戦闘の選択中の技をハイライト")
+		and main.focused_choice.icon != null, "戦闘の選択中の技をハイライト")
 	_check(not main.battle_preview.is_empty(), "戦闘の選択中の技をプレビュー")
 	captured = (await _capture("battle-highlight-preview")) and captured
 	_tap_key(KEY_DOWN, true)
