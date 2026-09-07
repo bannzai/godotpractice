@@ -1,8 +1,11 @@
 extends Node3D
 ## 海、遠い岩島、ゆっくり流れる雲を異なる距離に重ねた空の風景。
 
+const ORIGAMI_PAPER := preload("res://assets/textures/origami-paper.png")
+const CONSTRUCTION_PAPER := preload("res://assets/textures/construction-paper-sky.png")
+
 var _environment: Environment
-var _sky: ProceduralSkyMaterial
+var _sky: PanoramaSkyMaterial
 var _sun: DirectionalLight3D
 var _clouds: Node3D
 var _cloud_material: StandardMaterial3D
@@ -16,9 +19,8 @@ func configure() -> void:
 	_environment = Environment.new()
 	_environment.background_mode = Environment.BG_SKY
 	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	_sky = ProceduralSkyMaterial.new()
-	_sky.sky_curve = 0.18
-	_sky.ground_curve = 0.1
+	_sky = PanoramaSkyMaterial.new()
+	_sky.panorama = CONSTRUCTION_PAPER
 	var sky_resource: Sky = Sky.new()
 	sky_resource.sky_material = _sky
 	_environment.sky = sky_resource
@@ -29,8 +31,8 @@ func configure() -> void:
 	_sun.shadow_enabled = true
 	_sun.directional_shadow_max_distance = 60.0
 	add_child(_sun)
-	_cloud_material = _material(Color("fff6d9"))
-	_sea_material = _material(Color("387f9d"))
+	_cloud_material = _material(Color("fff6d9"), ORIGAMI_PAPER)
+	_sea_material = _material(Color("4ba8b1"), CONSTRUCTION_PAPER)
 	var sea: MeshInstance3D = MeshInstance3D.new()
 	var plane: PlaneMesh = PlaneMesh.new()
 	plane.size = Vector2(440.0, 440.0)
@@ -61,12 +63,7 @@ func sync(day_time: float, day_length: float) -> void:
 	# 生存ロジックの夜 (0.68〜翌0.16) に空の暗さを合わせる。
 	var daylight: float = smoothstep(0.12, 0.21, phase) * (1.0 - smoothstep(0.61, 0.71, phase))
 	var sunset: float = (1.0 - absf(daylight * 2.0 - 1.0)) * 0.65
-	_sky.sky_top_color = Color("101b37").lerp(Color("5bafc8"), daylight)
-	_sky.sky_horizon_color = Color("394669").lerp(Color("edcf9d"), daylight)
-	_sky.sky_horizon_color = _sky.sky_horizon_color.lerp(Color("df936f"), sunset)
-	_sky.ground_bottom_color = Color("17273e").lerp(Color("558f9a"), daylight)
-	_sky.ground_horizon_color = _sky.sky_horizon_color
-	_sky.sky_energy_multiplier = 0.55 + daylight * 0.45
+	_sky.energy_multiplier = 0.27 + daylight * 0.73 + sunset * 0.08
 	_environment.ambient_light_color = Color("859fce").lerp(Color("fff1d8"), daylight)
 	_environment.ambient_light_energy = 0.45 + daylight * 0.3
 	_sun.rotation_degrees = Vector3(-(phase - 0.16) * 346.0, -35.0, 0.0)
@@ -79,8 +76,8 @@ func sync(day_time: float, day_length: float) -> void:
 
 
 func _build_horizon() -> void:
-	var rock_material: StandardMaterial3D = _material(Color("6d8991"))
-	var distant_material: StandardMaterial3D = _material(Color("82979d"))
+	var rock_material: StandardMaterial3D = _material(Color("6d8991"), ORIGAMI_PAPER)
+	var distant_material: StandardMaterial3D = _material(Color("82979d"), ORIGAMI_PAPER)
 	for index: int in range(18):
 		var angle: float = float(index) * TAU / 18.0
 		var distance: float = 62.0 + float(index % 3) * 25.0
@@ -111,8 +108,9 @@ func _build_horizon() -> void:
 			_clouds.add_child(cloud)
 
 
-func _material(color: Color) -> StandardMaterial3D:
+func _material(color: Color, texture: Texture2D = null) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
 	material.albedo_color = color
+	material.albedo_texture = texture
 	material.roughness = 1.0
 	return material

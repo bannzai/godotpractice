@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://dyp3mwxnrbs2q"
-path="res://.godot/imported/MPLUSRounded1c-Regular.ttf-c1fb9122389aafc31b52ab31bae2f90d.fontdata"
+uid="uid://brlm5en2ox7h8"
+path="res://.godot/imported/ZenMaruGothic-Regular.ttf-e722f4bdba0973e8fcd9100dd0a10879.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/MPLUSRounded1c-Regular.ttf"
-dest_files=["res://.godot/imported/MPLUSRounded1c-Regular.ttf-c1fb9122389aafc31b52ab31bae2f90d.fontdata"]
+source_file="res://assets/fonts/ZenMaruGothic-Regular.ttf"
+dest_files=["res://.godot/imported/ZenMaruGothic-Regular.ttf-e722f4bdba0973e8fcd9100dd0a10879.fontdata"]
 
 [params]
 

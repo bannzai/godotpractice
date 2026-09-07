@@ -109,14 +109,22 @@ func item_name(item: String) -> String:
 
 
 func recipe_available(recipe: Dictionary) -> bool:
-	if phase != "play" or tool_level < int(recipe.get("level", 0)):
-		return false
+	return recipe_reason(recipe).is_empty()
+
+
+func recipe_reason(recipe: Dictionary) -> String:
+	if phase != "play":
+		return "遠征中だけ折れます"
+	if tool_level < int(recipe.get("level", 0)):
+		return "先に木のつるはしを折ります"
 	if bool(recipe.get("bench", false)) and not _has_bench():
-		return false
+		return "作業台を持つか、島に置きます"
+	var missing: Array[String] = []
 	for item: String in recipe.costs:
-		if int(inventory.get(item, 0)) < int(recipe.costs[item]):
-			return false
-	return true
+		var shortage: int = int(recipe.costs[item]) - int(inventory.get(item, 0))
+		if shortage > 0:
+			missing.append("%sが%d足りません" % [item_name(item), shortage])
+	return "、".join(missing)
 
 
 func _has_bench() -> bool:
@@ -166,13 +174,9 @@ func mine(cell: Vector3i) -> bool:
 
 
 func place(cell: Vector3i, player_aabb: AABB) -> bool:
+	if not placement_reason(cell, player_aabb).is_empty():
+		return false
 	var item: String = selected_item()
-	if phase != "play" or not PLACE_IDS.has(item) or int(inventory.get(item, 0)) <= 0:
-		return false
-	if not data.in_bounds(cell) or data.get_block(cell) not in [Data.AIR, Data.WATER]:
-		return false
-	if player_aabb.intersects(AABB(Vector3(cell), Vector3.ONE)):
-		return false
 	inventory[item] = int(inventory[item]) - 1
 	data.set_block(cell, int(PLACE_IDS[item]))
 	house_built = check_house()
@@ -180,6 +184,24 @@ func place(cell: Vector3i, player_aabb: AABB) -> bool:
 	world_changed.emit()
 	changed.emit()
 	return true
+
+
+func placement_reason(cell: Vector3i, player_aabb: AABB) -> String:
+	var item: String = selected_item()
+	var reason: String = ""
+	if phase != "play":
+		reason = "遠征中だけ置けます"
+	elif not PLACE_IDS.has(item):
+		reason = "%sは置けません" % item_name(item)
+	elif int(inventory.get(item, 0)) <= 0:
+		reason = "%sを持っていません" % item_name(item)
+	elif not data.in_bounds(cell):
+		reason = "島の外には置けません"
+	elif data.get_block(cell) not in [Data.AIR, Data.WATER]:
+		reason = "すでに紙ブロックがあります"
+	elif player_aabb.intersects(AABB(Vector3(cell), Vector3.ONE)):
+		reason = "自分と重なる場所には置けません"
+	return reason
 
 
 func add_item(item: String, amount: int) -> void:

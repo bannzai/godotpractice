@@ -131,6 +131,39 @@ def music():
         write_audio(name, delayed)
 
 
+def ambience():
+    """紙模型の風景を音だけでも識別できる、周期的な紙擦れと波の環境音。"""
+    duration = 8.0
+    count = int(duration * RATE)
+    for name in ('paper_day', 'paper_night'):
+        samples = []
+        for index in range(count):
+            phase = index / count
+            ocean = (
+                math.sin(math.tau * phase * 2)
+                + .45 * math.sin(math.tau * phase * 5 + .8)
+                + .2 * math.sin(math.tau * phase * 11 + 1.7)
+            )
+            fibers = (
+                math.sin(math.tau * phase * 317 + .4)
+                + .6 * math.sin(math.tau * phase * 521 + 2.1)
+                + .35 * math.sin(math.tau * phase * 809 + .9)
+            )
+            centers = (.18, .47, .76) if name == 'paper_day' else (.29, .63, .91)
+            rustle = 0.0
+            for center in centers:
+                distance = min(abs(phase - center), 1.0 - abs(phase - center))
+                rustle += math.exp(-((distance / .035) ** 2))
+            if name == 'paper_day':
+                value = ocean * .045 + fibers * rustle * .022
+            else:
+                night_wind = math.sin(math.tau * phase) + .3 * math.sin(math.tau * phase * 7)
+                value = night_wind * .026 + fibers * rustle * .014
+            samples.append(value)
+        samples[-1] = samples[0]
+        write_audio(name, samples)
+
+
 def effects():
     specs = {
         'break_grass': (0.22, 260, .65), 'break_dirt': (.21, 180, .7),
@@ -166,5 +199,6 @@ def effects():
 if __name__ == '__main__':
     images()
     music()
+    ambience()
     effects()
     print('灯守の島: 画像と音源の生成完了')
