@@ -28,7 +28,7 @@ func setup(id: String, rect: Rect2) -> void:
 
 
 func _frames(id: String) -> SpriteFrames:
-	var sheet: Texture2D = load("res://assets/art/%s_sheet.svg" % id)
+	var sheet: Texture2D = load("res://assets/art/%s_sheet.png" % id)
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	for row: int in range(ACTIONS.size()):

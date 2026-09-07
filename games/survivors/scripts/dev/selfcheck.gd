@@ -117,9 +117,15 @@ func _check_motion_and_pause(state: Node) -> void:
 	_check(state.player_pos == before and state.elapsed == elapsed_before, "ポーズ中に進行しない")
 	state.toggle_pause()
 	_check(state.phase == "playing", "ポーズから再開")
-	state.player_pos = Vector2.ONE * Rules.WORLD_LIMIT
+	state.player_pos = Vector2(1_000_000, -1_000_000)
+	var distant_origin: Vector2 = state.player_pos
 	state.step(0.05, Vector2.ONE)
-	_check(state.player_pos == Vector2.ONE * Rules.WORLD_LIMIT, "フィールド境界を越えない")
+	_check(state.player_pos.distance_to(distant_origin) > 11.4, "無限平面の遠方でも移動を続ける")
+	var spawn: Vector2 = state.call("_spawn_position")
+	_check(
+		absf(spawn.distance_to(state.player_pos) - 760.0) < 0.2,
+		"遠方でもプレイヤー周囲に敵を配置する"
+	)
 
 
 func _check_damage_and_retry(state: Node) -> void:

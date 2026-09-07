@@ -5,7 +5,7 @@ const WorldView = preload("res://scripts/world.gd")
 const HudView = preload("res://scripts/hud.gd")
 const EffectsView = preload("res://scripts/effects.gd")
 const AudioDirector = preload("res://scripts/audio_director.gd")
-const UI_FONT = preload("res://assets/fonts/MPLUSRounded1c-Regular.ttf")
+const UI_FONT = preload("res://assets/fonts/KleeOne-Regular.ttf")
 
 var model: Node
 var world: Node3D
@@ -39,7 +39,10 @@ func _ready() -> void:
 	add_child(hud)
 	hud.setup(UI_FONT)
 	hud.start_requested.connect(start_day)
+	hud.map_requested.connect(show_map)
 	hud.title_requested.connect(show_title)
+	hud.tutorial_next_requested.connect(advance_tutorial)
+	hud.tutorial_skip_requested.connect(skip_tutorial)
 	audio = AudioDirector.new()
 	add_child(audio)
 	audio.setup()
@@ -68,6 +71,20 @@ func show_title() -> void:
 	hud.set_paused(false)
 
 
+func show_map() -> void:
+	model.show_map()
+	paused = false
+	hud.set_paused(false)
+
+
+func advance_tutorial() -> void:
+	model.advance_tutorial()
+
+
+func skip_tutorial() -> void:
+	model.skip_tutorial()
+
+
 ## 入力イベントの発生回数に応じた操作なので冪等にはしない。
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("fullscreen"):
@@ -89,7 +106,7 @@ func _input(event: InputEvent) -> void:
 
 ## 押下で一度だけ発行する命令。長押し投擲は _physics_process の間隔で制限する。
 func _unhandled_input(event: InputEvent) -> void:
-	if model.phase != "playing" or paused:
+	if model.phase != "playing" or paused or model.tutorial_page >= 0:
 		return
 	if event.is_action_pressed("whistle"):
 		model.whistle()
@@ -108,7 +125,8 @@ func _physics_process(delta: float) -> void:
 	if model == null:
 		return
 	impact_time = maxf(0.0, impact_time - delta)
-	if model.phase == "playing" and not paused and impact_time <= 0.0:
+	if (model.phase == "playing" and model.tutorial_page < 0
+			and not paused and impact_time <= 0.0):
 		yaw -= Input.get_axis("camera_left", "camera_right") * delta * 1.8
 		var input: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 		var movement := Vector3(input.x, 0, input.y).rotated(Vector3.UP, yaw)
@@ -125,6 +143,7 @@ func _physics_process(delta: float) -> void:
 	world.sync(model, 0.0 if paused else delta, aim)
 	effects.sync(model, 0.0 if paused else delta, world.camera)
 	hud.refresh(model)
+	hud.set_context(world.describe_target(model, aim))
 	audio.update_state(model)
 
 

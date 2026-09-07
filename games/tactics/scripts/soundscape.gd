@@ -1,7 +1,8 @@
 extends Node
-## 場面BGMと操作SE。通常終了は停止後に数フレーム描画してからツリーを終了する。
+## 場面BGM・環境音と操作SE。通常終了は停止後に数フレーム描画してからツリーを終了する。
 
 var music: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var effects: Array[AudioStreamPlayer] = []
 var current_cue: String = ""
 var voice: int = 0
@@ -14,6 +15,9 @@ func _ready() -> void:
 	music = AudioStreamPlayer.new()
 	music.volume_db = -13.0
 	add_child(music)
+	ambience = AudioStreamPlayer.new()
+	ambience.volume_db = -18.0
+	add_child(ambience)
 	for index: int in range(4):
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()
 		player.volume_db = -8.0
@@ -24,9 +28,10 @@ func _ready() -> void:
 func play_music(cue: String) -> void:
 	if not is_instance_valid(music) or muted or DisplayServer.get_name() == "headless":
 		return
-	if cue == current_cue and music.playing:
-		return
 	if cue not in ["title", "stage", "battle", "result"]:
+		return
+	play_ambience()
+	if cue == current_cue and music.playing:
 		return
 	current_cue = cue
 	var stream: AudioStreamOggVorbis = load("res://assets/audio/%s.ogg" % cue)
@@ -36,11 +41,20 @@ func play_music(cue: String) -> void:
 	has_played = true
 
 
+func play_ambience() -> void:
+	if not is_instance_valid(ambience) or ambience.playing:
+		return
+	var stream: AudioStreamOggVorbis = load("res://assets/audio/ambience.ogg")
+	stream.loop = true
+	ambience.stream = stream
+	ambience.play()
+
+
 func play_sfx(cue: String) -> void:
 	# 操作に対応する発音イベントなので、呼ぶたびに音を重ねる非冪等な関数。
 	if effects.is_empty() or muted or DisplayServer.get_name() == "headless":
 		return
-	if cue not in ["attack", "heal", "level", "confirm"]:
+	if cue not in ["attack", "heal", "level", "confirm", "fan"]:
 		return
 	effects[voice].stream = load("res://assets/audio/%s.ogg" % cue)
 	effects[voice].play()
@@ -53,6 +67,9 @@ func stop_audio() -> void:
 	if is_instance_valid(music):
 		music.stop()
 		music.stream = null
+	if is_instance_valid(ambience):
+		ambience.stop()
+		ambience.stream = null
 	for player: AudioStreamPlayer in effects:
 		player.stop()
 		player.stream = null

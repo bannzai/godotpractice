@@ -28,6 +28,9 @@ var _hit_stop: float = 0.0
 var _last_phase: String = ""
 var _quitting: bool = false
 var _highlight: MeshInstance3D
+var _highlight_material: StandardMaterial3D
+var _placement_preview: MeshInstance3D
+var _placement_material: StandardMaterial3D
 var _cracks: MeshInstance3D
 var _crack_material: StandardMaterial3D
 var _torches: Node3D
@@ -89,7 +92,7 @@ func start_game() -> void:
 	paused = false
 	model.new_game(46073)
 	_resume_world()
-	hud.notify_text("まず木を集めよう。E / X でものづくりを開けます")
+	hud.start_tutorial(player.position)
 
 
 func _resume_world() -> void:
@@ -154,6 +157,8 @@ func _physics_process(delta: float) -> void:
 	target_block = world.raycast(player.camera.global_position,
 		-player.camera.global_basis.z, 5.0)
 	_update_target(delta)
+	hud.update_tutorial(player.position,
+		Data.AIR if target_block.is_empty() else int(target_block.id))
 	if Input.is_action_pressed("mine"):
 		_mine(delta)
 	else:
@@ -171,6 +176,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			if mode == DisplayServer.WINDOW_MODE_FULLSCREEN else DisplayServer.WINDOW_MODE_FULLSCREEN)
 		return
 	if model.phase != "play":
+		return
+	if event.is_action_pressed("tutorial_skip") and hud.tutorial_step >= 0:
+		hud.skip_tutorial()
+		return
+	if event.is_action_pressed("map_menu"):
+		_request("close" if paused else "map", "")
 		return
 	if event.is_action_pressed("pause_game"):
 		_request("close" if paused else "pause", "")
@@ -239,16 +250,32 @@ func _mine(delta: float) -> void:
 
 func _update_target(_delta: float) -> void:
 	_highlight.visible = not target_block.is_empty()
+	_placement_preview.hide()
 	_cracks.visible = not target_block.is_empty() and mining_progress > 0
 	hud.progress.value = mining_progress
 	hud.progress.visible = mining_progress > 0
 	hud.target.text = ""
+	hud.placement.text = ""
 	if target_block.is_empty():
+		hud.target.text = "照準を紙ブロックへ重ねると、できることが見えます"
 		return
 	_highlight.position = Vector3(target_block.cell) + Vector3.ONE * 0.5
 	_cracks.position = _highlight.position
 	_crack_material.albedo_color.a = 0.12 + floorf(mining_progress * 4) * 0.15
-	hud.target.text = "%s  •  長押しで採集" % model.item_name(Data.ITEMS[target_block.id])
+	var can_mine: bool = model.can_mine(target_block.cell)
+	_highlight_material.albedo_color = Color("ffd65e80") if can_mine else Color("e46b5f80")
+	hud.target.text = ("○ %sをひらく　左クリック / Q / RT 長押し" %
+		model.item_name(Data.ITEMS[target_block.id])) if can_mine else \
+		("× %s　より丈夫なつるはしが必要" % model.item_name(Data.ITEMS[target_block.id]))
+	var place_cell: Vector3i = target_block.previous
+	var place_reason: String = model.placement_reason(place_cell, player.body_aabb())
+	if place_reason.is_empty():
+		_placement_preview.show()
+		_placement_preview.position = Vector3(place_cell) + Vector3.ONE * 0.5
+		hud.placement.text = "◇ %sをここに組む　右クリック / R / LT" % \
+			model.item_name(model.selected_item())
+	else:
+		hud.placement.text = "置けない理由：" + place_reason
 
 
 func _rebuild() -> void:
@@ -264,12 +291,22 @@ func _build_target() -> void:
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3.ONE * 1.012
 	_highlight.mesh = mesh
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(1, 0.89, 0.64, 0.14)
-	_highlight.material_override = material
+	_highlight_material = StandardMaterial3D.new()
+	_highlight_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_highlight_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_highlight_material.albedo_color = Color("ffd65e80")
+	_highlight.material_override = _highlight_material
 	add_child(_highlight)
+	_placement_preview = MeshInstance3D.new()
+	_placement_preview.mesh = mesh
+	_placement_preview.scale = Vector3.ONE * 0.985
+	_placement_material = StandardMaterial3D.new()
+	_placement_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_placement_material.albedo_color = Color("69d7c34f")
+	_placement_material.albedo_texture = load("res://assets/textures/origami-paper.png")
+	_placement_material.roughness = 1.0
+	_placement_preview.material_override = _placement_material
+	add_child(_placement_preview)
 	_cracks = MeshInstance3D.new()
 	_cracks.mesh = mesh
 	_cracks.scale = Vector3.ONE * 1.003
@@ -286,6 +323,7 @@ func _build_target() -> void:
 	_cracks.material_override = _crack_material
 	add_child(_cracks)
 	_highlight.hide()
+	_placement_preview.hide()
 	_cracks.hide()
 
 
@@ -302,9 +340,10 @@ func _request(action: String, value: String) -> void:
 			model.respawn()
 			_resume_world()
 		"title": show_title()
-		"pause", "craft_menu", "help":
+		"pause", "craft_menu", "help", "map":
 			paused = true
-			hud.show_menu({"pause": "pause", "craft_menu": "craft", "help": "help"}[action])
+			hud.show_menu({"pause": "pause", "craft_menu": "craft", "help": "help",
+				"map": "map"}[action])
 		"close":
 			paused = false
 			hud.close_overlay()

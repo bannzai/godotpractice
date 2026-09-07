@@ -4,6 +4,7 @@ extends "res://scripts/dev/integration.gd"
 
 const Catalog := preload("res://scripts/catalog.gd")
 const Story := preload("res://scripts/story.gd")
+const CutIn := preload("res://scripts/cut_in.gd")
 const ACTOR_IDS: Array[String] = [
 	"child", "warrior", "water", "fox", "headless", "doll", "monk", "moth",
 	"bride", "crow", "bell", "beast", "hero_0", "hero_1", "hero_2", "hero_3", "police", "boss"
@@ -30,42 +31,101 @@ func _capture_scenes() -> void:
 	await _click_name("StartRun")
 	await _capture("intro")
 	await _click_name("BeginJourney")
-	await _capture("map")
-	await _click_name("OpenCodex")
-	await _capture("codex")
-	for page: int in range(1, 3):
-		await _click_name("CodexNext")
-		await _capture("codex-%d" % page)
-	await _click_name("CloseOverlay")
-	await _click_name("OpenParty")
-	await _capture("party")
-	await _click_name("CloseOverlay")
-	await _key(KEY_ESCAPE)
-	await _capture("pause")
-	await _click_name("Help")
-	await _capture("help")
-	await _click_name("CloseOverlay")
+	await _capture_tutorial()
+	await _capture_streets()
+	await _capture_notebook()
 	for kind: String in Catalog.NODE_LABELS:
 		await _prepare_node(kind)
 		await _capture("node-" + kind)
 	await _prepare_node("grave")
 	await _click_name("EventChoice0")
 	await _click_name("OpenParty")
-	await _capture("party-reserve")
+	await _capture("notebook-party-reserve")
 	await _click_name("CloseOverlay")
 	await _capture_dialogues()
 	await _capture_police_penalties()
 	await _capture_darkness()
 	await _capture_endings()
 	await _capture_effects()
+	await _capture_cut_ins()
 	await _capture_characters()
 	await _check_fullscreen()
+
+
+func _capture_tutorial() -> void:
+	_check(run.tutorial_step == run.TUTORIAL_GRAVE, "最初の通りで墓地への案内を表示")
+	var required: int = run.tutorial_required_branch()
+	await _capture("tutorial-walk-to-grave")
+	var other: int = 1 - required
+	main._approach_entrance(other)
+	await create_timer(0.35).timeout
+	await _capture("flashlight-other-entrance", 0.0)
+	main._approach_entrance(required)
+	await create_timer(0.35).timeout
+	await _capture("flashlight-guided-entrance", 0.0)
+	await _click_name("Branch%d" % required)
+	await _capture("tutorial-enter-grave")
+	await _click_name("EventChoice0")
+	_check(run.tutorial_step == run.TUTORIAL_BATTLE, "霊を迎えると霊戦への案内を表示")
+	await _capture("tutorial-walk-to-battle")
+	required = run.tutorial_required_branch()
+	await _click_name("Branch%d" % required)
+	await _capture("tutorial-choose-technique")
+	for enemy: Dictionary in run.enemies:
+		enemy.hp = 1
+	await _click_name("ResolveTurn")
+	_check(run.tutorial_step == run.TUTORIAL_COMPLETE, "最初の霊戦勝利で案内を完了")
+	await _capture("tutorial-complete")
+
+
+func _capture_streets() -> void:
+	for district: int in range(12):
+		main.busy = true
+		run.new_run(20260907)
+		run.skip_tutorial()
+		run.begin_journey()
+		run.depth = district
+		run.route_choices.resize(district)
+		run.route_choices.fill(0)
+		main.busy = false
+		main.street_selected = 0
+		main.render()
+		await _settle()
+		await _capture("street-%02d" % (district + 1), 0.12)
+
+
+func _capture_notebook() -> void:
+	main.busy = true
+	run.new_run(20260907)
+	run.skip_tutorial()
+	run.begin_journey()
+	run.darkness = 67
+	run.ether = 7
+	run.relics = 2
+	main.busy = false
+	main.render()
+	await _settle()
+	await _click_name("OpenCodex")
+	await _capture("notebook-spirits-1")
+	for page: int in range(1, 3):
+		await _click_name("CodexNext")
+		await _capture("notebook-spirits-%d" % (page + 1))
+	await _click_name("CloseOverlay")
+	await _click_name("OpenParty")
+	await _capture("notebook-party")
+	await _click_name("CloseOverlay")
+	await _key(KEY_ESCAPE)
+	await _capture("notebook-pause")
+	await _click_name("Help")
+	await _capture("notebook-help")
+	await _click_name("CloseOverlay")
 
 
 ## 個別ノードを固定した撮影条件。通常プレイの到達証明とは区別する。
 func _prepare_node(kind: String) -> void:
 	main.busy = true
 	run.new_run(20260907)
+	run.skip_tutorial()
 	run.begin_journey()
 	for depth: int in range(run.route.size()):
 		for branch: int in range(run.route[depth].size()):
@@ -103,6 +163,7 @@ func _capture_darkness() -> void:
 	for darkness: int in [0, 30, 60, 80]:
 		main.busy = true
 		run.new_run(20260907)
+		run.skip_tutorial()
 		run.begin_journey()
 		run.darkness = darkness
 		main.busy = false
@@ -118,6 +179,7 @@ func _capture_endings() -> void:
 	for ending: String in Story.ENDINGS:
 		main.busy = true
 		run.new_run(20260907)
+		run.skip_tutorial()
 		run.mode = "result"
 		run.ending = ending
 		run.result_text = Story.ENDINGS[ending].text
@@ -156,6 +218,33 @@ func _capture_effects() -> void:
 		await create_timer(0.18).timeout
 		await _capture("effect-battle-%d" % index, 0.0)
 	await _settle()
+
+
+func _capture_cut_ins() -> void:
+	main.busy = true
+	run.new_run(20260907)
+	run.skip_tutorial()
+	run.begin_journey()
+	main.busy = false
+	main.render()
+	await _settle()
+	for id: String in CutIn.SPIRIT_IDS:
+		var cut_in := CutIn.new()
+		main.screen.add_child(cut_in)
+		cut_in.setup(id, "attack", "%sの一撃" % Catalog.spirit(id).name)
+		cut_in.seek_progress(0.45)
+		await _capture("cutin-%s-attack" % id, 0.0)
+		cut_in.queue_free()
+		await process_frame
+	for action: String in ["attack", "hurt", "dissolve"]:
+		for frame: int in range(3):
+			var cut_in := CutIn.new()
+			main.screen.add_child(cut_in)
+			cut_in.setup("bride", action, "%s / %s" % [Catalog.spirit("bride").name, action])
+			cut_in.seek_progress([0.18, 0.48, 0.76][frame])
+			await _capture("cutin-sequence-%s-%d" % [action, frame], 0.0)
+			cut_in.queue_free()
+			await process_frame
 
 
 func _capture_characters() -> void:

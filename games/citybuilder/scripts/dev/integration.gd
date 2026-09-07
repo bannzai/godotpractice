@@ -1,6 +1,8 @@
 extends SceneTree
 ## 実入力を画面へ渡し、操作・保存・勝敗までを検証する。通常の保存先は使わない。
 
+const Sim = preload("res://scripts/simulation.gd")
+
 var failed: bool = false
 var city: Node
 var main: Control
@@ -25,6 +27,7 @@ func _run() -> void:
 	await _key(KEY_ENTER)
 	_check(city.phase == "playing", "Enter で新しい街を開始")
 	if city.phase == "playing":
+		await _tutorial_with_accept()
 		await _keyboard_and_mouse()
 		await _save_and_resume()
 		await _gamepad()
@@ -40,6 +43,17 @@ func _run() -> void:
 		quit(0)
 
 
+func _tutorial_with_accept() -> void:
+	_check(city.tutorial_active and city.tutorial_step == 0, "初回開始で図面の注記を表示")
+	_check(city.speed == 0, "チュートリアル中は時間を停止")
+	await _key(KEY_ENTER)
+	_check(city.tutorial_active and city.tutorial_step == 1, "Enter で配置プレビューの注記へ進む")
+	await _pad(JOY_BUTTON_A)
+	_check(city.tutorial_active and city.tutorial_step == 2, "パッド A で時間操作の注記へ進む")
+	await _key(KEY_ENTER)
+	_check(not city.tutorial_active and city.speed == 1, "最後の注記から図面操作を開始")
+
+
 func _check(condition: bool, label: String) -> void:
 	if condition:
 		print("入力検証 OK: " + label)
@@ -49,6 +63,8 @@ func _check(condition: bool, label: String) -> void:
 
 
 func _keyboard_and_mouse() -> void:
+	_check(main.view.selection_valid, "配置可能な区画を水色で判定")
+	_check(main.view._preview.visible, "選択中の住宅を配置前に予告")
 	await _key(KEY_SPACE)
 	_check(city.speed == 0, "Space で時間停止")
 	await _key(KEY_T)
@@ -72,6 +88,8 @@ func _keyboard_and_mouse() -> void:
 	_check(main.selected_tool == 1, "Q で住宅へ切替")
 	await _key(KEY_ENTER)
 	_check(_tile(cursor).kind == "residential", "Enter で住宅建設")
+	_check(not main.view.selection_valid, "配置済みの区画を配置不可で表示")
+	_check(main.placement_label.text.contains("同じ用途が配置済み"), "配置できない理由を表示")
 	var money: int = city.state.money
 	await _key(KEY_ENTER)
 	_check(city.state.money == money, "同一マスへの連続入力は二重課金しない")
@@ -103,7 +121,7 @@ func _keyboard_and_mouse() -> void:
 	await _motion(origin + Vector2(24, 18), Vector2(24, 18), MOUSE_BUTTON_MASK_RIGHT)
 	await _mouse_button(origin + Vector2(24, 18), MOUSE_BUTTON_RIGHT, false)
 	_check(main.view.pan.distance_to(pan) > 1.0, "右ドラッグでパン")
-	await _click(Vector2(1180, 470))
+	await _click(_tax_point(16))
 	_check(city.state.tax > 9, "税率スライダーをマウスで操作")
 	var cursor_after_tax: Vector2i = main.view.cursor
 	await _key(KEY_RIGHT)
@@ -114,8 +132,27 @@ func _keyboard_and_mouse() -> void:
 	await _key(KEY_Q)
 	await _key(KEY_O)
 	_check(main.view.overlay == "power", "O で電力問題を表示")
+	_check_component_power_ledger()
+	city.elapsed = 3.9
 	await _key(KEY_N)
 	_check(city.state.month == 1, "N で翌月へ進行")
+	_check(is_zero_approx(city.elapsed), "手動の翌月進行で月内経過時間をリセット")
+
+
+func _check_component_power_ledger() -> void:
+	var saved_state: Dictionary = city.state.duplicate(true)
+	var extra_power := Vector2i(2, 22)
+	var index: int = extra_power.y * Sim.SIZE + extra_power.x
+	city.state.tiles[index] = {"terrain": "flat", "kind": "power", "level": 0, "age": 0}
+	city.analysis = Sim.analyze(city.state)
+	main.view.cursor = Vector2i(7, 16)
+	main._refresh()
+	_check(int(city.analysis.capacity) == 180, "切断した2つの送電網を別系統として解析")
+	_check(main.needs.text.contains("全系統") and main.needs.text.contains("/ 180"), "台帳に全系統の容量を表示")
+	_check(main.needs.text.contains("選択区画の系統") and main.needs.text.contains("/ 90"), "台帳に選択系統の容量を分離表示")
+	city.state = saved_state
+	city.analysis = Sim.analyze(city.state)
+	main._refresh()
 
 
 func _save_and_resume() -> void:
@@ -158,6 +195,9 @@ func _gamepad() -> void:
 	_check(city.phase == "playing", "パッド A で新しい街を開始")
 	if city.phase != "playing":
 		return
+	_check(city.tutorial_active, "パッドで開始しても図面の注記を表示")
+	await _pad(JOY_BUTTON_B)
+	_check(not city.tutorial_active and city.speed == 1, "パッド B で注記をスキップ")
 	await _pad(JOY_BUTTON_START)
 	_check(city.speed == 0, "パッド Start で時間停止")
 	_check(main.view.overlay == "power" and main.overlay_index == 1, "タイトルから新規開始しても問題表示と地図が一致")
@@ -195,6 +235,8 @@ func _win() -> void:
 	_check(city.phase == "playing", "クリアルートの街を開始")
 	if city.phase != "playing":
 		return
+	await _key(KEY_ESCAPE)
+	_check(not city.tutorial_active, "Escape でクリアルートの注記をスキップ")
 	await _key(KEY_SPACE)
 	for x: int in range(8, 11):
 		await _click(_point(Vector2i(x, 16)))
@@ -215,10 +257,12 @@ func _lose() -> void:
 	_check(city.phase == "playing", "敗北ルートの街を開始")
 	if city.phase != "playing":
 		return
+	await _pad(JOY_BUTTON_B)
+	_check(not city.tutorial_active, "パッド B で敗北ルートの注記をスキップ")
 	await _pad(JOY_BUTTON_START)
 	# 資金だけを敗北直前へ準備し、税率と月送りは実入力で操作する。
 	city.state.money = 0
-	await _click(Vector2(981, 470))
+	await _click(_tax_point(0))
 	_check(city.state.tax == 0, "税率スライダーで無税を選択")
 	await _pad(JOY_BUTTON_RIGHT_SHOULDER)
 	await _pad(JOY_BUTTON_LEFT_SHOULDER)
@@ -238,6 +282,11 @@ func _tile(cell: Vector2i) -> Dictionary:
 
 func _point(cell: Vector2i) -> Vector2:
 	return main.view.global_position + main.view.cell_to_screen(cell)
+
+
+func _tax_point(value: int) -> Vector2:
+	var ratio: float = inverse_lerp(main.tax_slider.min_value, main.tax_slider.max_value, value)
+	return main.tax_slider.global_position + Vector2(main.tax_slider.size.x * ratio, 9)
 
 
 ## 押下と解放を別フレームで注入し、実際の入力配送を通す。

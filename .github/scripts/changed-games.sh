@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # CI の matrix に載せるゲーム (games/<slug>) を決めて `games=<JSON 配列>` の 1 行を出力する (GITHUB_OUTPUT 形式)。
 #
-#   - pull_request: ベースブランチとの差分が games/ 配下だけなら、変更のあったゲームだけを選ぶ。
-#     games/ の外 (workflow・ルートの Makefile・共通設定) に変更があれば全ゲームを選ぶ (共有物の変更は全ゲームに効くため)
+#   - pull_request: ベースブランチとの差分が「ゲーム個別のパス」だけなら、変更のあったゲームだけを選ぶ。
+#     ゲーム個別のパス = games/<slug>/ 配下、documents/knowledge/<slug>.md、documents/hearing/<slug>.md
+#     それ以外 (workflow・ルートの Makefile・共通設定・共有ドキュメント) に変更があれば全ゲームを選ぶ (共有物の変更は全ゲームに効くため)
 #   - それ以外 (push 等): 全ゲーム
 #
 # Usage: changed-games.sh <event_name> <base_ref>
@@ -19,14 +20,32 @@ all_games() {
   done | sort
 }
 
+# 変更ファイルのパスから対応するゲームの slug を出力する。ゲーム個別のパスでなければ何も出力しない
+game_of() {
+  case "$1" in
+    games/*/*) echo "$1" | cut -d/ -f2 ;;
+    documents/knowledge/*.md | documents/hearing/*.md) basename "$1" .md ;;
+  esac
+}
+
 selected="$(all_games)"
 
 if [ "$event" = "pull_request" ] && [ -n "$base_ref" ]; then
   changed="$(git diff --name-only "origin/${base_ref}...HEAD")"
-  if [ -n "$changed" ] && ! grep -qv '^games/' <<< "$changed"; then
-    selected="$(grep -oE '^games/[^/]+' <<< "$changed" | cut -d/ -f2 | sort -u | while read -r game; do
-      [ -f "games/$game/project.godot" ] && echo "$game"
-    done)"
+  if [ -n "$changed" ]; then
+    per_game_only=1
+    candidates=""
+    while IFS= read -r path; do
+      game="$(game_of "$path")"
+      if [ -z "$game" ] || [ ! -f "games/$game/project.godot" ]; then
+        per_game_only=0
+        break
+      fi
+      candidates="$candidates$game"$'\n'
+    done <<< "$changed"
+    if [ "$per_game_only" = 1 ]; then
+      selected="$(printf '%s' "$candidates" | sort -u)"
+    fi
   fi
 fi
 

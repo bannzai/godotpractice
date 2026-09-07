@@ -1,444 +1,582 @@
 #!/usr/bin/env python3
-"""こもれび農園の独立 SVG と PCM 音源を固定手順で再生成する。"""
+"""CC0 写真と紙目から、版画調の PNG 素材を固定手順で再生成・検査する。"""
+
+from __future__ import annotations
 
 from pathlib import Path
 import argparse
 import array
 import hashlib
+import io
 import json
 import math
-import random
-import re
 import shutil
 import struct
 import sys
 import tempfile
 import wave
 
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
+
+
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "assets"
-INK = "#31574a"
-CREAM = "#fff1ce"
-GOLD = "#e8af52"
-LEAF = "#6eaa67"
-BGM_NAMES = {"title", "spring", "summer", "festival", "result"}
+INK = "#332c26"
+PAPER = "#ead7ab"
+RED = "#a83f2f"
+GREEN = "#315c43"
+GOLD = "#c98b32"
+BLUE = "#426a72"
+GENERATED_FILES: list[str] = []
+GENERATED_AUDIO_FILES: list[str] = []
 
 
-def ellipse(x, y, rx, ry, fill, stroke=INK, sw=2.5):
-    return f'<ellipse cx="{x}" cy="{y}" rx="{rx}" ry="{ry}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
+def _write_png(path: Path, image: Image.Image) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stream = io.BytesIO()
+    image.save(stream, "PNG", optimize=False, compress_level=9)
+    payload = stream.getvalue()
+    if not path.exists() or path.read_bytes() != payload:
+        path.write_bytes(payload)
 
 
-def rect(x, y, w, h, fill, radius=0, stroke=INK, sw=2.5):
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{radius}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
+def _source(name: str) -> Image.Image:
+    return Image.open(ASSETS / "source_photos" / name).convert("RGB")
 
 
-def path(d, fill="none", stroke=INK, sw=2.5):
-    return f'<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>'
+def _paper(size: tuple[int, int], tint: str = PAPER) -> Image.Image:
+    texture = ImageOps.fit(_source("paper_cc0.jpg"), size, method=Image.Resampling.LANCZOS)
+    values = ImageOps.autocontrast(ImageOps.grayscale(texture), cutoff=1)
+    colored = ImageOps.colorize(values, black="#8e6c42", white=tint)
+    return Image.blend(Image.new("RGB", size, tint), colored, 0.34)
 
 
-def group(content, transform):
-    return f'<g transform="{transform}">{content}</g>'
-
-
-def write_svg(name, w, h, content):
-    # Godot の SVG インポーターでも透明度を保つため8桁hexを独立属性へ展開する。
-    content=re.sub(
-        r'(fill|stroke)="(#[0-9a-fA-F]{6})([0-9a-fA-F]{2})"',
-        lambda match:f'{match[1]}="{match[2]}" {match[1]}-opacity="{int(match[3],16)/255:.6f}"',
-        content,
+def _woodcut_photo(
+    source_name: str,
+    size: tuple[int, int],
+    colors: tuple[str, str, str] = (INK, GREEN, PAPER),
+) -> Image.Image:
+    photo = ImageOps.fit(_source(source_name), size, method=Image.Resampling.LANCZOS)
+    values = ImageOps.autocontrast(ImageOps.grayscale(photo), cutoff=2)
+    values = values.filter(ImageFilter.GaussianBlur(0.55))
+    values = values.point(lambda value: 25 if value < 92 else 138 if value < 176 else 235)
+    print_layer = ImageOps.colorize(
+        values,
+        black=colors[0],
+        mid=colors[1],
+        white=colors[2],
+        blackpoint=0,
+        midpoint=128,
+        whitepoint=255,
     )
-    target = ASSETS / name
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">{content}</svg>\n')
+    return ImageChops.multiply(print_layer, _paper(size, colors[2]))
 
 
-def flower(x, y, color="#f6baac", size=1):
-    body = "".join(ellipse(math.cos(i * math.tau / 5) * 5, math.sin(i * math.tau / 5) * 5, 4, 4, color, "none") for i in range(5))
-    return group(body + ellipse(0, 0, 3, 3, GOLD, "none"), f"translate({x} {y}) scale({size})")
+def _distress(image: Image.Image, seed: int, strength: int = 36) -> Image.Image:
+    result = image.convert("RGBA")
+    alpha = result.getchannel("A")
+    marks = Image.new("L", image.size, 255)
+    draw = ImageDraw.Draw(marks)
+    width, height = image.size
+    for index in range(strength):
+        x = (seed * 31 + index * 67) % max(1, width)
+        y = (seed * 19 + index * 43) % max(1, height)
+        length = 2 + (index * 5 + seed) % max(3, min(15, width // 4 + 1))
+        draw.line((x, y, min(width - 1, x + length), y), fill=80, width=1)
+    result.putalpha(ImageChops.multiply(alpha, marks))
+    return result
 
 
-def farmer(frame, action):
-    phase = math.sin(frame * math.pi / 2)
+def _actor_frame(kind: str, action: str, frame: int) -> Image.Image:
+    image = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    phase = (-1, 0, 1, 0)[frame]
     bob = phase * (2 if action == "walk" else 1)
-    lean = [0, -8, 10, 3][frame] if action in ("hoe", "water", "harvest") else (9 if action == "tired" else 0)
+    tired = action == "tired"
+    if kind == "chicken":
+        draw.ellipse((35, 103, 98, 114), fill="#4e41385c")
+        stride = phase * 6 if action == "walk" else 0
+        draw.line((55, 88, 53 - stride, 107), fill=GOLD, width=4)
+        draw.line((75, 88, 78 + stride, 107), fill=GOLD, width=4)
+        draw.ellipse((34, 52 + bob, 92, 96 + bob), fill="#e8d6a8", outline=INK, width=4)
+        wing_y = 58 + (-8 if action in ("hoe", "water", "harvest") and frame % 2 else 4)
+        draw.polygon(((48, 61), (77, wing_y), (82, 84), (52, 90)), fill=RED, outline=INK)
+        draw.ellipse((72, 39 + bob, 106, 73 + bob), fill="#eadbb9", outline=INK, width=4)
+        draw.polygon(((78, 41), (83, 26), (90, 40), (98, 27), (100, 45)), fill=RED)
+        draw.polygon(((101, 53), (119, 60), (101, 67)), fill=GOLD, outline=INK)
+        draw.ellipse((91, 49 if not tired else 55, 97, 55 if not tired else 57), fill=INK)
+        return _distress(image, 503 + frame * 11 + len(action), 17)
+
     stride = phase * 7 if action == "walk" else 0
-    body = ellipse(64, 111, 30, 8, "#31574a22", "none")
-    person = path(f"M51 92 L{50-stride} 107 M73 92 L{75+stride} 107", stroke="#44565a", sw=13)
-    person += ellipse(47-stride, 110, 10, 5, "#74574c") + ellipse(79+stride, 110, 10, 5, "#74574c")
-    person += rect(43, 62, 39, 35, "#f5c686", 12)
-    person += path("M49 65 L48 93 Q64 101 79 92 L78 64 M55 65 L55 79 L71 79 L71 65", "#588b98")
-    person += rect(56, 80, 14, 12, "#77a7a8", 3) + ellipse(53, 72, 2, 2, GOLD, "none") + ellipse(73, 72, 2, 2, GOLD, "none")
-    held = ""
+    skin = "#cb9569"
+    draw.ellipse((35, 106, 94, 117), fill="#4e41385c")
+    draw.line((51, 88, 48 - stride, 108), fill=INK, width=10)
+    draw.line((76, 88, 80 + stride, 108), fill=INK, width=10)
+    draw.ellipse((39 - stride, 104, 60 - stride, 114), fill=RED, outline=INK, width=2)
+    draw.ellipse((70 + stride, 104, 91 + stride, 114), fill=RED, outline=INK, width=2)
+    if kind == "farmer":
+        draw.rounded_rectangle((42, 57 + bob, 85, 98 + bob), radius=9, fill=BLUE, outline=INK, width=4)
+        draw.rectangle((53, 72 + bob, 74, 93 + bob), fill="#ba7b3d", outline=INK, width=3)
+    else:
+        draw.polygon(((38, 61 + bob), (87, 58 + bob), (96, 101 + bob), (30, 101 + bob)), fill=RED, outline=INK)
+        draw.rectangle((53, 65 + bob, 73, 96 + bob), fill=PAPER, outline=INK, width=3)
+    arm_shift = -10 if action in ("hoe", "water", "harvest") and frame in (1, 2) else 0
+    draw.line((42, 67 + bob, 30, 86 + bob - arm_shift), fill=skin, width=10)
+    draw.line((84, 67 + bob, 99, 82 + bob + arm_shift), fill=skin, width=10)
     if action == "hoe":
-        angle = [-38, -65, 20, 6][frame]
-        held = group(path("M88 73 L106 24", stroke="#ac815a", sw=6) + path("M99 23 L117 28 L115 36 L99 31 Z", "#7a9290") + ellipse(87, 74, 7, 6, "#edb98e"), f"rotate({angle} 84 77)")
+        draw.line((96, 82 + bob + arm_shift, 113, 35 + frame * 5), fill="#7a4b2d", width=5)
+        draw.line((103, 35 + frame * 5, 121, 40 + frame * 5), fill=INK, width=6)
     elif action == "water":
-        person += group(path("M88 77 L104 73 L111 65", stroke="#719fa6", sw=8) + rect(80, 71, 23, 21, "#6eb8bb", 5) + path("M82 71 Q82 57 95 64 L98 72", stroke="#356b73", sw=4) + ellipse(88, 76, 6, 6, "#edb98e"), f"rotate({[0,12,23,12][frame]} 86 74)")
+        draw.rounded_rectangle((87, 68 + bob, 111, 91 + bob), radius=4, fill=BLUE, outline=INK, width=3)
+        draw.line((106, 72 + bob, 121, 61 + bob), fill=BLUE, width=6)
         if frame > 0:
-            person += "".join(ellipse(109 + i * 4, 80 + i * 5 + frame, 1.5, 3, "#bcebee", "none") for i in range(3))
+            for drop in range(3):
+                draw.ellipse((116 - drop * 5, 76 + drop * 5, 120 - drop * 5, 83 + drop * 5), fill="#7faaa5")
     elif action == "harvest":
-        person += path(f"M82 72 L94 {65-frame*3}", stroke="#edb98e", sw=11)
-        held = group(crop("turnip", "ripe"), f"translate(79 {34-frame*3}) scale(.55)")
+        draw.ellipse((92, 38 - frame * 3, 116, 61 - frame * 3), fill=PAPER, outline=INK, width=3)
+        draw.line((104, 39 - frame * 3, 98, 28 - frame * 3), fill=GREEN, width=5)
+    head_y = 32 + bob + (7 if tired else 0)
+    draw.ellipse((42, head_y, 86, head_y + 43), fill=skin, outline=INK, width=4)
+    if kind == "farmer":
+        draw.polygon(((37, head_y + 5), (47, head_y - 16), (80, head_y - 14), (94, head_y + 5)), fill=GOLD, outline=INK)
+        draw.line((31, head_y + 5, 100, head_y + 5), fill=GOLD, width=8)
+        draw.line((31, head_y + 7, 100, head_y + 7), fill=INK, width=3)
     else:
-        person += path(f"M43 72 L{36-stride/2} {88+stride/2} M81 72 L{88+stride/2} {88-stride/2}", stroke="#edb98e", sw=11)
-    person += ellipse(64, 50, 23, 24, "#edb98e")
-    person += path("M42 42 Q40 20 60 24 Q83 21 88 43 L80 48 L78 38 Q56 42 49 34 L48 50 Z", "#705643")
-    person += ellipse(48, 55, 4, 6, "#edb98e") + ellipse(82, 55, 4, 6, "#edb98e")
-    if action == "tired":
-        person += path("M55 54 L61 56 M68 56 L74 54 M61 65 Q65 61 69 65")
+        draw.arc((35, head_y - 11, 90, head_y + 36), 185, 355, fill="#ddd0b2", width=12)
+        draw.ellipse((79, head_y - 4, 96, head_y + 13), fill="#ddd0b2", outline=INK, width=3)
+        draw.ellipse((48, head_y + 14, 62, head_y + 26), outline=INK, width=3)
+        draw.ellipse((68, head_y + 14, 82, head_y + 26), outline=INK, width=3)
+        draw.line((62, head_y + 20, 68, head_y + 20), fill=INK, width=2)
+    eye_y = head_y + (25 if tired else 21)
+    if tired:
+        draw.line((52, eye_y, 59, eye_y), fill=INK, width=3)
+        draw.line((70, eye_y, 77, eye_y), fill=INK, width=3)
     else:
-        person += ellipse(57, 52, 2.5, 3.5, INK, "none") + ellipse(71, 52, 2.5, 3.5, INK, "none") + path("M60 62 Q65 67 70 61", sw=2)
-    person += ellipse(53, 59, 4, 2.5, "#dc8e7c", "none") + ellipse(77, 59, 4, 2.5, "#dc8e7c", "none")
-    person += ellipse(64, 34, 35, 10, "#edc979") + path("M43 32 L47 14 Q65 7 81 16 L85 33 Z", "#efd99a")
-    person += path("M45 27 Q64 33 83 27", stroke="#a88d59", sw=6) + path("M52 17 L51 23 M61 15 L61 24 M72 16 L72 24", stroke="#d4b774", sw=2)
-    person += flower(82, 26, "#f6baac", .6) + held
-    return body + group(person, f"translate(0 {bob}) rotate({lean} 64 103)")
+        draw.ellipse((53, eye_y, 58, eye_y + 6), fill=INK)
+        draw.ellipse((71, eye_y, 76, eye_y + 6), fill=INK)
+    draw.arc((57, head_y + 26, 73, head_y + 37), 15, 165, fill=INK, width=2)
+    return _distress(image, (109 if kind == "farmer" else 307) + frame * 11 + len(action), 20)
 
 
-def merchant(frame, action):
-    wave_angle = [0, -24, -48, -24][frame] if action in ("hoe", "water", "harvest") else 0
-    stride = math.sin(frame * math.pi / 2) * 6 if action == "walk" else 0
-    bob = math.sin(frame * math.pi / 2) * 1.5
-    body = ellipse(64, 112, 29, 7, "#31574a22", "none")
-    person = ellipse(53-stride, 108, 9, 5, "#705643") + ellipse(75+stride, 108, 9, 5, "#705643")
-    person += path("M45 63 Q63 57 82 64 L91 99 Q66 111 38 100 Z", "#a994c1")
-    person += path("M53 64 L54 94 Q65 99 77 94 L76 64", "#dfcde2") + rect(57, 79, 16, 11, "#b19bc4", 3)
-    person += group(path("M79 69 L94 76 L100 62", stroke="#efc9a0", sw=10) + ellipse(100, 60, 6, 7, "#efc9a0"), f"rotate({wave_angle} 80 70)")
-    person += path("M45 72 L34 84", stroke="#efc9a0", sw=10)
-    person += path("M22 81 Q25 66 38 74 L41 83 M19 81 L46 81 L43 100 L23 100 Z", "#bb8d61")
-    person += path("M22 88 L44 88 M24 94 L44 94 M28 82 L29 99 M37 82 L37 99", stroke="#8a684c", sw=1.5)
-    person += "".join(flower(25+i*7, 77-(i%2)*5, ["#f3ada9", "#f0d476", "#c2b5df"][i], .65) for i in range(3))
-    person += ellipse(64, 39, 27, 29, "#d4c4ad") + ellipse(87, 27, 10, 11, "#d4c4ad")
-    person += ellipse(64, 49, 22, 24, "#efc9a0")
-    person += path("M43 45 Q44 24 61 24 Q68 24 79 32 L81 42 Q68 42 61 30 Q52 43 43 45", "#d4c4ad")
-    person += ellipse(55, 50, 9, 8, "#fff1ce44", INK, 2) + ellipse(75, 50, 9, 8, "#fff1ce44", INK, 2) + path("M64 50 L66 50", sw=2)
-    person += ellipse(55, 51, 2, 3, INK, "none") + ellipse(75, 51, 2, 3, INK, "none") + path("M60 62 Q66 68 72 61", sw=2)
-    person += path("M47 66 Q61 76 80 65 L72 77 L62 72 L54 77 Z", "#f0dcac")
-    person += flower(84, 32, "#a994c1", .75)
-    if action == "tired":
-        person += path("M52 51 L58 51 M72 51 L78 51", sw=3)
-    return body + group(person, f"translate(0 {bob})")
+def _make_characters() -> None:
+    for kind in ("farmer", "merchant", "chicken"):
+        sheet = Image.new("RGBA", (512, 768), (0, 0, 0, 0))
+        for row, action in enumerate(("idle", "walk", "hoe", "water", "harvest", "tired")):
+            for frame in range(4):
+                sheet.alpha_composite(_actor_frame(kind, action, frame), (frame * 128, row * 128))
+        name = f"characters/{kind}.png"
+        _write_png(ASSETS / name, sheet)
+        GENERATED_FILES.append(name)
 
 
-def chicken(frame, action):
-    flap = [-8, -26, 9, -15][frame] if action in ("hoe", "water", "harvest") else [0, 3, 0, -3][frame]
-    stride = math.sin(frame * math.pi / 2) * 7 if action == "walk" else 0
-    body = ellipse(64, 107, 26, 7, "#31574a22", "none")
-    body += path(f"M55 91 L{54-stride} 105 L{48-stride} 107 M72 91 L{75+stride} 105 L{81+stride} 107", stroke="#c99549", sw=4)
-    body += path("M42 69 Q18 57 29 42 Q36 48 39 55 Q26 35 38 33 Q48 45 48 60", "#f5e7c8")
-    body += ellipse(64, 78, 28, 22, "#fff4dc")
-    body += group(path("M51 68 Q76 62 78 82 Q62 95 47 81 Q59 81 57 74 Z", "#e1d3b6"), f"rotate({flap} 52 73)")
-    head_y = 58 + (10 if action == "tired" else 0) + (frame%2)*2
-    body += ellipse(83, head_y, 17, 19, "#fff4dc")
-    body += path(f"M74 {head_y-15} Q69 {head_y-31} 78 {head_y-25} Q85 {head_y-35} 89 {head_y-23} Q101 {head_y-25} 95 {head_y-12}", "#d98379")
-    body += path(f"M96 {head_y-1} L108 {head_y+4} L96 {head_y+9} Z", "#e8af52")
-    body += ellipse(95, head_y+13, 5, 7, "#d98379")
-    body += ellipse(88, head_y-1, 3, 4 if action != "tired" else 1, INK, "none") + ellipse(89, head_y-2, .8, 1, CREAM, "none")
-    return body
-
-
-def crop(kind, stage):
-    colors = {"turnip": "#eee1bf", "carrot": "#e69d54", "tomato": "#dc8172", "corn": "#e5be5c"}
+def _crop_mask(kind: str, stage: str) -> Image.Image:
+    mask = Image.new("L", (64, 64), 0)
+    draw = ImageDraw.Draw(mask)
     if stage == "seed":
-        return ellipse(32, 47, 13, 5, "#775b43", "none") + ellipse(29, 44, 3, 2, "#e4c592", "none") + ellipse(37, 46, 2, 1.5, "#e4c592", "none")
-    scale = {"sprout": .5, "growing": .75, "ripe": 1}[stage]
-    plant = path("M32 49 L32 20", stroke="#4f8250", sw=3)
-    plant += path("M31 38 Q12 41 14 26 Q27 24 31 38 M33 32 Q49 34 51 20 Q36 19 33 32", LEAF)
-    if kind == "corn":
-        plant += path("M32 49 L31 10 M31 13 L25 7 M31 10 L36 5", stroke="#bda34e", sw=3)
-        plant += path("M29 38 Q12 28 10 15 Q27 20 29 38 M35 44 Q52 39 56 23 Q38 23 35 44", "#8cb973")
-    if stage == "ripe" or stage == "growing":
+        draw.ellipse((21, 40, 43, 51), fill=255)
+        return mask
+    scale = {"sprout": 0.48, "growing": 0.74, "ripe": 1.0}[stage]
+    draw.line((32, 53, 32, int(17 + 16 * (1 - scale))), fill=255, width=max(2, int(5 * scale)))
+    draw.ellipse((32 - int(23 * scale), 21, 33, 37), fill=255)
+    draw.ellipse((31, 15, 32 + int(23 * scale), 33), fill=255)
+    if stage != "sprout":
         if kind == "turnip":
-            plant += path("M17 39 Q16 27 31 28 Q47 27 47 40 Q45 51 34 54 L31 59 L28 53 Q19 49 17 39", colors[kind]) + path("M20 35 Q31 40 43 34", stroke="#cdafa4", sw=4)
+            draw.ellipse((15, 30, 49, 60), fill=255)
         elif kind == "carrot":
-            plant += path("M20 33 Q31 26 43 34 L30 58 Q20 43 20 33", colors[kind]) + path("M23 37 L32 39 M28 45 L34 46", stroke="#bd8149", sw=2)
+            draw.polygon(((16, 31), (49, 31), (30, 62)), fill=255)
         elif kind == "tomato":
-            plant += ellipse(24, 44, 12, 11, colors[kind]) + ellipse(43, 32, 11, 10, colors[kind]) + path("M17 36 L25 39 L29 34 M37 25 L43 28 L48 23", stroke="#4f8250", sw=3)
-            plant += ellipse(20, 41, 3, 2, "#efa99a", "none")
+            draw.ellipse((9, 35, 34, 59), fill=255)
+            draw.ellipse((31, 28, 56, 52), fill=255)
         else:
-            plant += ellipse(35, 33, 8, 18, colors[kind]) + path("M28 40 L26 24 Q16 34 31 50 M40 42 L43 21 Q50 41 32 51", "#76a563")
-            plant += "".join(ellipse(34+(j%2)*4, 23+j*4, 1, 1.5, "#bd963f", "none") for j in range(5))
-    return group(plant, f"translate({32*(1-scale)} {54*(1-scale)}) scale({scale})")
+            draw.rounded_rectangle((23, 19, 43, 59), radius=8, fill=255)
+    return mask
 
 
-def props():
-    house = ellipse(123, 173, 109, 15, "#31574a25", "none") + rect(31, 69, 183, 100, "#efd9aa", 6)
-    house += path("M13 78 L110 10 Q122 2 134 11 L230 78 L218 91 L121 30 L26 92 Z", "#ba7764")
-    house += path("M43 61 L122 14 L204 64 M33 72 L122 24 L212 75", stroke="#dd9c7b", sw=4)
-    house += rect(165, 13, 22, 36, "#aebda7", 3) + rect(160, 9, 31, 8, "#d6ddc2", 3)
-    house += rect(96, 105, 43, 64, "#8caa92", 20) + path("M118 108 L118 164", stroke="#597e6b", sw=2) + ellipse(130, 138, 3, 3, GOLD)
-    for x in (48, 160):
-        house += rect(x, 102, 33, 31, "#8ac2c1", 6) + path(f"M{x+16} 104 L{x+16} 131 M{x+2} 117 L{x+31} 117", stroke=CREAM, sw=3) + rect(x-5, 135, 43, 10, "#b48862", 3)
-        house += "".join(flower(x+4+i*12, 134, "#e8a093", .6) for i in range(3))
-    house += rect(86, 166, 63, 10, "#b9b69a", 3)
-    write_svg("props/house.svg", 244, 190, house)
-    well = ellipse(65, 125, 53, 11, "#31574a25", "none") + ellipse(65, 102, 45, 24, "#96b2a3") + rect(20, 81, 90, 24, "#c3cfb5", 3) + ellipse(65, 81, 45, 18, "#dce0c2") + ellipse(65, 81, 33, 10, "#548c96")
-    well += path("M33 92 L33 28 M96 92 L96 28", stroke="#a98962", sw=8) + path("M13 34 L64 6 L118 34 Z", "#c7866b") + path("M33 47 L96 47", stroke="#a98962", sw=7) + path("M65 47 L65 85", stroke="#d5b879", sw=3) + rect(58, 76, 16, 14, "#87aaa8", 3)
-    write_svg("props/well.svg", 130, 140, well)
-    shipping = ellipse(64, 100, 55, 10, "#31574a25", "none") + rect(14, 40, 100, 60, "#b88f62", 5) + path("M14 43 L35 25 L104 25 L114 43 Z", "#d3af79") + path("M19 57 L109 57 M19 79 L109 79 M32 43 L32 97 M96 43 L96 97", stroke="#866a4c", sw=3) + rect(43, 50, 40, 34, "#f2ddb0", 3)
-    shipping += path("M53 73 L62 58 L73 72 M62 58 L62 79", stroke="#5f8962", sw=4) + ellipse(28, 51, 2, 2, INK, "none") + ellipse(100, 88, 2, 2, INK, "none")
-    write_svg("props/shipping.svg", 128, 112, shipping)
-    shop = ellipse(117, 147, 99, 13, "#31574a25", "none") + path("M30 49 L30 132 M201 49 L201 132", stroke="#967751", sw=8) + rect(22, 95, 190, 46, "#c59b6d", 5)
-    shop += path("M9 53 L37 13 L193 13 L223 53 Z", "#a3bfa0")
-    for i in range(6):
-        x = 11+i*35
-        shop += path(f"M{x} 53 L{x+13} 14 L{x+35} 14 L{x+35} 53 Q{x+17} 73 {x} 53", "#f4e2b7" if i%2 == 0 else "#85a99b")
-    shop += path("M35 112 L198 112 M35 132 L198 132", stroke="#a07955", sw=2)
-    for i, kind in enumerate(("turnip", "carrot", "tomato", "corn")):
-        shop += group(crop(kind, "ripe"), f"translate({29+i*43} 59) scale(.7)")
-    write_svg("props/shop.svg", 234, 164, shop)
-    tree = ellipse(88, 179, 59, 12, "#31574a25", "none") + path("M76 166 L78 82 L105 79 L106 167 L119 179 L65 179 Z", "#a8885b") + path("M85 159 L86 94 M104 122 L117 107", stroke="#805f46", sw=4)
-    for x,y,rx,ry,color in [(60,83,49,43,"#598c68"),(114,83,47,45,"#659967"),(91,45,55,42,"#80ae70"),(54,52,35,32,"#92b77a"),(113,36,33,28,"#9abe7e")]:
-        tree += ellipse(x,y,rx,ry,color)
-    tree += path("M29 62 Q44 41 61 49 M73 29 Q94 13 112 28 M105 83 Q130 64 141 81", stroke="#b4ce91", sw=4)
-    tree += ellipse(43,87,5,6,"#e9bd69") + ellipse(120,60,5,6,"#e9bd69")
-    write_svg("props/tree.svg", 176, 195, tree)
-    fence = path("M7 35 L121 35 M7 57 L121 57", stroke="#b69a70", sw=11)
-    for x in (15,64,113):
-        fence += path(f"M{x-6} 72 L{x-6} 19 L{x} 11 L{x+6} 19 L{x+6} 72 Z", "#e4c593") + ellipse(x, 35, 1.8, 1.8, "#897657", "none")
-    write_svg("props/fence.svg", 128, 80, fence)
-
-
-def terrain():
-    tiles = []
-    for index, color in enumerate(("#9cbd7a", "#d7bf8f", "#a28159", "#785f49", "#78b9be", "#a7c783")):
-        tile = rect(0,0,64,64,color,stroke="none")
-        if index in (0,5):
-            for j in range(7):
-                x,y = (j*19+11)%61, (j*29+9)%58
-                tile += path(f"M{x-3} {y} L{x} {y+3} L{x+2} {y-3}", stroke="#80a866", sw=1.4)
-            if index == 5:
-                tile += flower(14,23,"#f5e5b1",.45) + flower(43,45,"#efbca9",.5)
-        elif index == 1:
-            for j in range(10):
-                tile += ellipse((j*19+5)%64,(j*27+12)%64,2.5,1.5,"#bca57b","none")
-        elif index in (2,3):
-            for y in (12,27,42,57):
-                tile += path(f"M5 {y} Q30 {y-3} 58 {y}", stroke="#866746" if index==2 else "#624f40",sw=3)
-                tile += path(f"M7 {y+4} L55 {y+4}",stroke="#bc9867" if index==2 else "#8b7761",sw=1.5)
-        else:
-            tile += path("M3 17 Q12 21 22 17 M35 38 Q47 44 60 38 M8 57 Q20 62 33 57",stroke="#b8dbd4",sw=2)
-        tiles.append(group(tile, f"translate({index*64} 0)"))
-    write_svg("tiles/terrain.svg",384,64,"".join(tiles))
-
-
-def backgrounds():
-    far = '<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#b7dad3"/><stop offset="1" stop-color="#f8e9ba"/></linearGradient></defs>' + rect(0,0,1280,720,"url(#sky)",stroke="none")
-    far += ellipse(1030,118,60,60,"#fff0bf","none")
-    for x,y,s in ((130,110,1),(530,63,.7),(880,188,.6)):
-        far += group(ellipse(0,0,60,16,"#fff3dbaa","none") + ellipse(-18,-12,30,20,"#fff3dbaa","none") + ellipse(18,-8,28,21,"#fff3dbaa","none"),f"translate({x} {y}) scale({s})")
-    far += path("M0 356 Q180 204 389 350 Q573 207 787 334 Q1084 186 1280 320 L1280 720 L0 720Z","#99bba1","none")
-    write_svg("backgrounds/far.svg",1280,720,far)
-    mid = path("M0 458 Q175 292 406 420 Q674 278 906 422 Q1100 310 1280 420 L1280 720 L0 720Z","#80a978","none")
-    mid += path("M0 555 Q219 457 509 528 Q815 407 1280 517 L1280 720 L0 720Z","#a2bd7c","none")
-    mid += path("M797 480 Q793 573 965 720 L1144 720 Q910 547 850 486Z","#e2ca98","none")
-    for i in range(12):
-        x=30+i*109; y=420+(i%3)*22
-        mid += ellipse(x,y,13,28,"#679169","none") + path(f"M{x} {y+14} L{x} {y+35}",stroke="#74946c",sw=3)
-    write_svg("backgrounds/mid.svg",1280,720,mid)
-    near = path("M0 640 Q75 575 178 670 L260 720 L0 720Z","#4c795c","none") + path("M1000 720 Q1110 594 1280 634 L1280 720Z","#537e5d","none")
-    for x,y in ((40,677),(115,704),(1180,687),(1250,650)):
-        near += path(f"M{x} {y+30} Q{x-40} {y-30} {x-25} {y-35} Q{x+5} {y-24} {x} {y+30} M{x} {y+30} Q{x+45} {y-28} {x+30} {y-35} Q{x+2} {y-26} {x} {y+30}","#79a56b","#426b53",2)
-        near += flower(x,y,"#f0c991",.8)
-    write_svg("backgrounds/near.svg",1280,720,near)
-    title = ellipse(320,285,285,251,"#f7e9bd",INK,4) + ellipse(320,296,265,230,"#a9c485","none")
-    title += path("M65 341 Q272 166 581 352 L570 440 Q294 640 81 431Z","#d4bc8a","none")
-    house = (ASSETS/"props/house.svg").read_text().split('>',1)[1].rsplit('</svg>',1)[0]
-    title += group(house,"translate(167 100) scale(1.3)")
-    for i,kind in enumerate(("turnip","carrot","tomato","corn")):
-        title += group(crop(kind,"ripe"),f"translate({100+i*109} 354) scale(1.4)")
-    title += group(farmer(0,"water"),"translate(346 268) scale(1.8)") + group(chicken(0,"idle"),"translate(140 380) scale(.85)")
-    for x,y in ((50,255),(556,227),(103,472),(527,458)):
-        title += flower(x,y,"#edb793",1.8)
-    write_svg("backgrounds/title.svg",640,580,title)
-
-
-def ui():
-    icon_hoe = path("M17 52 L48 13",stroke="#b69064",sw=7) + path("M36 14 L54 29 L60 22 L43 7Z","#83a0a0")
-    icon_seed = path("M15 14 L47 14 L51 55 L11 55Z","#eddaaa") + rect(14,8,34,8,"#c3aa73",3) + path("M31 43 L31 29 M31 35 Q14 35 20 24 Q28 23 31 35 M32 31 Q44 32 43 22 Q35 23 32 31","#8daf70")
-    icon_water = rect(12,28,31,25,"#87b9ba",6) + path("M16 28 Q14 8 31 12 Q38 13 38 28",stroke="#68989d",sw=5) + path("M42 38 L54 30 L59 17",stroke="#87b9ba",sw=8) + ellipse(57,18,5,3,"#c0d9cd")
-    icon_hand = path("M19 52 Q7 37 15 32 L23 39 L22 16 Q24 10 28 16 L29 30 L31 11 Q35 7 38 12 L37 31 L41 18 Q47 14 48 20 L44 35 Q51 29 55 34 Q59 39 50 49 L42 58Z","#e9bf98")
-    for name, content in (("hoe",icon_hoe),("seed",icon_seed),("water",icon_water),("hand",icon_hand)):
-        write_svg(f"ui/{name}.svg",64,64,content)
-    logo = ellipse(96,58,43,43,"#eed59a",INK,3) + ellipse(96,58,29,29,"#efb952","none")
-    logo += path("M96 108 L96 54 M94 79 Q46 83 37 47 Q83 36 94 79 M98 93 Q147 92 154 55 Q111 51 98 93","#83aa70",INK,3)
-    logo += path("M35 118 Q98 137 159 118",stroke=INK,sw=4)
-    for i in range(5):
-        logo += ellipse(31+i*7, 107-i*11, 5, 10, GOLD,INK,1.5)
-        logo += ellipse(161-i*7,107-i*11,5,10,GOLD,INK,1.5)
-    write_svg("ui/logo.svg",192,144,logo)
-
-
-def audio():
-    rate=22050
-    random_source=random.Random(37)
-    def add_note(samples, onset, duration, midi, amp, voice="pluck", pan=0):
-        freq=440*2**((midi-69)/12)
-        start=int(onset*rate); length=int(duration*rate)
-        for j in range(length):
-            at=(start+j)%len(samples); t=j/rate
-            if voice=="wood":
-                value=(math.sin(math.tau*freq*t)+.36*math.sin(math.tau*freq*2.73*t)+.15*math.sin(math.tau*freq*5.19*t))*math.exp(-t*13)
-            elif voice=="brush":
-                value=random_source.uniform(-1,1)*math.exp(-t*42)*.35
-            elif voice=="bass":
-                value=(math.sin(math.tau*freq*t)+.22*math.sin(math.tau*freq*2*t))*math.exp(-t*3)*min(1,t*45)
-            else:
-                value=sum(math.sin(math.tau*freq*k*t)/k**1.7*math.exp(-t*(3+k*1.3)) for k in range(1,6))*min(1,t*160)
-            fade=min(1,(length-j)/(rate*.035))
-            samples[at][0]+=value*amp*fade*(1-pan*.4)
-            samples[at][1]+=value*amp*fade*(1+pan*.4)
-    def save(name,samples):
-        if name in BGM_NAMES:
-            # 終端8msだけを滑らかに補正し、ループ接続点の振幅を一致させる。
-            blend_frames=min(int(rate*.008),len(samples)-1)
-            corrections=[samples[0][side]-samples[-1][side] for side in (0,1)]
-            for index in range(blend_frames):
-                progress=index/(blend_frames-1)
-                blend=progress*progress*(3-2*progress)
-                for side in (0,1):
-                    samples[len(samples)-blend_frames+index][side]+=corrections[side]*blend
-        else:
-            # 単発効果音は先頭2msと末尾10msに音量包絡を付けて再生・停止音を抑える。
-            for index in range(len(samples)):
-                envelope=min(1,index/(rate*.002),(len(samples)-1-index)/(rate*.010))
-                for side in (0,1):
-                    samples[index][side]*=envelope
-        peak=max(max(abs(a),abs(b)) for a,b in samples) or 1
-        multiplier=.77/max(1,peak)
-        payload=bytearray()
-        for left,right in samples:
-            payload.extend(struct.pack("<hh",int(max(-1,min(1,left*multiplier))*32767),int(max(-1,min(1,right*multiplier))*32767)))
-        with wave.open(str(ASSETS/"audio"/f"{name}.wav"),"wb") as output:
-            output.setparams((2,2,rate,0,"NONE","not compressed")); output.writeframes(payload)
-    (ASSETS/"audio").mkdir(parents=True,exist_ok=True)
-    arrangements={"title":(96,[72,76,79,81,79,76,74,72],0),"spring":(112,[72,74,76,79,76,74,67,71],0),"summer":(122,[79,81,83,86,83,81,79,76],-5),"festival":(140,[72,79,84,83,81,79,76,74],0),"result":(108,[72,76,79,84,83,79,81,84],0)}
-    for name,(bpm,melody,transpose) in arrangements.items():
-        beat=60/bpm; samples=[[0.,0.] for _ in range(int(beat*16*rate))]
-        roots=[48,53,55,48]
-        for index in range(32):
-            onset=index*beat/2; chord=roots[index//8]+transpose
-            add_note(samples,onset,beat*.9,melody[index%8]+transpose,.16,"wood" if name=="summer" else "pluck",-.4)
-            add_note(samples,onset,beat*1.1,chord+12+[0,4,7,12][index%4],.10,"pluck",.5)
-            if index%2==0:
-                add_note(samples,onset,beat*1.5,chord,.16,"bass",0)
-                add_note(samples,onset,.1,40,.16,"brush",.7)
-            if name=="festival" or index%4==2:
-                add_note(samples,onset+beat/4,.11,76,.08,"wood",-.6)
-        # 一周の残響を循環加算し、ループ境界で余韻を途切れさせない。
-        dry=[row[:] for row in samples]; delay=int(beat*.75*rate)
-        for index in range(len(samples)):
-            for side in (0,1): samples[index][side]+=dry[(index-delay)%len(samples)][1-side]*.15
-        save(name,samples)
-    effects={"hoe":([43,50],.25,"wood"),"seed":([76,81],.24,"wood"),"water":([79,83,86,91],.55,"brush"),"harvest":([72,76,79,84],.5,"pluck"),"ship":([60,67,72,79],.65,"wood"),"next_day":([67,72,76,79,84],1.2,"pluck"),"ui":([81,88],.16,"wood"),"success":([72,76,79,84,88],1.5,"pluck"),"fail":([55,52,48],.6,"wood")}
-    for name,(notes,duration,voice) in effects.items():
-        samples=[[0.,0.] for _ in range(int((duration+.25)*rate))]
-        for i,note in enumerate(notes):
-            add_note(samples,i*duration/len(notes),.3 if voice!="pluck" else .5,note,.32,voice,(i%3-1)*.4)
-            if name=="water":add_note(samples,i*.08,.2,note,.13,"wood")
-        save(name,samples)
-
-
-def generate_images():
-    for kind,draw in (("farmer",farmer),("merchant",merchant),("chicken",chicken)):
-        frames=[]
-        for row,action in enumerate(("idle","walk","hoe","water","harvest","tired")):
-            for column in range(4):
-                frames.append(group(draw(column,action),f"translate({column*128} {row*128})"))
-        write_svg(f"characters/{kind}.svg",512,768,"".join(frames))
-    for kind in ("turnip","carrot","tomato","corn"):
-        for stage in ("seed","sprout","growing","ripe"):
-            write_svg(f"crops/{kind}_{stage}.svg",64,64,crop(kind,stage))
-    props(); terrain(); backgrounds(); ui()
-
-
-def main():
-    generate_images()
-    audio()
-    (ASSETS/"fonts").mkdir(parents=True,exist_ok=True)
-    for name in ("MPLUSRounded1c-Regular.ttf","OFL.txt"):
-        shutil.copyfile(ROOT.parent/"monsterquest"/"assets"/"fonts"/name,ASSETS/"fonts"/name)
-    print(f"素材生成 OK: {asset_counts(ASSETS)}")
-
-
-def asset_counts(directory):
-    counts={suffix:len(list(directory.rglob(f"*{suffix}"))) for suffix in (".svg",".wav",".ttf")}
-    return f"SVG {counts['.svg']}枚 / WAV {counts['.wav']}本 / フォント {counts['.ttf']}本"
-
-
-def source_hashes(directory):
-    return {
-        str(source.relative_to(directory)):hashlib.sha256(source.read_bytes()).hexdigest()
-        for source in sorted(directory.rglob("*"))
-        if source.is_file() and (source.suffix in (".svg",".wav",".ttf") or source.name=="OFL.txt")
+def _make_crop(kind: str, stage: str) -> Image.Image:
+    mask = _crop_mask(kind, stage)
+    palettes = {
+        "turnip": (INK, "#d7ba80", PAPER),
+        "carrot": (INK, RED, GOLD),
+        "tomato": (INK, RED, "#dc9c62"),
+        "corn": (INK, GOLD, "#e7c879"),
     }
+    texture = _woodcut_photo(f"{kind}_cc0.jpg", (64, 64), palettes[kind]).convert("RGBA")
+    image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    image.paste(texture, mask=mask)
+    edge = mask.filter(ImageFilter.FIND_EDGES).point(lambda value: 255 if value > 18 else 0)
+    image.paste(Image.new("RGBA", (64, 64), INK), mask=edge)
+    if stage != "seed":
+        draw = ImageDraw.Draw(image)
+        draw.line((32, 52, 32, 19), fill=GREEN, width=3)
+        draw.line((31, 35, 17, 27), fill=GREEN, width=4)
+        draw.line((33, 30, 47, 21), fill=GREEN, width=4)
+    return _distress(image, 701 + sum(map(ord, kind + stage)), 10)
 
 
-def verify():
-    """既存素材を変更せずに再生成の一致と PCM の実データを検証する。"""
-    global ASSETS
-    original=ASSETS
-    actual_hashes=source_hashes(original)
-    reports=[]
-    problems=[]
-    for source in sorted((original/"audio").glob("*.wav")):
-        with wave.open(str(source),"rb") as stream:
-            channels=stream.getnchannels()
-            rate=stream.getframerate()
-            frames=stream.getnframes()
-            if (channels,stream.getsampwidth(),rate)!=(2,2,22050) or frames==0:
+def _make_crops() -> None:
+    for kind in ("turnip", "carrot", "tomato", "corn"):
+        for stage in ("seed", "sprout", "growing", "ripe"):
+            name = f"crops/{kind}_{stage}.png"
+            _write_png(ASSETS / name, _make_crop(kind, stage))
+            GENERATED_FILES.append(name)
+
+
+def _save_prop(name: str, image: Image.Image, seed: int) -> None:
+    path = f"props/{name}.png"
+    _write_png(ASSETS / path, _distress(image, seed, 24))
+    GENERATED_FILES.append(path)
+
+
+def _make_props() -> None:
+    image = Image.new("RGBA", (244, 190), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((28, 78, 215, 168), fill=PAPER, outline=INK, width=6)
+    draw.polygon(((10, 83), (121, 8), (234, 83), (217, 101), (121, 36), (28, 102)), fill=RED, outline=INK)
+    for offset in range(3):
+        draw.line((31, 79 - offset * 10, 121, 19 - offset * 3, 213, 80 - offset * 10), fill="#d38c54", width=4)
+    draw.rounded_rectangle((96, 106, 143, 170), radius=18, fill=GREEN, outline=INK, width=5)
+    for x in (48, 164):
+        draw.rectangle((x, 106, x + 35, 139), fill=BLUE, outline=INK, width=4)
+        draw.line((x + 17, 107, x + 17, 138), fill=PAPER, width=3)
+        draw.line((x, 122, x + 35, 122), fill=PAPER, width=3)
+    _save_prop("house", image, 41)
+
+    image = Image.new("RGBA", (130, 140), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((16, 77, 114, 128), fill="#9a6b42", outline=INK, width=5)
+    draw.ellipse((22, 72, 108, 105), fill=BLUE, outline=INK, width=5)
+    draw.line((32, 85, 32, 29), fill=INK, width=8)
+    draw.line((98, 85, 98, 29), fill=INK, width=8)
+    draw.polygon(((10, 37), (65, 5), (121, 37)), fill=RED, outline=INK)
+    _save_prop("well", image, 43)
+
+    image = Image.new("RGBA", (128, 112), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((13, 39, 115, 102), fill="#9a6037", outline=INK, width=5)
+    draw.polygon(((14, 40), (34, 22), (104, 22), (115, 40)), fill=GOLD, outline=INK)
+    for y in (58, 81):
+        draw.line((17, y, 111, y), fill=INK, width=3)
+    draw.rectangle((46, 52, 83, 84), fill=PAPER, outline=INK, width=3)
+    draw.line((56, 75, 64, 59, 75, 74), fill=GREEN, width=4)
+    _save_prop("shipping", image, 47)
+
+    image = Image.new("RGBA", (234, 164), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((23, 57, 211, 145), fill="#9a6037", outline=INK, width=5)
+    for index in range(6):
+        x = 10 + index * 36
+        draw.polygon(((x, 58), (x + 15, 14), (x + 35, 14), (x + 35, 58)), fill=PAPER if index % 2 == 0 else GREEN, outline=INK)
+    draw.rectangle((50, 79, 182, 137), fill="#d6b56f", outline=INK, width=4)
+    _save_prop("shop", image, 53)
+
+    image = Image.new("RGBA", (176, 195), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.polygon(((67, 182), (77, 79), (106, 79), (111, 181)), fill="#70472f", outline=INK)
+    for box in ((15, 42, 99, 117), (70, 21, 161, 105), (38, 4, 135, 87)):
+        draw.ellipse(box, fill=GREEN, outline=INK, width=5)
+    _save_prop("tree", image, 59)
+
+    image = Image.new("RGBA", (128, 80), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.line((5, 33, 123, 33), fill="#7a4b2d", width=10)
+    draw.line((5, 58, 123, 58), fill="#7a4b2d", width=10)
+    for x in (15, 64, 113):
+        draw.polygon(((x - 8, 73), (x - 8, 20), (x, 8), (x + 8, 20), (x + 8, 73)), fill=GOLD, outline=INK)
+    _save_prop("fence", image, 61)
+
+
+def _make_terrain() -> None:
+    atlas = Image.new("RGB", (384, 64), PAPER)
+    colors = ("#627643", "#c19958", "#8a5437", "#61402e", "#477479", "#7b8c4d")
+    for tile_index, color in enumerate(colors):
+        tile = Image.blend(_paper((64, 64), color), Image.new("RGB", (64, 64), color), 0.56)
+        draw = ImageDraw.Draw(tile)
+        if tile_index in (2, 3):
+            for y in range(9, 64, 13):
+                draw.line((3, y, 61, y + tile_index % 2), fill=INK, width=3)
+        elif tile_index == 4:
+            for y in (14, 34, 53):
+                draw.arc((5, y - 6, 35, y + 7), 15, 165, fill="#b9c8ad", width=2)
+        else:
+            for index in range(9):
+                x = (tile_index * 11 + index * 19) % 61
+                y = (tile_index * 17 + index * 23) % 59
+                draw.line((x, y, x + 4, y - 5), fill=INK, width=1)
+        atlas.paste(tile, (tile_index * 64, 0))
+    name = "tiles/terrain.png"
+    _write_png(ASSETS / name, atlas)
+    GENERATED_FILES.append(name)
+
+
+def _make_backgrounds() -> None:
+    far = _woodcut_photo("farm_cc0.jpg", (1280, 720), (INK, "#6b7551", PAPER)).convert("RGBA")
+    far = Image.alpha_composite(far, Image.new("RGBA", far.size, "#d39a5538"))
+    _write_png(ASSETS / "backgrounds/far.png", _distress(far, 79, 70))
+    GENERATED_FILES.append("backgrounds/far.png")
+
+    mid = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(mid)
+    draw.polygon(((0, 411), (194, 322), (403, 398), (643, 288), (872, 403), (1071, 317), (1280, 391), (1280, 720), (0, 720)), fill="#7f7b4f8c")
+    for index in range(13):
+        x = 35 + index * 101
+        draw.line((x, 392 + index % 3 * 18, x, 458), fill=INK, width=5)
+        draw.ellipse((x - 15, 365 + index % 3 * 18, x + 15, 413), fill="#486044", outline=INK, width=3)
+    _write_png(ASSETS / "backgrounds/mid.png", _distress(mid, 83, 42))
+    GENERATED_FILES.append("backgrounds/mid.png")
+
+    near = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(near)
+    draw.polygon(((0, 625), (96, 579), (214, 682), (263, 720), (0, 720)), fill="#273e33cc")
+    draw.polygon(((1017, 720), (1110, 604), (1280, 623), (1280, 720)), fill="#273e33cc")
+    for x in (42, 112, 1174, 1248):
+        draw.line((x, 716, x - 10, 659), fill=INK, width=4)
+        draw.ellipse((x - 31, 640, x - 5, 688), fill=GREEN, outline=INK, width=2)
+        draw.ellipse((x + 2, 635, x + 34, 684), fill=GREEN, outline=INK, width=2)
+    _write_png(ASSETS / "backgrounds/near.png", _distress(near, 89, 25))
+    GENERATED_FILES.append("backgrounds/near.png")
+
+    title = _woodcut_photo("farm_cc0.jpg", (640, 580), (INK, GREEN, PAPER)).convert("RGBA")
+    title.alpha_composite(Image.new("RGBA", title.size, "#7f32172c"))
+    border = ImageDraw.Draw(title)
+    for offset in range(6):
+        border.rounded_rectangle((10 + offset, 10 + offset, 629 - offset, 569 - offset), radius=12, outline=INK, width=2)
+    title.alpha_composite(_actor_frame("farmer", "water", 2).resize((218, 218), Image.Resampling.NEAREST), (388, 327))
+    for index, crop in enumerate(("turnip", "carrot", "tomato", "corn")):
+        title.alpha_composite(_make_crop(crop, "ripe").resize((90, 90), Image.Resampling.NEAREST), (55 + index * 112, 430))
+    _write_png(ASSETS / "backgrounds/title.png", _distress(title, 97, 54))
+    GENERATED_FILES.append("backgrounds/title.png")
+
+    village = _paper((1280, 720), "#dfc28d").convert("RGBA")
+    draw = ImageDraw.Draw(village)
+    for offset in range(5):
+        draw.rounded_rectangle((48 + offset, 44 + offset, 1231 - offset, 675 - offset), radius=23, outline=INK, width=2)
+    draw.line((310, 472, 460, 380, 618, 429, 777, 302, 972, 233), fill="#8b3f2f", width=20, joint="curve")
+    draw.line((310, 472, 460, 380, 618, 429, 777, 302, 972, 233), fill=PAPER, width=8, joint="curve")
+    draw.ellipse((232, 411, 371, 548), fill=GREEN, outline=INK, width=7)
+    draw.rectangle((267, 443, 336, 504), fill=PAPER, outline=INK, width=5)
+    draw.polygon(((252, 447), (301, 407), (352, 447)), fill=RED, outline=INK)
+    draw.ellipse((896, 158, 1046, 308), fill=RED, outline=INK, width=7)
+    draw.rectangle((927, 211, 1012, 279), fill=GOLD, outline=INK, width=5)
+    for index, (x, y) in enumerate(((460, 380), (618, 429), (777, 302))):
+        draw.ellipse((x - 17, y - 17, x + 17, y + 17), fill=GOLD if index == 1 else GREEN, outline=INK, width=4)
+    _write_png(ASSETS / "backgrounds/village_map.png", _distress(village, 101, 82))
+    GENERATED_FILES.append("backgrounds/village_map.png")
+
+
+def _make_ui() -> None:
+    for name in ("hoe", "water", "seed", "hand"):
+        image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        if name == "hoe":
+            draw.line((15, 55, 50, 10), fill="#794b2c", width=8)
+            draw.polygon(((39, 9), (61, 26), (54, 34), (32, 15)), fill=INK)
+        elif name == "water":
+            draw.rounded_rectangle((9, 26, 44, 56), radius=6, fill=BLUE, outline=INK, width=4)
+            draw.arc((12, 7, 43, 42), 180, 355, fill=INK, width=5)
+            draw.line((42, 36, 58, 18), fill=BLUE, width=8)
+        elif name == "seed":
+            draw.polygon(((13, 13), (50, 13), (54, 57), (8, 57)), fill=GOLD, outline=INK)
+            draw.line((32, 48, 32, 26), fill=GREEN, width=4)
+            draw.ellipse((20, 27, 33, 38), fill=GREEN)
+            draw.ellipse((31, 22, 46, 34), fill=GREEN)
+        else:
+            draw.polygon(((14, 53), (8, 37), (16, 31), (24, 39), (22, 14), (30, 10), (33, 31), (38, 12), (45, 15), (44, 36), (52, 29), (58, 35), (46, 57)), fill="#c68e65", outline=INK)
+        path = f"ui/{name}.png"
+        _write_png(ASSETS / path, _distress(image, 113 + len(name), 9))
+        GENERATED_FILES.append(path)
+
+    logo = Image.new("RGBA", (192, 144), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(logo)
+    draw.ellipse((49, 6, 143, 100), fill=GOLD, outline=INK, width=6)
+    draw.line((96, 124, 96, 55), fill=INK, width=7)
+    draw.ellipse((36, 47, 95, 87), fill=GREEN, outline=INK, width=4)
+    draw.ellipse((97, 51, 157, 92), fill=GREEN, outline=INK, width=4)
+    draw.arc((25, 88, 168, 139), 5, 175, fill=INK, width=6)
+    _write_png(ASSETS / "ui/logo.png", _distress(logo, 127, 18))
+    GENERATED_FILES.append("ui/logo.png")
+
+
+def generate_images() -> None:
+    GENERATED_FILES.clear()
+    _make_characters()
+    _make_crops()
+    _make_props()
+    _make_terrain()
+    _make_backgrounds()
+    _make_ui()
+
+
+def _write_wav(path: Path, samples: list[tuple[float, float]], rate: int = 22050) -> None:
+    peak = max(max(abs(left), abs(right)) for left, right in samples) or 1.0
+    gain = 0.72 / max(1.0, peak)
+    payload = bytearray()
+    for left, right in samples:
+        payload.extend(struct.pack(
+            "<hh",
+            round(max(-1.0, min(1.0, left * gain)) * 32767),
+            round(max(-1.0, min(1.0, right * gain)) * 32767),
+        ))
+    stream = io.BytesIO()
+    with wave.open(stream, "wb") as output:
+        output.setparams((2, 2, rate, 0, "NONE", "not compressed"))
+        output.writeframes(payload)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    contents = stream.getvalue()
+    if not path.exists() or path.read_bytes() != contents:
+        path.write_bytes(contents)
+
+
+def _rural_ambience() -> list[tuple[float, float]]:
+    rate = 22050
+    seconds = 8
+    samples: list[tuple[float, float]] = []
+    for index in range(rate * seconds):
+        time = index / rate
+        breeze = (
+            math.sin(math.tau * 137 * time)
+            + 0.42 * math.sin(math.tau * 263 * time)
+            + 0.28 * math.sin(math.tau * 521 * time)
+        ) * (0.055 + 0.016 * math.sin(math.tau * 0.25 * time))
+        brook_left = 0.025 * math.sin(math.tau * 631 * time)
+        brook_right = 0.025 * math.sin(math.tau * 947 * time)
+        bird = 0.0
+        for onset, pitch in ((1.25, 1460.0), (4.55, 1780.0), (6.2, 1320.0)):
+            local = time - onset
+            if 0.0 <= local < 0.34:
+                envelope = math.sin(math.pi * local / 0.34) ** 2
+                bird += math.sin(math.tau * (pitch + local * 580.0) * local) * envelope * 0.13
+        samples.append((breeze + brook_left + bird, breeze * 0.9 + brook_right + bird * 0.7))
+    return samples
+
+
+def _map_chime() -> list[tuple[float, float]]:
+    rate = 22050
+    samples: list[tuple[float, float]] = []
+    for index in range(rate):
+        time = index / rate
+        envelope = min(1.0, time * 90.0) * math.exp(-time * 5.2)
+        wooden = (
+            math.sin(math.tau * 392.0 * time)
+            + 0.38 * math.sin(math.tau * 1074.0 * time)
+            + 0.17 * math.sin(math.tau * 2031.0 * time)
+        ) * envelope * 0.42
+        samples.append((wooden, wooden * 0.82))
+    return samples
+
+
+def generate_audio() -> None:
+    GENERATED_AUDIO_FILES.clear()
+    for name, samples in (("rural_ambience", _rural_ambience()), ("map", _map_chime())):
+        relative = f"audio/{name}.wav"
+        _write_wav(ASSETS / relative, samples)
+        GENERATED_AUDIO_FILES.append(relative)
+
+
+def _audio_report(directory: Path) -> tuple[list[dict[str, object]], list[str]]:
+    reports: list[dict[str, object]] = []
+    problems: list[str] = []
+    for source in sorted((directory / "audio").glob("*.wav")):
+        with wave.open(str(source), "rb") as stream:
+            channels = stream.getnchannels()
+            rate = stream.getframerate()
+            frames = stream.getnframes()
+            if (channels, stream.getsampwidth(), rate) != (2, 2, 22050) or frames == 0:
                 problems.append(f"{source.name}: PCM形式・フレーム数が不正")
                 continue
-            samples=array.array("h",stream.readframes(frames))
-        if sys.byteorder!="little":
+            samples = array.array("h", stream.readframes(frames))
+        if sys.byteorder != "little":
             samples.byteswap()
-        peak=max(abs(value) for value in samples)/32768
-        rms=math.sqrt(sum(value*value for value in samples)/len(samples))/32768
-        clipped=sum(value<=-32768 or value>=32767 for value in samples)
-        boundary=max(abs(samples[side]-samples[-channels+side]) for side in range(channels))/32768
-        report={"file":source.name,"seconds":round(frames/rate,5),"peak":round(peak,6),
-                "rms_dbfs":round(20*math.log10(rms),3) if rms else None,
-                "clipped_samples":clipped,"boundary_delta":round(boundary,7)}
-        reports.append(report)
-        if clipped or rms<.001 or any(not any(samples[side::channels]) for side in range(channels)):
+        peak = max(abs(value) for value in samples) / 32768
+        rms = math.sqrt(sum(value * value for value in samples) / len(samples)) / 32768
+        clipped = sum(value <= -32768 or value >= 32767 for value in samples)
+        reports.append({
+            "file": source.name,
+            "seconds": round(frames / rate, 5),
+            "peak": round(peak, 6),
+            "rms_dbfs": round(20 * math.log10(rms), 3) if rms else None,
+            "clipped_samples": clipped,
+        })
+        if clipped or rms < 0.001:
             problems.append(f"{source.name}: クリッピングまたは無音を検出")
-        if source.stem in BGM_NAMES and boundary>1/32768:
-            problems.append(f"{source.name}: ループ境界の差が1 PCM段階を超える")
-        print(f"音声検証: {json.dumps(report,ensure_ascii=False)}")
-    temporary_root=ROOT/"tmp"
-    temporary_root.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="asset-verify-",dir=temporary_root) as temporary:
+    return reports, problems
+
+
+def _hashes(directory: Path, names: list[str]) -> dict[str, str]:
+    return {name: hashlib.sha256((directory / name).read_bytes()).hexdigest() for name in sorted(names)}
+
+
+def asset_counts(directory: Path) -> str:
+    return (
+        f"PNG {len(list(directory.rglob('*.png')))}枚 / "
+        f"CC0写真 {len(list(directory.rglob('*.jpg')))}枚 / "
+        f"WAV {len(list(directory.rglob('*.wav')))}本"
+    )
+
+
+def verify() -> None:
+    global ASSETS
+    original = ASSETS
+    problems: list[str] = []
+    if list(original.rglob("*.svg")):
+        problems.append("assets に SVG が残っています")
+    if not (original / "fonts" / "Yomogi-Regular.ttf").exists():
+        problems.append("Yomogi-Regular.ttf がありません")
+    if (original / "fonts" / "MPLUSRounded1c-Regular.ttf").exists():
+        problems.append("禁止された M PLUS Rounded 1c が残っています")
+    (ROOT / "tmp").mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="asset-verify-", dir=ROOT / "tmp") as temporary:
+        temporary_assets = Path(temporary)
+        shutil.copytree(original / "source_photos", temporary_assets / "source_photos")
         try:
-            ASSETS=Path(temporary)
-            main()
-            regenerated_hashes=source_hashes(ASSETS)
+            ASSETS = temporary_assets
+            generate_images()
+            generate_audio()
+            expected_names = GENERATED_FILES.copy() + GENERATED_AUDIO_FILES.copy()
+            regenerated_hashes = _hashes(temporary_assets, expected_names)
         finally:
-            ASSETS=original
-    if actual_hashes!=regenerated_hashes:
-        changed=sorted(name for name in actual_hashes.keys()|regenerated_hashes.keys()
-                       if actual_hashes.get(name)!=regenerated_hashes.get(name))
-        problems.append(f"再生成のSHA-256が不一致: {', '.join(changed)}")
-    report_path=temporary_root/"asset-verification.json"
-    report_path.write_text(json.dumps({"counts":asset_counts(original),"sha256":actual_hashes,
-                                      "audio":reports,"problems":problems},ensure_ascii=False,indent=2)+"\n")
+            ASSETS = original
+    missing = [name for name in expected_names if not (original / name).exists()]
+    if missing:
+        problems.append("生成済み素材が不足しています: " + ", ".join(missing))
+    actual_hashes = _hashes(original, [name for name in expected_names if name not in missing])
+    if actual_hashes != regenerated_hashes:
+        problems.append("版画 PNG・生成音声の再生成 SHA-256 が一致しません")
+    audio_reports, audio_problems = _audio_report(original)
+    problems.extend(audio_problems)
+    report_path = ROOT / "tmp" / "asset-verification.json"
+    report_path.write_text(
+        json.dumps({
+            "counts": asset_counts(original),
+            "generated_sha256": actual_hashes,
+            "audio": audio_reports,
+            "problems": problems,
+        }, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     if problems:
         for problem in problems:
-            print(f"素材検証失敗: {problem}",file=sys.stderr)
+            print(f"素材検証失敗: {problem}", file=sys.stderr)
         raise SystemExit(1)
-    print(f"素材検証 OK: SHA-256 {len(actual_hashes)}ファイル一致 / {asset_counts(original)}")
+    print(f"素材検証 OK: PNG {len(GENERATED_FILES)}枚・生成音声 {len(GENERATED_AUDIO_FILES)}本の再生成一致 / 音声 {len(audio_reports)}本")
     print(f"検証記録: {report_path}")
 
 
-if __name__=="__main__":
-    parser=argparse.ArgumentParser(description=__doc__)
-    mode=parser.add_mutually_exclusive_group()
-    mode.add_argument("--verify",action="store_true",help="既存素材を検査し、一時ディレクトリへの再生成とSHA-256で照合する")
-    mode.add_argument("--images-only",action="store_true",help="SVG画像だけを再生成する")
-    arguments=parser.parse_args()
+def main() -> None:
+    generate_images()
+    generate_audio()
+    print(f"版画素材生成 OK: {asset_counts(ASSETS)}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--verify", action="store_true", help="PNGの再生成一致と既存WAVを検査する")
+    mode.add_argument("--images-only", action="store_true", help="版画PNGだけを再生成する")
+    arguments = parser.parse_args()
     if arguments.verify:
         verify()
     elif arguments.images_only:
         generate_images()
-        print(f"画像生成 OK: {asset_counts(ASSETS)}")
+        print(f"版画PNG生成 OK: {asset_counts(ASSETS)}")
     else:
         main()

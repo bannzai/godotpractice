@@ -6,6 +6,10 @@ signal changed
 
 const Catalog: Script = preload("res://scripts/catalog.gd")
 const Story: Script = preload("res://scripts/story.gd")
+const SAVE_VERSION: int = 2
+const TUTORIAL_GRAVE: String = "grave"
+const TUTORIAL_BATTLE: String = "battle"
+const TUTORIAL_COMPLETE: String = "complete"
 const ROUTE_KINDS: Array[Array] = [
 	["grave", "story"], ["battle", "living"], ["rest", "police"],
 	["story", "grave"], ["battle", "living"], ["rest", "story"],
@@ -32,6 +36,7 @@ var discovered: Array[String] = []
 var ending: String = ""
 var result_text: String = ""
 var last_message: String = ""
+var tutorial_step: String = TUTORIAL_GRAVE
 var save_path: String = "user://ghostrogue-save.json"
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_uid: int = 1
@@ -63,6 +68,7 @@ func new_run(seed_value: int = 0) -> void:
 	collected.clear()
 	ending = ""
 	result_text = ""
+	tutorial_step = TUTORIAL_GRAVE
 	_next_uid = 1
 	for id: String in ["child", "warrior", "water"]:
 		_gain_spirit(id)
@@ -78,8 +84,42 @@ func begin_journey() -> bool:
 	return true
 
 
+## チュートリアル完了後の再呼び出しでは状態を変えない。
+func skip_tutorial() -> bool:
+	if tutorial_step == TUTORIAL_COMPLETE:
+		return true
+	tutorial_step = TUTORIAL_COMPLETE
+	last_message = "手帳の案内を閉じた。自分の判断で夜の町を進む。"
+	_publish()
+	return true
+
+
+func tutorial_required_branch() -> int:
+	if mode != "map" or depth < 0 or depth >= route.size():
+		return -1
+	var required_kind: String = ""
+	if tutorial_step == TUTORIAL_GRAVE and depth == 0:
+		required_kind = "grave"
+	elif tutorial_step == TUTORIAL_BATTLE and depth == 1:
+		required_kind = "battle"
+	if required_kind.is_empty():
+		return -1
+	for branch: int in range(route[depth].size()):
+		if String(route[depth][branch].get("kind", "")) == required_kind:
+			return branch
+	return -1
+
+
 func enter_node(branch: int) -> bool:
 	if mode != "map" or depth >= route.size() or branch < 0 or branch >= route[depth].size():
+		return false
+	var required_branch: int = tutorial_required_branch()
+	if required_branch >= 0 and branch != required_branch:
+		if tutorial_step == TUTORIAL_GRAVE:
+			last_message = "最初は懐中電灯が照らす墓へ向かい、共に戦う霊を迎えよう。"
+		else:
+			last_message = "迎えた霊と共に、懐中電灯が照らす気配へ向かおう。"
+		changed.emit()
 		return false
 	current_node = route[depth][branch].duplicate(true)
 	route_choices.append(branch)
@@ -127,6 +167,11 @@ func choose_event(index: int) -> bool:
 	var choices: Array[Dictionary] = event_choices()
 	if index < 0 or index >= choices.size():
 		return false
+	if tutorial_step == TUTORIAL_GRAVE and depth == 0 and current_node.get("kind") == "grave" \
+			and index != 0:
+		last_message = "今夜を進むには、まず墓に残る霊へ灯を差し出そう。案内は手帳から飛ばせる。"
+		changed.emit()
+		return false
 	if relics + int(choices[index].get("relic", 0)) < 0:
 		last_message = "渡せるお守りがない。別の選択を選ぼう。"
 		changed.emit()
@@ -138,6 +183,9 @@ func choose_event(index: int) -> bool:
 				_gain_spirit(current_node.spirit)
 				_change_darkness(12 if current_node.kind == "grave" else 28)
 				last_message = "%s が灯に加わった。" % Catalog.spirit(current_node.spirit).name
+				if tutorial_step == TUTORIAL_GRAVE and depth == 0 \
+						and current_node.kind == "grave":
+					tutorial_step = TUTORIAL_BATTLE
 			else:
 				_change_darkness(-3 if current_node.kind == "grave" else -5)
 		"police":
@@ -276,6 +324,7 @@ func load_game(path: String = "") -> bool:
 	journal.assign(data.journal)
 	collected.assign(data.collected)
 	discovered.assign(data.discovered)
+	tutorial_step = String(data.get("tutorial_step", TUTORIAL_COMPLETE))
 	ending = data.ending
 	result_text = ""
 	last_message = data.last_message
@@ -474,10 +523,15 @@ func _check_battle_end(events: Array[Dictionary]) -> void:
 			if mode != "result":
 				_finish_node()
 		else:
+			var completes_tutorial: bool = tutorial_step == TUTORIAL_BATTLE and depth == 1 \
+				and battle_kind == "battle"
 			ether = mini(18, ether + 3)
 			relics = mini(9, relics + 1)
 			last_message = "漂う霊を鎮めた。霊気 +3、お守り +1。"
 			_finish_node()
+			if completes_tutorial:
+				tutorial_step = TUTORIAL_COMPLETE
+				last_message = "霊を迎え、共に戦う術を覚えた。ここから先は手帳と灯を頼りに進もう。"
 	if mode != "battle":
 		events.append({"kind": "message", "text": last_message})
 
@@ -505,12 +559,12 @@ func _publish() -> void:
 
 func _save_data() -> Dictionary:
 	return {
-		"version": 1, "mode": mode, "run_seed": run_seed, "depth": depth,
+		"version": SAVE_VERSION, "mode": mode, "run_seed": run_seed, "depth": depth,
 		"route_choices": route_choices, "party": party, "enemies": enemies,
 		"darkness": darkness, "ether": ether, "relics": relics, "turn": turn,
 		"battle_kind": battle_kind, "journal": journal, "collected": collected,
 		"discovered": discovered, "ending": ending, "last_message": last_message,
-		"next_uid": _next_uid, "rng_state": str(rng.state),
+		"next_uid": _next_uid, "rng_state": str(rng.state), "tutorial_step": tutorial_step,
 	}
 
 
@@ -524,12 +578,20 @@ static func _read_save(path: String) -> Dictionary:
 
 
 static func _valid_save(data: Dictionary) -> bool:
+	if not Catalog.integer_between(data.get("version"), 1, SAVE_VERSION):
+		return false
+	var version: int = int(data.version)
 	var keys: Array[String] = ["version", "mode", "run_seed", "depth", "route_choices",
 		"party", "enemies", "darkness", "ether", "relics", "turn", "battle_kind", "journal",
 		"collected", "discovered", "ending", "last_message", "next_uid", "rng_state"]
+	if version == SAVE_VERSION:
+		keys.append("tutorial_step")
 	if data.size() != keys.size() or not data.has_all(keys):
 		return false
-	if data.version != 1 or data.mode not in ["intro", "map", "event", "battle", "result"]:
+	if data.mode not in ["intro", "map", "event", "battle", "result"]:
+		return false
+	if version == SAVE_VERSION and (not data.tutorial_step is String \
+			or data.tutorial_step not in [TUTORIAL_GRAVE, TUTORIAL_BATTLE, TUTORIAL_COMPLETE]):
 		return false
 	for entry: Array in [["run_seed", 1, 2147483647], ["depth", 0, 12], ["darkness", 0, 100],
 		["ether", 0, 18], ["relics", 0, 9], ["turn", 0, 10000], ["next_uid", 1, 1000]]:

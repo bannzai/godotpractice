@@ -60,6 +60,12 @@ func return_to_title() -> void:
 	_set_phase("title")
 
 
+func enter_menu_phase(value: String) -> void:
+	if value not in ["garage", "tutorial"]:
+		return
+	_set_phase(value)
+
+
 # 入力を積分してレース時刻を進めるため、呼び出すたびに状態が変わる。
 func tick(delta: float, throttle: float, steer: float, drift: bool, fire: bool) -> void:
 	if delta <= 0.0:
@@ -155,6 +161,9 @@ func hit(index: int) -> void:
 	racer.spin = 0.85
 	racer.speed *= 0.3
 	racer.boost = 0.0
+	racer.drifting = false
+	racer.drift_charge = 0.0
+	racer.drift_direction = 0.0
 	racer.invulnerable = 1.5
 	effect.emit("hit", index)
 

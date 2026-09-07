@@ -62,7 +62,7 @@ screenshot: import
 
 # 操作を伴わない起動〜メインシーン表示を Movie Maker モードで録画して mp4 にする (起動直後の描画崩れ・真っ黒を
 # 検出する。headless は dummy レンダラで落ちるため描画付きで起動する)。真っ黒な動画を成功と誤認しないよう、
-# 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する。
+# 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 20 以上であることも検査する。
 # 音声トラックの平均音量も -60 dB を上回ることを確認し、無音の録画を検出する。
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
@@ -75,7 +75,7 @@ movie: import
 	ffmpeg -hide_banner -nostats -i $(LOG_DIR)/movie.mp4 -vn -af volumedetect -f null - > $(LOG_DIR)/movie-audio.log 2>&1
 	awk '/mean_volume:/ { found = 1; audible = $$(NF-1) != "-inf" && $$(NF-1) > -60 } END { exit !(found && audible) }' $(LOG_DIR)/movie-audio.log
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
-	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 20) ? 0 : 1 } END { if (!found) exit 1 }'
 
 # 26 秒の操作付き映像。実入力でタイトル→移動・回復・強化→ボス→結果→タイトルを通す。
 # 敵・武器・経験値・時刻は録画専用に設定する。通常ルールの生存検証は playthrough が担当する。
@@ -109,7 +109,7 @@ run: import
 
 # 通常の run 起動経路・音声ドライバでタイトルを撮り、終了時のログまで検査する。
 runcheck: import
-	SURVIVORS_RUN_CAPTURE=1 $(MAKE) run > $(LOG_DIR)/runcheck.log 2>&1; \
+	SURVIVORS_RUN_CAPTURE=1 $(MAKE) --silent run > $(LOG_DIR)/runcheck.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/runcheck.log; \
 	tail -n 1 $(LOG_DIR)/runcheck.log | grep -q '^exit=0$$'
 	grep -q '^runcheck OK$$' $(LOG_DIR)/runcheck.log

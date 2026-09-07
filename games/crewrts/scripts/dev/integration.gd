@@ -20,7 +20,21 @@ func _run() -> void:
 	await _frames(3)
 	_check(model.phase == "title" and main.hud._title.visible, "起動時にタイトルを表示")
 	await _tap_key(KEY_ENTER)
-	_check(model.phase == "playing", "タイトルの Enter が出発ボタンへ届く")
+	_check(model.phase == "map" and main.hud._map.visible, "タイトルの Enter で島の絵地図を開く")
+	await _tap_key(KEY_ENTER)
+	_check(model.phase == "playing" and model.tutorial_page == 0,
+		"地図の選択から操作ノートの 1 頁目を開く")
+	var tutorial_remaining: float = model.remaining
+	_key(KEY_W, true)
+	await _frames(4)
+	_key(KEY_W, false)
+	_check(model.remaining == tutorial_remaining, "操作ノートを読んでいる間は探索時間を止める")
+	await _tap_key(KEY_ENTER)
+	_check(model.tutorial_page == 1, "決定操作で投げ方の頁へ進む")
+	await _tap_button(JOY_BUTTON_A)
+	_check(model.tutorial_page == 2, "パッド A で笛の頁へ進む")
+	await _tap_button(JOY_BUTTON_A)
+	_check(model.tutorial_page == -1 and model.tutorial_seen, "最後の頁から探索を開始する")
 	await _check_keyboard()
 	await _check_gamepad()
 	await _check_mouse()
@@ -236,7 +250,11 @@ func _check_result_loop() -> void:
 	_check(model.phase == "title" and main.hud._title.visible, "結果から十字キーと A ボタンでタイトルへ戻る")
 	main.hud._start.pressed.emit()
 	await _frames(3)
-	_check(model.phase == "playing" and model.collected == 0, "出発ボタンの signal で新しい日を開始")
+	_check(model.phase == "map", "表紙から島の絵地図へ進む")
+	main.hud._map_depart.pressed.emit()
+	await _frames(3)
+	_check(model.phase == "playing" and model.collected == 0,
+		"地図の調査ボタンで新しい日を開始")
 
 
 func _key(code: int, pressed: bool) -> void:

@@ -52,10 +52,24 @@ func _process(delta: float) -> bool:
 
 
 func _menu_input() -> void:
-	var times: Array[float] = [0.7, 0.75, 1.5, 1.55]
-	if _menu_step >= times.size() or _elapsed < times[_menu_step]:
+	var events: Array[Dictionary] = [
+		{"time": 0.7, "code": KEY_ENTER, "pressed": true},
+		{"time": 0.75, "code": KEY_ENTER, "pressed": false},
+		{"time": 1.5, "code": KEY_ENTER, "pressed": true},
+		{"time": 1.55, "code": KEY_ENTER, "pressed": false},
+		{"time": 2.2, "code": KEY_F, "pressed": true},
+		{"time": 2.25, "code": KEY_F, "pressed": false},
+		{"time": 2.7, "code": KEY_J, "pressed": true},
+		{"time": 2.75, "code": KEY_J, "pressed": false},
+		# Movie Maker は実時間より速く進むため、実時間350msの長押し判定へ十分な間隔を取る。
+		{"time": 3.0, "code": KEY_F, "pressed": true},
+		{"time": 4.5, "code": KEY_F, "pressed": false},
+		{"time": 5.1, "code": KEY_ENTER, "pressed": true},
+		{"time": 5.15, "code": KEY_ENTER, "pressed": false},
+	]
+	if _menu_step >= events.size() or _elapsed < float(events[_menu_step].time):
 		return
-	_key(KEY_ENTER, _menu_step % 2 == 0)
+	_key(events[_menu_step].code, events[_menu_step].pressed)
 	_menu_step += 1
 
 

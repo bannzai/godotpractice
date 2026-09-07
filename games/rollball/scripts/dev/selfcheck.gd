@@ -3,12 +3,14 @@ extends SceneTree
 ## release ビルドで assert が消えるため、明示的な判定と exit code で結果を返す。
 
 const RunStateScript: GDScript = preload("res://scripts/run_state.gd")
+const RoomScript: GDScript = preload("res://scripts/room.gd")
 
 var failed: bool = false
 
 
 func _initialize() -> void:
 	_check_run_state()
+	_check_stages_and_art_direction()
 	_check_input_map()
 	_check_scenes("res://scenes")
 	_check_assets_credited()
@@ -55,6 +57,35 @@ func _check_run_state() -> void:
 	_check(state.phase == "title" and state.collected == 0, "結果からタイトルへ戻り初期化")
 	_check(state.remaining == state.TIME_LIMIT, "リセットで時間を復元")
 	_check(state.diameter == state.INITIAL_DIAMETER, "リセットで直径を復元")
+	state.free()
+
+
+func _check_stages_and_art_direction() -> void:
+	var state: Node = RunStateScript.new()
+	state.open_stage_select()
+	_check(state.phase == "stage_select", "タイトルから部屋選択に遷移")
+	state.select_stage("playroom")
+	_check(state.selected_stage == "playroom", "選んだ部屋を進行状態に保持")
+	state.begin_tutorial()
+	_check(state.phase == "tutorial" and not state.tutorial_seen, "初回チュートリアルを開始")
+	state.finish_tutorial()
+	state.start_run()
+	_check(state.phase == "playing" and state.tutorial_seen, "チュートリアル完了後に開始")
+	state.reset()
+	_check(state.selected_stage == "playroom" and state.tutorial_seen,
+		"タイトルへ戻っても選択と初回完了を保持")
+	var atelier: Array[Dictionary] = RoomScript.item_layout("atelier")
+	var playroom: Array[Dictionary] = RoomScript.item_layout("playroom")
+	_check(RoomScript.STAGES.size() == 2, "選べる部屋が2つ")
+	_check(atelier.size() >= 100 and playroom.size() >= 100, "両方の部屋に100個以上配置")
+	_check(atelier[0].position != playroom[0].position, "部屋ごとに異なる配置")
+	var clay_source: String = FileAccess.get_file_as_string(
+		"res://scripts/visuals/clay_surface.gd"
+	)
+	_check(clay_source.contains("normal_texture") and clay_source.contains("ARRAY_COLOR"),
+		"粘土表面に手続き法線と頂点カラー")
+	var hud_source: String = FileAccess.get_file_as_string("res://scripts/hud.gd")
+	_check(not hud_source.contains("移動  WASD / 左スティック"), "画面下の共通操作ガイドを廃止")
 	state.free()
 
 

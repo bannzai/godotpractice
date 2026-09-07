@@ -286,7 +286,7 @@ def keyart():
 
 
 def logo():
-    font = TTFont(ROOT / 'fonts/font.ttf')
+    font = TTFont(ROOT / 'fonts/ZenKurenaido-Regular.ttf')
     glyphs = font.getGlyphSet()
     cmap = font.getBestCmap()
     text = ''

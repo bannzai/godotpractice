@@ -5,9 +5,15 @@ const CHARACTERS: Array[String] = [
 	"ember", "tide", "sprout", "moth", "crab", "owl", "player", "captain", "healer", "crab_captain",
 ]
 const State: Script = preload("res://scripts/game_state.gd")
+const FRAME_SIZE := 32
+const FRAME_COUNT := 6
+const SHEET_SIZE := Vector2i(FRAME_SIZE * FRAME_COUNT, FRAME_SIZE * 5)
+const FIELD_PALETTE: Array[String] = ["0F380F", "306230", "8BAC0F", "9BBC0F"]
+const BATTLE_PALETTE: Array[String] = ["0F380F", "306230", "8BAC0F", "9BBC0F", "C3423F"]
 
 
 static func run(check: Callable, tree: SceneTree) -> void:
+	_check_pixel_assets(check)
 	_check_sheets(check)
 	_check_events(check)
 	await _check_animations(check, tree)
@@ -16,7 +22,7 @@ static func run(check: Callable, tree: SceneTree) -> void:
 static func _check_sheets(check: Callable) -> void:
 	var designs: Dictionary = {}
 	for id: String in CHARACTERS:
-		var texture: Texture2D = load("res://assets/characters/%s.svg" % id)
+		var texture: Texture2D = load("res://assets/pixel/characters/%s.png" % id)
 		check.call(texture != null, "キャラクター固有の画像をロード: " + id)
 		if texture == null:
 			continue
@@ -24,14 +30,17 @@ static func _check_sheets(check: Callable) -> void:
 		check.call(image != null and not image.is_empty(), "シートの画素を取得: " + id)
 		if image == null or image.is_empty():
 			continue
-		check.call(image.get_size() == Vector2i(1152, 960), "6 列 × 5 行のキャラクター画像: " + id)
+		check.call(image.get_size() == SHEET_SIZE, "32px・6 列 × 5 行のキャラクター画像: " + id)
+		_check_palette(check, image, id, FIELD_PALETTE)
 		var fingerprint: int = hash(image.get_data())
 		check.call(not designs.has(fingerprint), "他のキャラとは異なる画像: " + id)
 		designs[fingerprint] = id
 		for row: int in QuestActor.ACTIONS.size():
 			var poses: Dictionary = {}
 			for column: int in QuestActor.FRAME_COUNT:
-				var frame: Image = image.get_region(Rect2i(column * 192, row * 192, 192, 192))
+				var frame: Image = image.get_region(Rect2i(
+					column * FRAME_SIZE, row * FRAME_SIZE, FRAME_SIZE, FRAME_SIZE
+				))
 				check.call(frame.get_used_rect().has_area(), "透明だけのフレームではない: %s/%d/%d" % [
 					id, row, column,
 				])
@@ -41,6 +50,59 @@ static func _check_sheets(check: Callable) -> void:
 			])
 
 
+static func _check_pixel_assets(check: Callable) -> void:
+	_check_pixel_directory(check, "res://assets/pixel")
+
+
+static func _check_pixel_directory(check: Callable, path: String) -> void:
+	var directory: DirAccess = DirAccess.open(path)
+	check.call(directory != null, "ドット絵素材を走査: " + path)
+	if directory == null:
+		return
+	for filename: String in directory.get_files():
+		if filename.get_extension().to_lower() != "png":
+			continue
+		var asset_path: String = path.path_join(filename)
+		var texture: Texture2D = load(asset_path) as Texture2D
+		check.call(texture != null, "ドット絵素材をロード: " + asset_path)
+		if texture == null:
+			continue
+		var image: Image = texture.get_image()
+		check.call(image != null and not image.is_empty(), "ドット絵の画素を取得: " + asset_path)
+		if image != null and not image.is_empty():
+			var is_effect: bool = path == "res://assets/pixel/effects" or "/effects/" in path
+			var palette: Array[String] = BATTLE_PALETTE if is_effect else FIELD_PALETTE
+			_check_palette(check, image, asset_path, palette)
+	for subdirectory: String in directory.get_directories():
+		if subdirectory in ["source", "characters"]:
+			continue
+		_check_pixel_directory(check, path.path_join(subdirectory))
+
+
+static func _check_palette(
+	check: Callable, image: Image, label: String, allowed_palette: Array[String]
+) -> void:
+	var colors: Dictionary = {}
+	var invalid_colors: Dictionary = {}
+	var partial_alpha := false
+	for y: int in image.get_height():
+		for x: int in image.get_width():
+			var color: Color = image.get_pixel(x, y)
+			if color.a8 == 0:
+				continue
+			partial_alpha = partial_alpha or color.a8 != 255
+			var html: String = color.to_html(false).to_upper()
+			colors[html] = true
+			if html not in allowed_palette:
+				invalid_colors[html] = true
+	check.call(not partial_alpha, "アンチエイリアスになる半透明画素がない: " + label)
+	check.call(invalid_colors.is_empty(), "許可パレットだけを使う: %s / %s" % [
+		label, ", ".join(invalid_colors.keys()),
+	])
+	check.call(colors.size() >= 1 and colors.size() <= allowed_palette.size(),
+		"許可した階調数以内で描く: " + label)
+
+
 ## 同じツリー上で全キャラを実際に再生して、時間経過と完了状態を確かめる。
 static func _check_animations(check: Callable, tree: SceneTree) -> void:
 	var actors: Array[QuestActor] = []
@@ -48,6 +110,11 @@ static func _check_animations(check: Callable, tree: SceneTree) -> void:
 		var actor := QuestActor.new()
 		tree.root.add_child(actor)
 		actor.setup(id, Rect2(0, 0, 192, 192))
+		check.call(
+			actor.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST
+			or actor.sprite.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST,
+			"キャラクターをニアレストで拡大: " + id
+		)
 		actors.append(actor)
 		for action: String in QuestActor.ACTIONS:
 			check.call(actor.sprite.sprite_frames.get_frame_count(action) == 6,

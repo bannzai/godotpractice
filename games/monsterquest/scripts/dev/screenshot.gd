@@ -30,19 +30,46 @@ func _capture_scenes() -> bool:
 	game.mode = "title"
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
-	if not await _capture("title", 0.4):
-		return false
+	var captured: bool = await _capture("title", 1.2)
 	main._show_help()
-	if not await _capture("help"):
-		return false
+	captured = (await _capture("help")) and captured
 	main.start_new()
-	if not await _capture("transition-play-mid", 0.10):
-		return false
-	if not await _capture("town", 0.3):
-		return false
-	if not await _capture_locations():
-		return false
-	return await _capture_combat()
+	captured = (await _capture("transition-play-mid", 0.10)) and captured
+	captured = (await _capture_tutorial_and_map()) and captured
+	captured = (await _capture("town", 0.3)) and captured
+	captured = (await _capture("town-highlight", 0.3)) and captured
+	captured = (await _capture_locations()) and captured
+	return (await _capture_combat()) and captured
+
+
+func _capture_tutorial_and_map() -> bool:
+	_check(main.tutorial_active and main.tutorial_step == 0,
+		"新規冒険で移動チュートリアルを開始")
+	var captured: bool = await _capture("tutorial-move", 0.55)
+	main.walk(Vector2i.RIGHT)
+	captured = (await _settle()) and captured
+	_check(main.tutorial_active and main.tutorial_step == 1,
+		"一歩移動すると話すチュートリアルへ進む")
+	captured = (await _capture("tutorial-interact")) and captured
+	main.skip_tutorial()
+	main.show_region_map()
+	await process_frame
+	await process_frame
+	_check(main.region_map_open and main.region_selection == "route",
+		"町の地方図で小径を選択中にする")
+	_check(not main.region_preview.is_empty() and not main.region_unavailable_reason.is_empty(),
+		"地方図に行き先プレビューと現在地の不可理由を表示")
+	captured = (await _capture("region-map-route-highlight")) and captured
+	captured = (await _capture("region-map-unavailable")) and captured
+	main.select_region("route")
+	main.show_region_map()
+	await process_frame
+	await process_frame
+	_check(main.region_map_open and main.region_selection == "town",
+		"小径の地方図で町を選択中にする")
+	captured = (await _capture("region-map-town-highlight")) and captured
+	main.select_region("town")
+	return captured
 
 
 func _capture_locations() -> bool:
@@ -63,30 +90,36 @@ func _capture_locations() -> bool:
 
 
 func _capture_combat() -> bool:
+	game.party[0] = Catalog.create_monster("ember", 15)
 	for id: String in ["tide", "sprout", "moth", "crab", "owl"]:
 		game.party.append(Catalog.create_monster(id, 6))
 	game.storage.append(Catalog.create_monster("owl", 4))
 	main.open_menu()
-	if not await _capture("party"):
-		return false
+	var captured: bool = await _capture("party")
 	main._show_storage()
-	if not await _capture("storage"):
-		return false
+	captured = (await _capture("storage")) and captured
 	main.close_menu()
 	await main.begin_battle("sprout", 5, false)
-	if not await _capture("battle", 0.4):
-		return false
-	if not await _capture_first_attack():
-		return false
+	captured = (await _capture("battle", 0.65)) and captured
+	_check(is_instance_valid(main.focused_choice)
+		and main.focused_choice.icon != null, "戦闘の選択中の技をハイライト")
+	_check(not main.battle_preview.is_empty(), "戦闘の選択中の技をプレビュー")
+	captured = (await _capture("battle-highlight-preview")) and captured
+	_tap_key(KEY_DOWN, true)
+	await process_frame
+	_tap_key(KEY_DOWN, false)
+	await process_frame
+	await process_frame
+	captured = (await _capture("battle-vertical-preview")) and captured
+	captured = (await _capture_first_attack()) and captured
 	game.mode = "field"
 	await main.begin_battle("crab", 8, true)
-	if not await _capture("trainer", 0.4):
-		return false
-	return await _capture_polish()
+	captured = (await _capture("trainer", 0.65)) and captured
+	return (await _capture_polish()) and captured
 
 
 func _capture_first_attack() -> bool:
-	if not _start_attack("spark"):
+	if not _start_attack("flare"):
 		return false
 	if not await _capture("attack", 0.25):
 		return false
@@ -180,11 +213,11 @@ func _capture_results() -> bool:
 	main.refresh()
 	if not await _capture("transition-result-mid", 0.10):
 		return false
-	if not await _capture("clear", 0.30):
+	if not await _capture("clear", 0.55):
 		return false
 	game.mode = "gameover"
 	main.refresh()
-	if not await _capture("gameover", 0.4):
+	if not await _capture("gameover", 0.65):
 		return false
 	main.retry()
 	_check(game.mode == "field" and game.party[0].hp == Catalog.stats(game.party[0]).hp,
@@ -192,7 +225,7 @@ func _capture_results() -> bool:
 	main.to_title()
 	if not await _capture("transition-title-mid", 0.10):
 		return false
-	return await _capture("return-title", 0.30)
+	return await _capture("return-title", 0.55)
 
 
 func _prepare_battle(lead: String, enemy: String, level: int = 10) -> void:
@@ -211,7 +244,10 @@ func _start_attack(move_id: String) -> bool:
 	main.battle_turn("attack", move_id)
 	var started: bool = main.busy and game.enemy.hp < hp_before \
 		and main.battle_message.text.contains(Catalog.MOVES[move_id].name)
-	_check(started, "選択した技が成立して、攻撃演出が始まる: " + Catalog.MOVES[move_id].name)
+	_check(started, "選択した技が成立して、攻撃演出が始まる: %s / busy=%s / HP=%d→%d / %s" % [
+		Catalog.MOVES[move_id].name, main.busy, hp_before, game.enemy.hp,
+		main.battle_message.text,
+	])
 	return started
 
 
@@ -256,7 +292,7 @@ func _capture_character(id: String) -> bool:
 	board.theme = main.theme
 	viewport.add_child(board)
 	var paper := ColorRect.new()
-	paper.color = Color("edf0df")
+	paper.color = Color("9bbc0f")
 	paper.size = board.size
 	board.add_child(paper)
 	_board_label(board, _character_name(id) + " / 実時間のアニメーション", Vector2(42, 26), 36)
@@ -294,7 +330,7 @@ func _populate_board(board: Control, id: String) -> Array[QuestActor]:
 		var card := ColorRect.new()
 		card.position = Vector2(28, 174 + row * 196)
 		card.size = Vector2(1224, 186)
-		card.color = Color("ffffff") if row % 2 == 0 else Color("f8f5e7")
+		card.color = Color("8bac0f") if row % 2 == 0 else Color("9bbc0f")
 		board.add_child(card)
 		_board_label(board, ["待機", "移動", "攻撃", "被弾", "倒れる"][row],
 			Vector2(66, 226 + row * 196), 30)
@@ -322,7 +358,7 @@ func _board_label(board: Control, text: String, at: Vector2, font_size: int) -> 
 	label.text = text
 	label.position = at
 	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", Color("24483f"))
+	label.add_theme_color_override("font_color", Color("0f380f"))
 	board.add_child(label)
 
 
@@ -345,6 +381,15 @@ func _capture(screen: String, delay: float = 0.08) -> bool:
 	if status == OK:
 		print("screenshot: " + path)
 	return status == OK
+
+
+## 押下と解放を別フレームへ配送し、実際の選択移動と同じ入力経路を通す。
+func _tap_key(code: Key, pressed: bool) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = pressed
+	Input.parse_input_event(event)
 
 
 func _dispose_main() -> void:

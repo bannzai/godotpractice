@@ -56,8 +56,9 @@ movie: import
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -loglevel error -y -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 $(LOG_DIR)/movie-last.png
-	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
-	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+	# 黒を主色にしたタイトルなので、平均値ではなく明るい側10%の輝度で描画の有無を判定する。
+	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YHIGH:file=- -f null - \
+	  | awk -F= '/YHIGH/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
 # 30 fps・30秒。通常の初期状態から実入力だけで進行し、結果とタイトル復帰を記録する。
 movie-play: import

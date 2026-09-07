@@ -22,15 +22,21 @@ func _capture_scenes() -> bool:
 	state = root.get_node("GameState")
 	state.save_path = "res://tmp/screenshot-save.json"
 	state.high_score = 0
+	state.tutorial_seen = false
 	await _wait(0.45)
 	for label: String in [
 		"title",
+		"navigation",
+		"navigation-highlight",
+		"tutorial-move",
+		"tutorial-shoot",
+		"tutorial-bomb",
 		"play",
 		"explosion",
 		"hit",
 		"power",
 		"supply",
-		"alert",
+		"boss-route",
 		"boss",
 		"boss-phase-two",
 		"pause",
@@ -40,7 +46,7 @@ func _capture_scenes() -> bool:
 		if label in ["hit", "power", "supply"]:
 			await _wait(0.9)
 		_prepare_capture(label)
-		await _wait(1.5 if label in ["clear", "gameover", "play"] else 0.18)
+		await _wait(1.5 if label in ["clear", "gameover", "play"] else 0.22)
 		if not await _capture(label):
 			return false
 	if not await _capture_effect_series():
@@ -64,8 +70,18 @@ func _capture_scenes() -> bool:
 
 func _prepare_capture(label: String) -> void:
 	match label:
+		"navigation":
+			main.show_navigation()
+		"navigation-highlight":
+			main.tutorial_pulse = 0.4
+		"tutorial-move":
+			main.confirm_route()
+		"tutorial-shoot":
+			main.tutorial_step = 1
+		"tutorial-bomb":
+			main.tutorial_step = 2
 		"play":
-			main.start_run()
+			main.complete_tutorial()
 			state.elapsed = 36.0
 			state.add_score(4680)
 			state.power = 2
@@ -94,13 +110,14 @@ func _prepare_capture(label: String) -> void:
 			main.items.append({"position": main.player, "kind": "power", "age": 0.0})
 		"supply":
 			main.items.append({"position": main.player, "kind": "bomb", "age": 0.0})
-		"alert":
-			state.elapsed = 148.0
+		"boss-route":
+			state.elapsed = 150.0
 			main.enemies.clear()
 			main.bullets.clear()
 			main.wave_index = main.waves.size()
+			main.call("_begin_boss_chart")
 		"boss":
-			state.elapsed = 150.0
+			main.boss_chart_time = 0.0
 			main.advance(0.01)
 		"boss-phase-two":
 			main.damage_boss(190)

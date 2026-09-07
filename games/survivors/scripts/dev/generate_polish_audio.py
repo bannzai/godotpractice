@@ -1,7 +1,7 @@
-"""宵森の灯守の独自楽曲・効果音を Python 標準ライブラリだけで再生成する。
+"""NEON DAWN の独自楽曲・効果音を Python 標準ライブラリだけで再生成する。
 
 作者: bannzai / Codex。外部の旋律・録音・音源サンプルは使用しない。
-生成仕様: 青緑の夜森と金の灯に合わせた撥弦・木琴・パッド・ベース・打楽器。
+生成仕様: 既存譜面を維持したシンセ音色と、電気的な環境音・ベース・打楽器。
 生成物の利用条件と一覧は assets/CREDITS.md を正とする。
 """
 
@@ -35,22 +35,24 @@ def instrument(kind: str, note: int, seconds: float) -> array:
         release = min(1.0, (count - i - 1) / (RATE * 0.08))
         attack = min(1.0, t / 0.004)
         if kind == "pluck":
-            # Karplus–Strong の遅延線で、弦の倍音が時間とともに減衰する。
+            # Karplus–Strong に矩形波を重ね、短いシンセ・プラックにする。
             cursor = i % delay
             value = string[cursor]
             string[cursor] = 0.498 * (value + string[(cursor + 1) % delay])
-            value *= 2.0 * math.exp(-t * 0.6)
+            square = 1.0 if math.sin(phase) >= 0 else -1.0
+            value = (value * 1.45 + square * 0.22) * math.exp(-t * 1.25)
         elif kind == "mallet":
-            value = (math.sin(phase) * math.exp(-t * 3.6)
-                     + 0.42 * math.sin(phase * 2.76) * math.exp(-t * 11)
-                     + 0.16 * math.sin(phase * 5.4) * math.exp(-t * 19))
+            # 位相変調で、立ち上がりの鋭いネオン調リードを作る。
+            modulation = 2.8 * math.sin(phase * 2.01) * math.exp(-t * 5.4)
+            value = (math.sin(phase + modulation) * math.exp(-t * 2.7)
+                     + 0.22 * math.sin(phase * 0.5) * math.exp(-t * 4.0))
         elif kind == "bell":
-            value = (math.sin(phase) + 0.33 * math.sin(phase * 2.005)
-                     + 0.17 * math.sin(phase * 3.98)) * math.exp(-t * 2.0)
+            value = (math.sin(phase + 1.7 * math.sin(phase * 3.01))
+                     + 0.22 * math.sin(phase * 0.501)) * math.exp(-t * 2.0)
         elif kind == "pad":
-            value = (math.sin(phase) + 0.22 * math.sin(phase * 2)
-                     + 0.14 * math.sin(phase * 3.003)
-                     + 0.19 * math.sin(phase * 0.997))
+            detune = math.sin(phase * 0.997) + math.sin(phase * 1.003)
+            value = (detune + 0.32 * math.sin(phase * 2)
+                     + 0.11 * math.sin(phase * 4.003))
             attack = min(1.0, t / 0.35)
             release = min(1.0, (seconds - t) / 0.65)
             value *= 0.65 + 0.06 * math.sin(math.tau * 0.8 * t)
@@ -113,7 +115,7 @@ def write_wave(name: str, channels: list[array], peak_target: float) -> None:
         boundary = max(abs(decoded[c] - decoded[-2 + c]) / 32768 for c in range(2))
         if clipped or not (0.005 < rms < 0.5):
             raise ValueError(f"音量検査失敗: {name} clip={clipped}, rms={rms}")
-        if name.startswith("bgm-") and boundary > 0.04:
+        if (name.startswith("bgm-") or name == "ambience") and boundary > 0.05:
             raise ValueError(f"ループ境界が不連続: {name} {boundary}")
         print(f"{name}.wav: {source.getnframes() / RATE:.2f} 秒、"
               f"peak={peak_target:.2f}、RMS={rms:.3f}、飽和={clipped}、境界差={boundary:.4f}")
@@ -165,6 +167,27 @@ def make_track(scene: str, bpm: int, chords: list[tuple[int, ...]],
     write_wave(f"bgm-{scene}", channels, 0.70)
 
 
+def make_ambience() -> None:
+    """整数周期の発振だけで、継ぎ目のない電気的な夜風を合成する。"""
+    seconds = 16
+    count = RATE * seconds
+    channels = [array("d", [0.0]) * count for _ in range(2)]
+    for i in range(count):
+        phase = i / count
+        # 基音の周期数を整数にし、左右も同じ位置でループする。
+        hum = 0.42 * math.sin(math.tau * 880 * phase)
+        hum += 0.18 * math.sin(math.tau * 1320 * phase + 0.7)
+        shimmer = 0.08 * math.sin(math.tau * 6413 * phase)
+        shimmer *= 0.55 + 0.45 * math.sin(math.tau * 3 * phase)
+        sweep = 0.12 * math.sin(
+            math.tau * 2240 * phase + 2.4 * math.sin(math.tau * 2 * phase)
+        )
+        pulse = 0.11 * math.sin(math.tau * 16 * phase) ** 7
+        channels[0][i] = hum + shimmer + sweep + pulse
+        channels[1][i] = hum - shimmer + 0.9 * sweep - pulse
+    write_wave("ambience", channels, 0.28)
+
+
 def make_audio() -> None:
     """固定音列と固定 seed から全楽曲・効果音を再生成する。"""
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -180,6 +203,7 @@ def make_audio() -> None:
     make_track("result", 96,
                [(48, 55, 60, 64), (43, 50, 55, 59), (45, 52, 57, 60), (41, 48, 53, 57)],
                [(72, 76, 79), (74, 71, 67), (76, 72, 69), (77, 76, 72)])
+    make_ambience()
     for cue, notes, kind, step, length in [
         ("attack", (83, 76), "pluck", 0.025, 0.16),
         ("hurt", (42, 37), "snare", 0.04, 0.24),

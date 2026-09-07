@@ -3,7 +3,6 @@ extends SceneTree
 
 const Catalog := preload("res://scripts/card_catalog.gd")
 const Actor := preload("res://scripts/actor.gd")
-const Backdrop := preload("res://scripts/backdrop.gd")
 const UI := preload("res://scripts/ui.gd")
 
 var main: Control
@@ -33,12 +32,29 @@ func _capture_scenes() -> bool:
 	await create_timer(0.5).timeout
 	await _capture("title")
 	await _key(KEY_ENTER)
+	await create_timer(0.4).timeout
 	_check(run.phase == "map", "Enter でタイトルから開始")
+	_check(main.tutorial_step == 0, "初回だけ地図のチュートリアルを表示")
+	await _capture("tutorial-map-route")
+	main._tutorial_skip()
+	_check(main.tutorial_step == -1, "チュートリアルを読み飛ばせる")
+	main.tutorial_step = 0
+	main._render(false)
+	await _joy(JOY_BUTTON_A)
+	await _capture("tutorial-map-controls")
+	await _joy(JOY_BUTTON_A)
+	_check(main.tutorial_step == 2, "地図の案内後に行き先を選べる")
 	run.start_run(609)
 	await create_timer(0.4).timeout
 	await _capture("map")
 	await _joy(JOY_BUTTON_A)
+	await create_timer(0.4).timeout
 	_check(run.phase == "battle", "ゲームパッド A でノード選択")
+	await _capture("tutorial-battle-intent")
+	await _joy(JOY_BUTTON_A)
+	await _capture("tutorial-battle-card")
+	await _joy(JOY_BUTTON_A)
+	_check(main.tutorial_step == -1, "戦闘の案内後にカードを選べる")
 	await create_timer(0.08).timeout
 	await _capture("draw")
 	await create_timer(0.5).timeout
@@ -69,6 +85,7 @@ func _capture_scenes() -> bool:
 	await _capture("map-overlay")
 	await _key(KEY_ESCAPE)
 	await _capture_large_hand()
+	await _capture_disabled_cards()
 	await _capture_statuses()
 	await _capture_effects()
 	await _complete_run()
@@ -129,6 +146,21 @@ func _capture_large_hand() -> void:
 	main._render(false)
 
 
+func _capture_disabled_cards() -> void:
+	var previous_hand: Array[String] = run.hand.duplicate()
+	var previous_energy: int = run.energy
+	run.hand.assign(["heavy", "strike", "guard"])
+	run.energy = 0
+	main._render(false)
+	await create_timer(0.1).timeout
+	await _capture("card-disabled-reasons")
+	_check(main.card_nodes.all(func(card: Button) -> bool: return card.disabled),
+		"墨が足りないカードを選択不可にする")
+	run.hand.assign(previous_hand)
+	run.energy = previous_energy
+	main._render(false)
+
+
 func _capture_statuses() -> void:
 	var previous: Array[int] = [run.weak, run.vulnerable, run.enemy.weak, run.enemy.vulnerable]
 	run.weak = 2
@@ -170,24 +202,18 @@ func _capture_characters() -> void:
 	stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage.theme = main.theme
 	root.add_child(stage)
-	var backdrop := Backdrop.new()
-	stage.add_child(backdrop)
-	backdrop.setup("title")
-	for side: String in ["left", "right"]:
-		var motion := InputEventMouseMotion.new()
-		motion.position = Vector2(70 if side == "left" else 1210, 360)
-		Input.parse_input_event(motion)
-		await create_timer(0.7).timeout
-		await _capture("background-" + side)
-	var heading: Label = UI.label(stage, "", Rect2(44, 45, 1190, 60), 34, UI.GOLD)
-	UI.label(stage, "七つの固有デザインと、五つの動作", Rect2(46, 116, 1190, 34), 20, UI.MUTED)
+	UI.book(stage)
+	var engraving: TextureRect = UI.art(stage, "map_engraving", Rect2(54, 166, 1170, 454))
+	engraving.modulate = Color(1, 1, 1, 0.12)
+	var heading: Label = UI.label(stage, "", Rect2(74, 62, 1130, 60), 34, UI.RUST)
+	UI.label(stage, "七つの版画人物と、五つの動作", Rect2(76, 119, 1120, 34), 20, UI.MUTED)
 	var ids: Array[String] = ["hero", "enemy_moth", "enemy_sentinel", "enemy_brute",
 		"enemy_wisp", "boss", "npc_keeper"]
 	var names: Array[String] = ["灯守", "灰羽の蛾", "苔の番人", "岩角の獣", "祠の燐火", "夜を抱く巨像", "祠の司祭"]
 	var actors: Array[Node2D] = []
 	for index: int in range(ids.size()):
-		var x: float = 22 + index * 177
-		UI.panel(stage, Rect2(x, 204, 172, 362), Color("101c2ca8"), Color("657b7355"))
+		var x: float = 24 + index * 177
+		UI.panel(stage, Rect2(x, 202, 169, 366), UI.LIGHT_PAPER, UI.GOLD, 2, 1)
 		var actor := Actor.new()
 		stage.add_child(actor)
 		actor.setup(ids[index], Rect2(x + 2, 203, 168, 320))

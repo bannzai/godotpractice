@@ -119,7 +119,10 @@ func _check_survival() -> void:
 	var state: Node = State.new()
 	state.new_game(46)
 	_check(not state.craft("stone_pick"), "素材不足ではクラフトしない")
+	_check(state.recipe_reason(State.RECIPES[0]).contains("木材が1足りません"),
+		"折れないレシピは不足素材を説明")
 	state.add_item("wood", 12)
+	_check(state.recipe_reason(State.RECIPES[0]).is_empty(), "折れるレシピは拒否理由がない")
 	_check(state.craft("plank") and state.inventory.plank == 4, "木から板へ変換")
 	_check(state.craft("bench"), "板から作業台へ変換")
 	state.craft("plank")
@@ -139,6 +142,8 @@ func _check_survival() -> void:
 	_check(state.mine(stone), "石の道具で鉱石を採掘")
 	state.add_item("dirt", 2)
 	var target := Vector3i(16, 7, 16)
+	_check(state.placement_reason(target, AABB(Vector3(target), Vector3.ONE)).contains("自分"),
+		"設置予告は自分と重なる理由を説明")
 	_check(not state.place(target, AABB(Vector3(target), Vector3.ONE)), "体内への設置を拒否")
 	_check(state.inventory.dirt == 2, "設置失敗時に素材を消費しない")
 	_check(state.place(target, AABB(Vector3(3, 9, 3), Vector3.ONE)), "空間への設置")

@@ -20,16 +20,28 @@ func _run() -> void:
 	root.add_child(main)
 	await process_frame
 	await key(KEY_ENTER)
-	_check(campaign.screen == "play", "Enterでタイトルから戦場へ")
+	_check(campaign.screen == "story", "Enterでタイトルから物語へ")
+	_check(main.tutorial_active, "新しい絵巻では初陣の指南が有効")
+	await key(KEY_ENTER)
+	_check(campaign.screen == "play", "Enterで物語から戦場へ")
+	_check(_has_text(main.sidebar, "一ノ指南"), "戦場に初回指南を表示")
+	await key(KEY_RIGHT)
+	await key(KEY_ENTER)
+	_check(main.selected.is_empty(), "空の升は選択されない")
+	_check("誰もいません" in main.notice, "空の升を選べない理由を表示")
+	await key(KEY_LEFT)
 	await key(KEY_ENTER)
 	_check(main.selected == "hero", "Enterで主人公を選択")
+	_check(main.tutorial_step == 1, "指南が移動の段階へ進む")
 	await key(KEY_RIGHT)
 	_check(main.cursor == Vector2i(3, 5), "右キーでカーソル移動")
 	await key(KEY_ENTER)
 	await idle()
 	_check(campaign.unit_by_id("hero").x == 3, "実入力で青いマスへ移動")
+	_check(main.tutorial_step == 2, "指南が見立ての段階へ進む")
 	await key(KEY_I)
 	_check(main.selected == "hero", "満HPで薬を使っても移動取消の選択を保つ")
+	_check("HPが満タン" in main.notice, "薬を使えない理由を表示")
 	await button(JOY_BUTTON_B)
 	_check(campaign.unit_by_id("hero").x == 2, "Bで移動を取り消す")
 	await button(JOY_BUTTON_A)
@@ -39,6 +51,21 @@ func _run() -> void:
 	await key(KEY_ESCAPE)
 	await click(Vector2(176, 359))
 	_check(main.selected == "hero", "マウスクリックで主人公を選択")
+	_check(_has_button(main.sidebar, "攻撃"), "選択後に扇の攻撃を表示")
+	_check(_has_button(main.sidebar, "待機"), "選択後に扇の待機を表示")
+	_check(_has_button(main.sidebar, "薬"), "選択後に扇の薬を表示")
+	_check(_has_button(main.sidebar, "取消"), "選択後に扇の取消を表示")
+	await click_cell(Vector2i(5, 5))
+	_check(main.target.is_empty(), "射程外の敵は攻撃対象にならない")
+	_check("射程外" in main.notice, "敵を選べない理由を表示")
+	await click_cell(Vector2i(4, 5))
+	await idle()
+	await click_cell(Vector2i(5, 5))
+	_check(main.target == "e1", "移動後の敵を攻撃対象に選択")
+	_check(_has_text(main.sidebar, "戦の見立て"), "攻撃前に巻物の見立てを表示")
+	_check(_has_button(main.sidebar, "この見立てで進む"), "巻物に確定操作を表示")
+	_check(_has_button(main.sidebar, "巻物を戻す"), "巻物に取消操作を表示")
+	await key(KEY_ESCAPE)
 	await key(KEY_ESCAPE)
 	await button(JOY_BUTTON_START)
 	_check(campaign.screen == "title", "Startで保存しタイトルへ")
@@ -53,7 +80,9 @@ func _run() -> void:
 	await click(Vector2(600, 500))
 	_check(campaign.screen == "title", "結果からマウスでタイトル復帰")
 	await button(JOY_BUTTON_A)
-	_check(campaign.screen == "play", "パッドAで新規プレイ")
+	_check(campaign.screen == "story", "パッドAで新規プレイの物語へ")
+	await button(JOY_BUTTON_A)
+	_check(campaign.screen == "play", "パッドAで物語から戦場へ")
 	for unit: Dictionary in campaign.units:
 		if unit.team == "player":
 			unit.hp = 0
@@ -130,6 +159,24 @@ func click(at: Vector2) -> void:
 	event.pressed = false
 	Input.parse_input_event(event)
 	await process_frame
+
+
+func click_cell(cell: Vector2i) -> void:
+	await click(Vector2(66, 117) + Vector2(cell) * 44 + Vector2(22, 22))
+
+
+func _has_button(node: Node, caption: String) -> bool:
+	for child: Node in node.find_children("*", "Button", true, false):
+		if child.text == caption:
+			return true
+	return false
+
+
+func _has_text(node: Node, fragment: String) -> bool:
+	for child: Node in node.find_children("*", "Label", true, false):
+		if fragment in child.text:
+			return true
+	return false
 
 
 func _check(value: bool, description: String) -> void:

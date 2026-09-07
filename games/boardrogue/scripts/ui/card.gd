@@ -30,17 +30,26 @@ func _ready() -> void:
 	mouse_exited.connect(queue_redraw)
 	focus_entered.connect(queue_redraw)
 	focus_exited.connect(queue_redraw)
+	set_process(legal)
+
+
+func _process(_delta: float) -> void:
+	if legal:
+		queue_redraw()
 
 
 func _draw() -> void:
 	var accent: Color = UI.JADE if side == 0 else UI.RED
 	var border: Color = UI.GOLD if selected or has_focus() else Color(accent, 0.45)
 	if legal:
-		border = UI.JADE
-	var fill := Color("223c33") if side == 0 else Color("392e29")
+		var pulse: float = 0.66 + sin(Time.get_ticks_msec() * 0.008) * 0.28
+		border = Color(UI.RED if side == 1 else UI.JADE, pulse)
+	var fill := Color("ead7adf2") if side == 0 else Color("d9c49af2")
 	if is_hovered():
 		fill = fill.lightened(0.13)
 	draw_style_box(UI.box(fill, border), Rect2(Vector2.ZERO, size))
+	if legal:
+		draw_rect(Rect2(4, 4, size.x - 8, size.y - 8), Color(border, 0.35), false, 3.0)
 	if card_id.is_empty():
 		_line("・" if not legal else "◇", size.y / 2 + 8, 22, border)
 		return
@@ -51,7 +60,7 @@ func _draw() -> void:
 		_line("潜伏", size.y - 8, 13, UI.GOLD)
 		return
 	var card: Dictionary = Catalog.CARDS[card_id]
-	_line(card.name, 17, 13, UI.PAPER)
+	_line(card.name, 17, 13, UI.INK)
 	var status: String = "攻 %d" % int(card.atk)
 	if face_down:
 		status += "・伏"

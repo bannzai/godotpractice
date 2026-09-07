@@ -2,7 +2,6 @@ extends RefCounted
 ## 時間による敵編成と成長の規則。描画や入力から独立して検証する。
 
 const DURATION: float = 600.0
-const WORLD_LIMIT: float = 2200.0
 const MAX_ENEMIES: int = 360
 const WEAPON_NAMES: Dictionary = {"bolt": "光の矢", "orbit": "衛星刃", "pulse": "波動環"}
 const SPAWN_TABLE: Array[Dictionary] = [

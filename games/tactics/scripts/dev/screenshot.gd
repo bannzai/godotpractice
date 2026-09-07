@@ -54,12 +54,22 @@ func _capture_scenes() -> void:
 	main.show_help()
 	await _capture("help")
 	main.start_game()
+	await create_timer(0.5).timeout
+	await _capture("story-1")
+	main._begin_stage()
 	await create_timer(1.0).timeout
+	await _capture("tutorial")
 	await _capture("stage-1")
 	main.choose_cell(Vector2i(2, 5))
+	await _capture("actionable-highlight")
 	await _capture("movement")
+	main.choose_cell(Vector2i(6, 7))
+	await _capture("selection-unavailable")
 	await main.choose_cell(Vector2i(4, 5))
+	await create_timer(0.25).timeout
+	await _capture("fan-menu")
 	main.choose_cell(Vector2i(5, 5))
+	await _capture("scroll-forecast")
 	await _capture("forecast")
 	main.confirm_attack()
 	await create_timer(0.5).timeout
@@ -68,6 +78,8 @@ func _capture_scenes() -> void:
 		await process_frame
 	# 実戦で倒れた敵や消費済みの行動を演出 fixture へ持ち越さない。
 	main.start_game()
+	main.skip_tutorial()
+	main._begin_stage()
 	await create_timer(1.0).timeout
 	await _capture_effects()
 	await _capture_results()
@@ -110,11 +122,19 @@ func _capture_results() -> void:
 	await create_timer(0.6).timeout
 	await _capture("victory")
 	main.advance_stage()
+	_fixture_label("画面確認用：第２章の絵巻")
+	await create_timer(0.6).timeout
+	await _capture("story-2")
+	main._begin_stage()
 	_fixture_label("画面確認用：第２章開始の状態を投入")
 	await create_timer(1.0).timeout
 	await _capture("stage-2")
 	campaign.outcome = "victory"
 	main.advance_stage()
+	_fixture_label("画面確認用：第３章の絵巻")
+	await create_timer(0.6).timeout
+	await _capture("story-3")
+	main._begin_stage()
 	_fixture_label("画面確認用：第３章開始の状態を投入")
 	await create_timer(1.0).timeout
 	await _capture("stage-3")
@@ -143,7 +163,7 @@ func _capture_actor_poses() -> void:
 		UI.label(sheet, "キャラ別アニメーション  /  " + POSE_NAMES[pose],
 			Rect2(40, 15, 1190, 55), 31, UI.GOLD)
 		UI.label(sheet, "本番の AnimationPlayer を開始・途中・終了の時刻で停止して撮影",
-			Rect2(40, 67, 1190, 32), 18, UI.MUTED)
+			Rect2(40, 67, 1190, 32), 18, UI.PAPER)
 		for column: int in range(Actor.KINDS.size()):
 			var x: float = 45 + column * 120
 			var title: Label = UI.label(sheet, KIND_NAMES[Actor.KINDS[column]],
@@ -173,7 +193,7 @@ func _add_pose_cell(sheet: Control, pose: String, column: int, row: int, x: floa
 	actor.animation_player.seek(seconds, true)
 	var phase_text: String = ["開始", "途中", "終了"][row]
 	var label: Label = UI.label(sheet, "%s  %.2f 秒" % [phase_text, seconds],
-		Rect2(x - 5, y + 139, 110, 27), 15, UI.JADE)
+		Rect2(x - 5, y + 139, 110, 27), 15, UI.GOLD)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 

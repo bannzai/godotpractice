@@ -1,4 +1,4 @@
-"""独自作曲の四場面BGMとSEを倍音・打楽器・左右定位から合成する。"""
+"""独自作曲の四場面BGM、環境音、SEを倍音・打楽器・左右定位から合成する。"""
 from array import array
 import math
 from pathlib import Path
@@ -110,11 +110,92 @@ def effects():
         save(cue, samples)
 
 
+def ambience():
+    """風、水、遠い鈴を周期波形で重ねた16秒の環境音を作る。"""
+    duration = 16
+    total = duration * RATE
+    samples = [0.] * (total * 2)
+    rng = random.Random(4707)
+    wind_layers = (
+        (157, .020),
+        (263, .018),
+        (557, .014),
+        (1103, .010),
+        (2053, .008),
+        (4099, .006),
+        (6121, .004),
+        (9239, .003),
+    )
+    left_phases = [rng.uniform(0., TAU) for _layer in wind_layers]
+    right_phases = [rng.uniform(0., TAU) for _layer in wind_layers]
+    for index in range(total):
+        phase = TAU * index / total
+        # Vorbisの変換窓で端点に残る微小差を抑えるため、40msだけ振幅を落とす。
+        edge_gain = min(1., index / (RATE * .04), (total - 1 - index) / (RATE * .04))
+        gust = .64 + .19 * math.sin(phase * 2 - .4) + .11 * math.sin(phase * 5 + .7)
+        wind_left = sum(
+            volume * math.sin(cycles * phase + left_phases[layer])
+            for layer, (cycles, volume) in enumerate(wind_layers)
+        )
+        wind_right = sum(
+            volume * math.sin(cycles * phase + right_phases[layer])
+            for layer, (cycles, volume) in enumerate(wind_layers)
+        )
+        water_envelope = .55 + .27 * math.sin(phase * 3 + .5)
+        water_left = (
+            math.sin(503 * phase + .22 * math.sin(phase * 7))
+            + .42 * math.sin(1291 * phase + .6)
+        ) * .018 * water_envelope
+        water_right = (
+            math.sin(509 * phase + .20 * math.sin(phase * 5))
+            + .38 * math.sin(1301 * phase + 1.1)
+        ) * .018 * water_envelope
+        samples[index * 2] = (wind_left * gust + water_left) * 2.2 * edge_gain
+        samples[index * 2 + 1] = (wind_right * gust + water_right) * 2.2 * edge_gain
+
+    # 鈴はループ境界から離して鳴らし、残響が区間内で消えるようにする。
+    note(samples, 4.2, 2.8, 83, .11, 'bell', -.65, 4707)
+    note(samples, 4.3, 3.0, 71, .05, 'bell', -.58, 4708)
+    note(samples, 10.9, 2.8, 86, .09, 'bell', .62, 4709)
+    note(samples, 11.0, 3.0, 74, .042, 'bell', .55, 4710)
+    save('ambience', samples)
+
+
+def fan_effect():
+    """和紙の擦れと扇骨の開く音を重ねた短い扇音を作る。"""
+    duration = .95
+    total = int(duration * RATE)
+    samples = [0.] * (total * 2)
+    rng = random.Random(4708)
+    smoothed = 0.
+    rib_times = (.08, .15, .22, .30, .39, .49, .60)
+    for index in range(total):
+        t = index / RATE
+        progress = t / duration
+        raw = rng.uniform(-1., 1.)
+        smoothed += (raw - smoothed) * .17
+        paper = (raw - smoothed * .72) * math.sin(math.pi * progress) ** 1.4
+        brush = math.sin(TAU * (115. * t + 68. * t * t)) * math.sin(math.pi * progress)
+        ribs = 0.
+        for rib_index, rib_time in enumerate(rib_times):
+            elapsed = t - rib_time
+            if 0. <= elapsed < .09:
+                pitch = 235. + rib_index * 17.
+                ribs += math.sin(TAU * pitch * elapsed) * math.exp(-55. * elapsed)
+        pan = -.55 + 1.1 * progress
+        value = (paper * .22 + brush * .045 + ribs * .095) * 1.5
+        samples[index * 2] = value * (1. - pan) / 2.
+        samples[index * 2 + 1] = value * (1. + pan) / 2.
+    save('fan', samples)
+
+
 if __name__ == '__main__':
     ROOT.mkdir(parents=True, exist_ok=True)
     music('title', 84, [76,79,81,0,83,81,79,76,74,76,79,81,79,76,74,0], [45,41,48,43], 'title')
     music('stage', 106, [72,76,79,76,74,77,81,79,76,79,84,81,79,76,74,72], [48,43,45,41], 'stage')
     music('battle', 138, [69,72,76,72,71,74,77,74,72,76,79,76,74,77,81,79], [45,41,43,40], 'battle')
     music('result', 92, [76,79,84,0,83,79,76,0,81,84,88,84,79,76,72,0], [48,43,45,41], 'result')
+    ambience()
     effects()
-    print('tactics BGM4曲・SE4種 Ogg Vorbisを生成')
+    fan_effect()
+    print('tactics BGM4曲・環境音1種・SE5種 Ogg Vorbisを生成')

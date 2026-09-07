@@ -2,6 +2,7 @@ extends Node
 ## 場面別の曲と出来事の効果音。音声スレッドが解放する時間を終了時に確保する。
 
 const MUSIC: Array[String] = ["title", "day", "night", "clear", "failed"]
+const AMBIENCE := {"day": "paper_day", "night": "paper_night"}
 const SOUNDS: Array[String] = [
 	"break_grass", "break_dirt", "break_stone", "break_sand", "break_wood",
 	"break_leaves", "break_crystal", "place", "step", "attack", "hurt", "craft", "ui",
@@ -12,8 +13,10 @@ const SOUNDS: Array[String] = [
 
 var current_track: String = ""
 var _music: AudioStreamPlayer
+var _ambience: AudioStreamPlayer
 var _sounds: Dictionary = {}
 var _streams: Dictionary = {}
+var _ambient_streams: Dictionary = {}
 var _enabled: bool = false
 var _initialized: bool = false
 var _stopped: bool = false
@@ -42,11 +45,19 @@ func _setup() -> void:
 	_music = AudioStreamPlayer.new()
 	_music.volume_db = -13.0
 	add_child(_music)
+	_ambience = AudioStreamPlayer.new()
+	_ambience.volume_db = -7.0
+	add_child(_ambience)
 	for key: String in MUSIC:
 		var stream: AudioStreamWAV = load("res://assets/audio/%s.wav" % key)
 		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
 		_streams[key] = stream
+	for key: String in AMBIENCE.values():
+		var stream: AudioStreamWAV = load("res://assets/audio/%s.wav" % key)
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
+		_ambient_streams[key] = stream
 	for key: String in SOUNDS:
 		var player := AudioStreamPlayer.new()
 		player.stream = load("res://assets/audio/%s.wav" % key)
@@ -64,6 +75,13 @@ func play_music(track: String) -> void:
 	_music.stop()
 	_music.stream = _streams[track]
 	_music.play()
+	_ambience.stop()
+	var ambience_key: String = str(AMBIENCE.get(track, ""))
+	if _ambient_streams.has(ambience_key):
+		_ambience.stream = _ambient_streams[ambience_key]
+		_ambience.play()
+	else:
+		_ambience.stream = null
 
 
 ## 入力や出来事ごとに発音するため非冪等。
@@ -79,10 +97,14 @@ func stop_audio() -> void:
 	if is_instance_valid(_music):
 		_music.stop()
 		_music.stream = null
+	if is_instance_valid(_ambience):
+		_ambience.stop()
+		_ambience.stream = null
 	for player: AudioStreamPlayer in _sounds.values():
 		player.stop()
 		player.stream = null
 	_streams.clear()
+	_ambient_streams.clear()
 
 
 func _process(_delta: float) -> void:

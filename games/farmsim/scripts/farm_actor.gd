@@ -3,9 +3,9 @@ extends Node2D
 
 const ACTIONS: Array[String] = ["idle", "walk", "hoe", "water", "harvest", "tired"]
 const CHARACTER_IMAGES: Dictionary = {
-	"farmer": preload("res://assets/characters/farmer.svg"),
-	"merchant": preload("res://assets/characters/merchant.svg"),
-	"chicken": preload("res://assets/characters/chicken.svg"),
+	"farmer": preload("res://assets/characters/farmer.png"),
+	"merchant": preload("res://assets/characters/merchant.png"),
+	"chicken": preload("res://assets/characters/chicken.png"),
 }
 
 var sprite: AnimatedSprite2D

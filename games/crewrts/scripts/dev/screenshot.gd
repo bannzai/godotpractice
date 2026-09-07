@@ -25,11 +25,7 @@ func _capture_scenes() -> bool:
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await create_timer(0.5).timeout
-	if not await _capture("tmp/screenshot-title.png"):
-		return false
-	main.start_day()
-	await create_timer(0.5).timeout
-	if not await _capture("tmp/screenshot-play.png"):
+	if not await _capture_onboarding(main):
 		return false
 	for capture: Callable in [_capture_actions, _capture_results, _capture_effects]:
 		if not await capture.call(main):
@@ -42,6 +38,45 @@ func _capture_scenes() -> bool:
 		return false
 	main.queue_free()
 	await process_frame
+	return true
+
+
+func _capture_onboarding(main: Node) -> bool:
+	if not await _capture("tmp/screenshot-title.png"):
+		return false
+	main.show_map()
+	await create_timer(0.45).timeout
+	if not await _capture("tmp/screenshot-map.png"):
+		return false
+	if not await _capture_tutorial(main):
+		return false
+	main.skip_tutorial()
+	await create_timer(0.25).timeout
+	if not await _capture("tmp/screenshot-play.png"):
+		return false
+	main.set_physics_process(false)
+	var model: Node = main.model
+	var point: Vector3 = model.cargo[0].position
+	main.world.sync(model, 0.0, point)
+	main.hud.set_context(main.world.describe_target(model, point))
+	if not await _capture("tmp/screenshot-highlight.png"):
+		return false
+	return true
+
+
+func _capture_tutorial(main: Node) -> bool:
+	main.start_day()
+	await create_timer(0.35).timeout
+	if not await _capture("tmp/screenshot-tutorial-move.png"):
+		return false
+	main.advance_tutorial()
+	await process_frame
+	if not await _capture("tmp/screenshot-tutorial-throw.png"):
+		return false
+	main.advance_tutorial()
+	await process_frame
+	if not await _capture("tmp/screenshot-tutorial-whistle.png"):
+		return false
 	return true
 
 

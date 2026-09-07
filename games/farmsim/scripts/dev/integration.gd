@@ -51,17 +51,22 @@ func _check_bindings() -> void:
 ## キーボードの道具切替と使用を実際に一度ずつ行うため非冪等。
 func _keyboard_farming() -> void:
 	await _tap_key(KEY_ENTER)
-	_check(main.mode == "playing", "Enterでタイトルから農場を開始できる")
+	_check(main.mode == "playing" and is_instance_valid(main.modal),
+		"Enterでタイトルから母の手紙を開ける")
+	await _tap_key(KEY_ENTER)
+	_check(main.tutorial_active and main.tutorial_step == 1 and not is_instance_valid(main.modal),
+		"母の手紙から段階チュートリアルを始められる")
 	await _tap_key(KEY_SPACE)
-	_check(farm.tiles[0].tilled, "Spaceで向いている畑を耕せる")
+	_check(farm.tiles[0].tilled and main.tutorial_step == 2 and farm.selected_tool == 2,
+		"Spaceで畑を耕すと種へ自動で案内される")
 	await create_timer(0.45).timeout
-	await _tap_key(KEY_3)
 	await _tap_key(KEY_SPACE)
-	_check(farm.tiles[0].crop == "turnip", "3とSpaceで種を植えられる")
+	_check(farm.tiles[0].crop == "turnip" and main.tutorial_step == 3 and farm.selected_tool == 1,
+		"同じマスへ種を植えると水やりへ自動で案内される")
 	await create_timer(0.45).timeout
-	await _tap_key(KEY_2)
 	await _tap_key(KEY_SPACE)
-	_check(farm.tiles[0].watered, "2とSpaceで水をあげられる")
+	_check(farm.tiles[0].watered and not main.tutorial_active,
+		"水やりまで終えると段階チュートリアルが完了する")
 	await create_timer(0.45).timeout
 	await _tap_key(KEY_R)
 	_check(farm.selected_crop == "carrot", "Rで種の種類を切り替えられる")
@@ -95,13 +100,18 @@ func _menus_and_save() -> void:
 	farm.player_position = main.world.TOWN
 	main.world.refresh()
 	await _tap_key(KEY_F)
-	_check(is_instance_valid(main.modal), "町でFを押してショップを開ける")
+	_check(main.mode == "map" and not is_instance_valid(main.modal),
+		"町でFを押すと版画の村地図へ移動する")
+	await _tap_key(KEY_ENTER)
+	_check(is_instance_valid(main.modal), "村地図から決定入力で種屋を開ける")
 	var money: int = farm.money
 	var seeds: int = farm.seeds.turnip
 	await _tap_key(KEY_ENTER)
 	_check(farm.money == money - farm.CROPS.turnip.seed_price and farm.seeds.turnip == seeds + 1,
 		"ショップの購入ボタンが所持金と種に反映される")
 	await _tap_key(KEY_ESCAPE)
+	await _tap_key(KEY_ESCAPE)
+	_check(main.mode == "playing", "村地図をBまたはEscで閉じて農場へ戻れる")
 	await _tap_key(KEY_TAB)
 	await _click(Vector2(872, 236))
 	_check(FileAccess.file_exists(SAVE_PATH), "手帳のボタンから検証専用パスに保存できる")
@@ -119,7 +129,11 @@ func _gamepad() -> void:
 	main.return_title()
 	await process_frame
 	await _tap_pad(JOY_BUTTON_A)
-	_check(main.mode == "playing", "パッドAで新しい農場を開始できる")
+	_check(main.mode == "playing" and is_instance_valid(main.modal),
+		"パッドAで新しい農場と母の手紙を開ける")
+	await _tap_pad(JOY_BUTTON_A)
+	_check(main.tutorial_step == 1 and not is_instance_valid(main.modal),
+		"パッドAで段階チュートリアルを開始できる")
 	await _tap_pad(JOY_BUTTON_RIGHT_SHOULDER)
 	_check(farm.selected_tool == 1, "RBで次の道具を選べる")
 	await _tap_pad(JOY_BUTTON_LEFT_SHOULDER)
@@ -161,8 +175,9 @@ func _outcomes() -> void:
 	await _tap_pad(JOY_BUTTON_A)
 	_check(main.mode == "title", "結果画面からパッドAでタイトルへ戻れる")
 	await _tap_key(KEY_ENTER)
-	_check(main.mode == "playing" and farm.day == 1 and farm.money == 120,
-		"再挑戦では初日の農場に戻る")
+	_check(main.mode == "playing" and farm.day == 1 and farm.money == 120
+		and is_instance_valid(main.modal), "再挑戦では初日の農場と母の手紙に戻る")
+	await _tap_key(KEY_ESCAPE)
 	farm.day = 20
 	farm.player_position = main.world.BED
 	main.world.refresh()

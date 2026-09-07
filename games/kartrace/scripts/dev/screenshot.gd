@@ -37,6 +37,16 @@ func _capture_scenes() -> void:
 	_state._rng.seed = 380038
 	await create_timer(0.5).timeout
 	await _capture("title")
+	_main.select_kart(1)
+	await _capture("title-highlight")
+	_main.show_garage()
+	await _capture("garage")
+	_main.show_tutorial()
+	await _capture("tutorial-accelerate")
+	_main.tutorial_step = 2
+	_main.hud.set_tutorial_step(2)
+	_main.hud.refresh()
+	await _capture("tutorial-drift")
 	_main.start_race()
 	_main.set_physics_process(false)
 	await create_timer(0.45).timeout
@@ -63,6 +73,11 @@ func _capture_scenes() -> void:
 	_main.hud.refresh()
 	await create_timer(0.08).timeout
 	await _capture("hit", 0.0)
+	_state.racers[0].respawn_timer = 0.55
+	_main._update_racers()
+	_main.hud.refresh()
+	await _capture("respawn")
+	_state.racers[0].respawn_timer = 0.0
 	# ゴール待機画面のfixtureとして長いブーストを与え、CPUより先に正順で完走する。
 	_state.racers[0].boost = 120.0
 	_state.racers[0].invulnerable = 120.0

@@ -19,6 +19,7 @@ func _run() -> void:
 	var state: Node = root.get_node("RunState")
 	await create_timer(0.7).timeout
 	_check(main.audio.music.playing, "タイトル BGM が再生中")
+	_check(main.audio.ambience.playing, "電気的な環境音が再生中")
 	_check(AudioServer.get_bus_peak_volume_left_db(0, 0) > -90.0, "音声バスに出力がある")
 	var track: AudioStreamWAV = main.audio.music.stream
 	var initial_position: float = main.audio.music.get_playback_position()
@@ -49,6 +50,10 @@ func _run() -> void:
 	_check(main.audio.current_scene == "title" and main.audio.music.playing, "タイトル BGM へ復帰")
 	main.audio.shutdown()
 	_check(not main.audio.music.playing and main.audio.music.stream == null, "終了前の音声停止と解放")
+	_check(
+		not main.audio.ambience.playing and main.audio.ambience.stream == null,
+		"終了前の環境音停止と解放"
+	)
 	main.queue_free()
 	await process_frame
 	await process_frame

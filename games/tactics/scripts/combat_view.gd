@@ -21,12 +21,12 @@ func setup(campaign: Node, first: String, second: String, initial_hp: Dictionary
 	stage = Control.new()
 	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(stage)
-	UI.panel(stage, Rect2(83, 152, 676, 417), UI.INK, UI.GOLD)
-	var landscape: TextureRect = UI.art(
-		stage, "backgrounds/mountains.svg", Rect2(85, 160, 672, 378)
+	UI.scroll_panel(stage, Rect2(70, 138, 720, 450))
+	var landscape: TextureRect = UI.art_cover(
+		stage, "generated/yamato-landscape.png", Rect2(84, 155, 692, 382)
 	)
-	landscape.modulate = Color(0.7, 0.8, 0.85, 0.5)
-	UI.label(stage, "交 戦", Rect2(358, 174, 180, 40), 28, UI.GOLD)
+	landscape.modulate = Color(0.72, 0.67, 0.53, 0.48)
+	UI.label(stage, "交 戦 絵 巻", Rect2(320, 165, 240, 40), 28, UI.CORAL)
 	for index: int in range(2):
 		var id: String = first if index == 0 else second
 		var unit: Dictionary = campaign.unit_by_id(id)

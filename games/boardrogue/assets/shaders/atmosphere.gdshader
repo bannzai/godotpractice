@@ -20,5 +20,9 @@ void fragment() {
     vec2 drift = UV * vec2(4.0, 12.0) + vec2(clock * 0.021, sin(clock * 0.09) * 0.12);
     float mist = noise(drift) * 0.65 + noise(drift * 2.8) * 0.35;
     float band = smoothstep(0.1, 0.9, UV.y) * (1.0 - smoothstep(0.72, 1.0, UV.y));
-    COLOR = vec4(tint.rgb, mist * band * strength);
+    float fiber = noise(UV * vec2(180.0, 38.0)) * 0.6 + sin(UV.y * 920.0) * 0.08;
+    float edge_distance = min(min(UV.x, 1.0 - UV.x), min(UV.y, 1.0 - UV.y));
+    float ragged_edge = 1.0 - smoothstep(0.006 + noise(UV * 31.0) * 0.016, 0.055, edge_distance);
+    float wash = mist * band * strength + fiber * 0.026 + ragged_edge * 0.19;
+    COLOR = vec4(tint.rgb, wash);
 }

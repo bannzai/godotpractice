@@ -24,11 +24,22 @@ func _capture_scenes() -> void:
 	root.add_child(main)
 	await create_timer(0.6).timeout
 	await _capture("title")
+	main._request("map", "")
+	await create_timer(0.5).timeout
+	await _capture("map")
+	main._request("close", "")
 	main.start_game()
 	await create_timer(0.4).timeout
-	await _capture("play")
+	await _capture("tutorial-first-page")
 	Inputs.prepare_tree(main)
-	await create_timer(0.2).timeout
+	await create_timer(0.35).timeout
+	await _capture("target-highlight")
+	# 完成予想位置だけを撮る固定条件。通常の採掘進行に持ち越さない。
+	main.model.add_item("dirt", 1)
+	await create_timer(0.15).timeout
+	await _capture("placement-preview")
+	main.model.inventory.erase("dirt")
+	main.model.changed.emit()
 	Inputs.mouse(MOUSE_BUTTON_LEFT, true)
 	await create_timer(0.16).timeout
 	await _capture("mining-start")
@@ -46,6 +57,9 @@ func _capture_scenes() -> void:
 	main._request("craft_menu", "")
 	await create_timer(0.15).timeout
 	await _capture("craft")
+	main._request("craft", "plank")
+	await create_timer(0.15).timeout
+	await _capture("craft-complete")
 	main._request("close", "")
 	main._request("pause", "")
 	await create_timer(0.15).timeout

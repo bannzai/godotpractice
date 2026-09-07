@@ -3,7 +3,18 @@ extends Node
 
 signal shutdown_finished
 
+const AMBIENCES_BY_TRACK: Dictionary = {
+	"title": ["ambience_paper"],
+	"map": ["ambience_wind", "ambience_fire", "ambience_paper"],
+	"battle": ["ambience_wind"],
+	"boss": ["ambience_wind", "ambience_fire"],
+	"result": ["ambience_paper"],
+	"victory": ["ambience_wind", "ambience_paper"],
+}
+const AMBIENCE_VOLUME_DB: float = -28.0
+
 var music: AudioStreamPlayer
+var ambience_players: Array[AudioStreamPlayer] = []
 var effects: Array[AudioStreamPlayer] = []
 var current_track: String = ""
 var muted: bool = false
@@ -21,6 +32,11 @@ func _ready() -> void:
 	music = AudioStreamPlayer.new()
 	music.volume_db = -12
 	add_child(music)
+	for _index: int in range(3):
+		var player := AudioStreamPlayer.new()
+		player.volume_db = AMBIENCE_VOLUME_DB
+		add_child(player)
+		ambience_players.append(player)
 	for index: int in range(4):
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -8
@@ -35,13 +51,31 @@ func track(name: String) -> void:
 	if current_track == name:
 		return
 	current_track = name
-	var stream: AudioStreamWAV = load("res://assets/audio/" + name + ".wav")
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_end = int(stream.get_length() * stream.mix_rate)
-	music.stream = stream
+	music.stream = _looping_stream(name)
+	_set_ambiences(name)
 	if not muted:
 		music.play()
 		has_played = true
+
+
+func _set_ambiences(track_name: String) -> void:
+	for player: AudioStreamPlayer in ambience_players:
+		player.stop()
+		player.stream = null
+	var names: Array = AMBIENCES_BY_TRACK.get(track_name, [])
+	for index: int in range(mini(names.size(), ambience_players.size())):
+		var player: AudioStreamPlayer = ambience_players[index]
+		player.stream = _looping_stream(str(names[index]))
+		if not muted:
+			player.play()
+			has_played = true
+
+
+func _looping_stream(name: String) -> AudioStreamWAV:
+	var stream: AudioStreamWAV = load("res://assets/audio/" + name + ".wav")
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_end = int(stream.get_length() * stream.mix_rate)
+	return stream
 
 
 # 入力イベントに対して一度発音するため、反復呼び出しでは別の音を重ねる。
@@ -66,6 +100,8 @@ func set_muted(value: bool) -> void:
 		if not previous.is_empty():
 			track(previous)
 	music.volume_db = -80 if muted else -12
+	for player: AudioStreamPlayer in ambience_players:
+		player.volume_db = -80 if muted else AMBIENCE_VOLUME_DB
 	for player: AudioStreamPlayer in effects:
 		player.volume_db = -80 if muted else -8
 
@@ -75,6 +111,9 @@ func stop_all() -> void:
 		return
 	music.stop()
 	music.stream = null
+	for player: AudioStreamPlayer in ambience_players:
+		player.stop()
+		player.stream = null
 	for player: AudioStreamPlayer in effects:
 		player.stop()
 		player.stream = null

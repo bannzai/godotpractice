@@ -56,6 +56,10 @@ func _demo_action() -> void:
 			await _key(KEY_ENTER)
 			await _settle()
 			entered_play = run.mode == "map"
+			# 30秒の全ラン録画では、画面にある導線を実クリックして案内を省略する。
+			# チュートリアル本編は screenshot と integration で別に最後まで検証する。
+			await _click_name("SkipTutorial")
+			print("録画入力 %03d F: 最初の夜の案内をスキップ" % frames)
 			next_action_frame = frames + 20
 		"result":
 			saw_result = true

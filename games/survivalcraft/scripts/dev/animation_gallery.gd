@@ -1,7 +1,7 @@
 extends Node3D
 ## 本番と同じキャラクターを並べ、各クリップの同じ進行率を比較する撮影用の展示。
 
-const FONT := preload("res://assets/fonts/MPLUSRounded1c-Regular.ttf")
+const FONT := preload("res://assets/fonts/ZenMaruGothic-Regular.ttf")
 const Creature := preload("res://scripts/actors/creature.gd")
 const SPECIES: Array[String] = ["player", "mossling", "wisp"]
 const MOTIONS: Array[String] = ["idle", "walk", "attack", "hurt", "vanish"]

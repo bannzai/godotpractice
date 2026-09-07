@@ -30,18 +30,46 @@ func _capture_scenes() -> bool:
 	root.add_child(game)
 	state = root.get_node("RunState")
 	await create_timer(0.8).timeout
-	if not await _capture("title"):
-		return false
-	game.start_run()
-	await create_timer(0.1).timeout
-	if not await _capture("transition-play"):
-		return false
-	await create_timer(0.8).timeout
-	if not await _capture("play"):
-		return false
-	if not await _capture_effects():
-		return false
-	return await _capture_growth()
+	var success: bool = await _capture("title")
+	if success:
+		game.show_stage_select()
+		await create_timer(0.5).timeout
+		success = await _capture("stage-atelier")
+	if success:
+		game.select_stage("playroom")
+		game.hud._stage_buttons[1].grab_focus()
+		await create_timer(1.2).timeout
+		success = await _capture("stage-playroom")
+	if success:
+		game.show_tutorial()
+		await create_timer(0.5).timeout
+		success = await _capture("tutorial-move")
+	if success:
+		game.next_tutorial_step()
+		await create_timer(0.25).timeout
+		success = await _capture("tutorial-camera")
+	if success:
+		game.next_tutorial_step()
+		await create_timer(0.25).timeout
+		success = await _capture("tutorial-collect")
+	if success:
+		game.skip_tutorial()
+		await create_timer(0.5).timeout
+		success = await _capture("play-playroom-highlight")
+	if success:
+		game.show_title()
+		game.select_stage("atelier")
+		game.start_run()
+		await create_timer(0.1).timeout
+		success = await _capture("transition-play")
+	if success:
+		await create_timer(0.8).timeout
+		success = await _capture("play-atelier-highlight")
+	if success:
+		success = await _capture_effects()
+	if success:
+		success = await _capture_growth()
+	return success
 
 
 func _capture_effects() -> bool:

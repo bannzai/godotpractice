@@ -4,6 +4,7 @@ extends Node
 signal shutdown_finished
 
 var music: AudioStreamPlayer
+var ambience_player: AudioStreamPlayer
 var effects: Array[AudioStreamPlayer] = []
 var current_track: String = ""
 var muted: bool = false
@@ -21,6 +22,9 @@ func _ready() -> void:
 	music = AudioStreamPlayer.new()
 	music.volume_db = -12
 	add_child(music)
+	ambience_player = AudioStreamPlayer.new()
+	ambience_player.volume_db = -27
+	add_child(ambience_player)
 	for index: int in range(4):
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -8
@@ -33,6 +37,7 @@ func track(name: String) -> void:
 	if shutting_down or DisplayServer.get_name() == "headless":
 		return
 	if current_track == name:
+		_start_ambience()
 		return
 	current_track = name
 	var stream: AudioStreamWAV = load("res://assets/audio/" + name + ".wav")
@@ -41,6 +46,20 @@ func track(name: String) -> void:
 	music.stream = stream
 	if not muted:
 		music.play()
+		has_played = true
+		_start_ambience()
+
+
+func _start_ambience() -> void:
+	if muted or shutting_down or not is_instance_valid(ambience_player):
+		return
+	if ambience_player.stream == null:
+		var stream: AudioStreamWAV = load("res://assets/audio/ambience.wav")
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_end = int(stream.get_length() * stream.mix_rate)
+		ambience_player.stream = stream
+	if not ambience_player.playing:
+		ambience_player.play()
 		has_played = true
 
 
@@ -66,6 +85,7 @@ func set_muted(value: bool) -> void:
 		if not previous.is_empty():
 			track(previous)
 	music.volume_db = -80 if muted else -12
+	ambience_player.volume_db = -80 if muted else -27
 	for player: AudioStreamPlayer in effects:
 		player.volume_db = -80 if muted else -8
 
@@ -75,6 +95,9 @@ func stop_all() -> void:
 		return
 	music.stop()
 	music.stream = null
+	if is_instance_valid(ambience_player):
+		ambience_player.stop()
+		ambience_player.stream = null
 	for player: AudioStreamPlayer in effects:
 		player.stop()
 		player.stream = null

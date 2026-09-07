@@ -111,18 +111,40 @@ func _check_navigation() -> void:
 	await _click_button("初期値")
 	await _click_button("保存して戻る")
 	_check(state.offset_ms == 0 and main.settings_panel == null, "調整を閉じて初期値に復帰")
-	await _click_button("試聴する")
+	await _click_button("試聴")
 	_check(main.previewing, "試聴を開始")
 	await _click_button("試聴を止める")
 	_check(not main.previewing, "試聴を終了")
+	_key(KEY_RIGHT, true)
+	_key(KEY_RIGHT, false)
+	await process_frame
+	_check(state.selected_song == 1, "右入力で次の屋台へ歩く")
+	_key(KEY_LEFT, true)
+	_key(KEY_LEFT, false)
+	await process_frame
+	_check(state.selected_song == 0, "左入力で前の屋台へ歩く")
 	main.manual_time = 0.0
-	await _click_button("この曲を演奏する")
+	await _click_button(str(state.songs[state.selected_song].title))
+	_check(main.tutorial_active and state.screen == "select", "初回演奏前に場内の稽古を表示")
+	_key(KEY_F, true)
+	_key(KEY_F, false)
+	await process_frame
+	_key(KEY_J, true)
+	_key(KEY_J, false)
+	await process_frame
+	_key(KEY_F, true)
+	await process_frame
+	await create_timer(0.36).timeout
+	_key(KEY_F, false)
+	await process_frame
+	_check(main.tutorial_step == 3, "朱・藍・長押しを順に稽古")
+	await _click_button("Enter / A")
 	_check(state.screen == "play", "実クリックで演奏開始")
 	_key(KEY_ESCAPE, true)
 	_key(KEY_ESCAPE, false)
 	await process_frame
 	_check(state.screen == "select", "Escape で演奏を中断")
-	await _click_button("タイトル")
+	await _click_button("タイトルへ")
 	_check(state.screen == "title", "選曲からタイトルへ")
 	_key(KEY_ENTER, true)
 	_key(KEY_ENTER, false)
@@ -180,7 +202,7 @@ func _check_input_devices() -> void:
 	main.manual_time = 60.0
 	await process_frame
 	_check(state.screen == "result", "入力した演奏の曲終了で結果へ")
-	await _click_button("選曲に戻る")
+	await _click_button("縁日の屋台へ戻る")
 	_check(state.screen == "select", "結果から実クリックで選曲へ")
 
 
@@ -221,7 +243,7 @@ func _check_all_charts() -> void:
 				"全曲・全難易度の実入力演奏でクリア結果")
 			_check(state.score == 1000000 and state.counts.Miss == 0,
 				"全曲・全難易度で全 Perfect と 100 万点")
-			await _click_button("選曲に戻る")
+			await _click_button("縁日の屋台へ戻る")
 	state.select_song(0)
 	state.set_difficulty("easy")
 	main.manual_time = 0.0
@@ -230,10 +252,10 @@ func _check_all_charts() -> void:
 	await process_frame
 	_check(state.screen == "result" and not state.cleared, "無入力では失敗結果")
 	main.manual_time = 0.0
-	await _click_button("もう一度演奏")
+	await _click_button("もう一度、太鼓")
 	_check(state.screen == "play", "結果の再演奏ボタンで再開")
-	await _click_button("中断")
-	await _click_button("タイトル")
+	await _click_button("Esc")
+	await _click_button("タイトルへ")
 	_check(state.screen == "title", "再演奏・中断からタイトルに帰還")
 
 
@@ -246,6 +268,7 @@ func _check_audio_clock() -> void:
 	main.start_song()
 	await create_timer(0.35).timeout
 	_check(main.music.playing, "実 AudioStreamPlayer で音源を再生")
+	_check(main.ambience.playing, "祭りの環境音を楽曲と重ねて再生")
 	var position: float = main.music.get_playback_position()
 	_check(position > 0.1, "実再生位置が進む")
 	var expected: float = maxf(0.0, position + AudioServer.get_time_since_last_mix()

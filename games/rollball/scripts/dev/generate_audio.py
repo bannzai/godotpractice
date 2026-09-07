@@ -14,7 +14,10 @@ import wave
 
 RATE = 22050
 OUTPUT = Path(__file__).resolve().parents[2] / "assets" / "audio"
-MUSIC_NAMES = {"title", "play", "urgent", "finish", "timeout", "music"}
+MUSIC_NAMES = {
+    "title", "play", "urgent", "finish", "timeout", "music",
+    "ambience_atelier", "ambience_playroom",
+}
 
 
 def frequency(note):
@@ -182,6 +185,25 @@ def result_music(success):
     return mix(16 * beat, events, loop=True)
 
 
+def ambience(playroom=False):
+    """紙や粘土を触る小音と室内の空気を、場面ごとの低い環境音にする。"""
+    length = 12.0
+    events = []
+    for step in range(15):
+        start = step * 0.8
+        note = 69 + (step * 5) % 9
+        events.append(event(start, "brush", note, 0.38, 0.17))
+        if step % 3 == 1:
+            events.append(event(start + 0.31, "rim", 48 + step % 4, 0.16, 0.08))
+    if playroom:
+        for start, note in [(1.4, 84), (4.7, 88), (8.2, 86), (10.6, 91)]:
+            events.append(event(start, "bell", note, 0.72, 0.045))
+    else:
+        for start, note in [(2.0, 61), (5.8, 64), (9.5, 59)]:
+            events.append(event(start, "pluck", note, 0.5, 0.045))
+    return mix(length, events, loop=True)
+
+
 def sound_effects():
     """回収・衝突・成長・成功・時間切れを異なる音域と発音で区別する。"""
     sounds = {
@@ -223,7 +245,8 @@ def main():
     parser.add_argument("--verify", action="store_true", help="再生成と保存済み WAV の全バイトを照合する")
     args = parser.parse_args()
     sounds = {"title": title(), "play": play(), "urgent": play(urgent=True),
-              "finish": result_music(True), "timeout": result_music(False)}
+              "finish": result_music(True), "timeout": result_music(False),
+              "ambience_atelier": ambience(), "ambience_playroom": ambience(True)}
     # 初回実装の参照を壊さず、旧名も通常プレイの新しい編曲で再生成する。
     sounds["music"] = sounds["play"]
     sounds.update(sound_effects())

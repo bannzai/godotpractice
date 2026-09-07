@@ -37,9 +37,9 @@ func setup(kind: int) -> void:
 	model_kind = clampi(kind, 0, 2)
 	_state = "idle"
 	_special_time = 0.0
-	_dark = _material(Color("172b38"))
-	_cream = _material(Color("fff1d1"))
-	_metal = _material(Color("b6dce0"), 0.7)
+	_dark = _material(Color("111136"))
+	_cream = _material(Color("fff36b"))
+	_metal = _material(Color("82efff"), 0.7)
 	body = Node3D.new()
 	body.name = "Body"
 	add_child(body)
@@ -103,8 +103,8 @@ func _process(delta: float) -> void:
 
 
 func _build_otter() -> void:
-	_paint = _material(Color("58d8bf"), 0.18)
-	_accent = _material(Color("ffca66"), 0.22)
+	_paint = _material(Color("00dfff"), 0.18)
+	_accent = _material(Color("ffe600"), 0.22)
 	_ellipsoid(body, Vector3(0, 0.48, 0.03), Vector3(1.35, 0.62, 2.24), _paint)
 	_ellipsoid(body, Vector3(0, 0.58, -0.82), Vector3(1.1, 0.3, 0.92), _cream)
 	_box(body, Vector3(0, 0.35, -1.06), Vector3(1.35, 0.14, 0.16), _accent)
@@ -129,8 +129,8 @@ func _build_otter() -> void:
 
 
 func _build_fox() -> void:
-	_paint = _material(Color("f57741"), 0.3)
-	_accent = _material(Color("69daf4"), 0.35)
+	_paint = _material(Color("ff3b24"), 0.3)
+	_accent = _material(Color("00dfff"), 0.35)
 	_box(body, Vector3(0, 0.44, 0.03), Vector3(1.25, 0.32, 1.88), _paint)
 	var nose: MeshInstance3D = _box(
 		body, Vector3(0, 0.49, -0.81), Vector3(0.94, 0.22, 0.94), _paint)
@@ -162,8 +162,8 @@ func _build_fox() -> void:
 
 
 func _build_owl() -> void:
-	_paint = _material(Color("8875dc"), 0.25)
-	_accent = _material(Color("ffe18d"), 0.5)
+	_paint = _material(Color("8238ff"), 0.25)
+	_accent = _material(Color("ffe600"), 0.5)
 	_ellipsoid(body, Vector3(0, 0.48, 0), Vector3(1.5, 0.59, 1.94), _paint)
 	_box(body, Vector3(0, 0.36, -1.0), Vector3(1.45, 0.15, 0.27), _metal)
 	for x: float in [-0.72, 0.72]:
@@ -282,16 +282,13 @@ func _particles(label: String, color: Color, count: int,
 	particles.lifetime = lifetime
 	particles.emitting = false
 	particles.local_coords = false
-	var mesh: SphereMesh = SphereMesh.new()
-	mesh.radius = size
-	mesh.height = size * 2.0
-	mesh.radial_segments = 6
-	mesh.rings = 3
+	var mesh: ArrayMesh = _vertex_colored_sphere_mesh(color, 6, 3)
 	var material: StandardMaterial3D = _material(color)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mesh.material = material
+	mesh.surface_set_material(0, material)
 	particles.mesh = mesh
+	particles.scale = Vector3.ONE * size * 2.0
 	var curve: Curve = Curve.new()
 	curve.add_point(Vector2(0, 1))
 	curve.add_point(Vector2(1, 0))
@@ -356,9 +353,14 @@ func _add_track(animation: Animation, path: String, values: Array) -> void:
 
 func _material(color: Color, metallic: float = 0.0) -> StandardMaterial3D:
 	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = color
+	# 色はSurfaceToolで生成するMesh.ARRAY_COLORに置き、白いalbedoへ乗算する。
+	material.albedo_color = Color.WHITE
+	material.vertex_color_use_as_albedo = true
+	material.vertex_color_is_srgb = true
 	material.metallic = metallic
 	material.roughness = 0.38 if metallic > 0.0 else 0.72
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.set_meta("vertex_color", color)
 	return material
 
 
@@ -372,11 +374,7 @@ func _lamp() -> StandardMaterial3D:
 
 func _ellipsoid(parent: Node3D, pos: Vector3, size: Vector3,
 		material: StandardMaterial3D) -> MeshInstance3D:
-	var mesh: SphereMesh = SphereMesh.new()
-	mesh.radius = 0.5
-	mesh.height = 1.0
-	mesh.radial_segments = 20
-	mesh.rings = 10
+	var mesh: ArrayMesh = _vertex_colored_sphere_mesh(_material_color(material), 8, 4)
 	var instance: MeshInstance3D = _mesh(parent, pos, mesh, material)
 	instance.scale = size
 	return instance
@@ -384,28 +382,21 @@ func _ellipsoid(parent: Node3D, pos: Vector3, size: Vector3,
 
 func _box(parent: Node3D, pos: Vector3, size: Vector3,
 		material: StandardMaterial3D) -> MeshInstance3D:
-	var mesh: BoxMesh = BoxMesh.new()
-	mesh.size = size
+	var mesh: ArrayMesh = _vertex_colored_box_mesh(size, _material_color(material))
 	return _mesh(parent, pos, mesh, material)
 
 
 func _cylinder(parent: Node3D, pos: Vector3, radius: float, height: float,
 		material: StandardMaterial3D) -> MeshInstance3D:
-	var mesh: CylinderMesh = CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 16
+	var mesh: ArrayMesh = _vertex_colored_cylinder_mesh(
+		radius, radius, height, _material_color(material), 8)
 	return _mesh(parent, pos, mesh, material)
 
 
 func _cone(parent: Node3D, pos: Vector3, radius: float, height: float,
 		material: StandardMaterial3D) -> MeshInstance3D:
-	var mesh: CylinderMesh = CylinderMesh.new()
-	mesh.top_radius = 0.0
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 4
+	var mesh: ArrayMesh = _vertex_colored_cylinder_mesh(
+		radius, 0.0, height, _material_color(material), 5)
 	return _mesh(parent, pos, mesh, material)
 
 
@@ -415,5 +406,122 @@ func _mesh(parent: Node3D, pos: Vector3, mesh: Mesh,
 	instance.mesh = mesh
 	instance.material_override = material
 	instance.position = pos
+	instance.set_meta("uses_vertex_colors", true)
 	parent.add_child(instance)
 	return instance
+
+
+func _material_color(material: StandardMaterial3D) -> Color:
+	var value: Variant = material.get_meta("vertex_color", Color.WHITE)
+	return value if value is Color else Color.WHITE
+
+
+## SurfaceTool.set_color()で実際のCOLOR属性を持つ、8面×4段の低ポリ球を作る。
+func _vertex_colored_sphere_mesh(color: Color, segments: int, rings: int) -> ArrayMesh:
+	var tool: SurfaceTool = SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for ring: int in range(rings):
+		var latitude_a: float = -PI * 0.5 + PI * float(ring) / rings
+		var latitude_b: float = -PI * 0.5 + PI * float(ring + 1) / rings
+		for segment: int in range(segments):
+			var angle_a: float = TAU * float(segment) / segments
+			var angle_b: float = TAU * float(segment + 1) / segments
+			var lower_a: Vector3 = _sphere_point(latitude_a, angle_a)
+			var lower_b: Vector3 = _sphere_point(latitude_a, angle_b)
+			var upper_a: Vector3 = _sphere_point(latitude_b, angle_a)
+			var upper_b: Vector3 = _sphere_point(latitude_b, angle_b)
+			var facet_color: Color = color.lightened(0.08) if segment % 2 == 0 else color.darkened(0.1)
+			if ring == 0:
+				_add_triangle(tool, lower_a, upper_b, upper_a, facet_color)
+			elif ring == rings - 1:
+				_add_triangle(tool, lower_a, lower_b, upper_a, facet_color.lightened(0.08))
+			else:
+				_add_quad(tool, lower_a, lower_b, upper_b, upper_a, facet_color)
+	var mesh: ArrayMesh = tool.commit()
+	mesh.resource_name = "VertexColorLowPolySphere"
+	return mesh
+
+
+func _sphere_point(latitude: float, angle: float) -> Vector3:
+	var radius_at_height: float = cos(latitude) * 0.5
+	return Vector3(cos(angle) * radius_at_height, sin(latitude) * 0.5,
+		sin(angle) * radius_at_height)
+
+
+func _vertex_colored_box_mesh(size: Vector3, color: Color) -> ArrayMesh:
+	var half: Vector3 = size * 0.5
+	var tool: SurfaceTool = SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_add_quad(tool,
+		Vector3(-half.x, -half.y, -half.z), Vector3(half.x, -half.y, -half.z),
+		Vector3(half.x, half.y, -half.z), Vector3(-half.x, half.y, -half.z),
+		color.lightened(0.08))
+	_add_quad(tool,
+		Vector3(half.x, -half.y, half.z), Vector3(-half.x, -half.y, half.z),
+		Vector3(-half.x, half.y, half.z), Vector3(half.x, half.y, half.z),
+		color.darkened(0.08))
+	_add_quad(tool,
+		Vector3(-half.x, -half.y, half.z), Vector3(-half.x, -half.y, -half.z),
+		Vector3(-half.x, half.y, -half.z), Vector3(-half.x, half.y, half.z),
+		color.darkened(0.18))
+	_add_quad(tool,
+		Vector3(half.x, -half.y, -half.z), Vector3(half.x, -half.y, half.z),
+		Vector3(half.x, half.y, half.z), Vector3(half.x, half.y, -half.z),
+		color.darkened(0.11))
+	_add_quad(tool,
+		Vector3(-half.x, half.y, -half.z), Vector3(half.x, half.y, -half.z),
+		Vector3(half.x, half.y, half.z), Vector3(-half.x, half.y, half.z),
+		color.lightened(0.18))
+	_add_quad(tool,
+		Vector3(-half.x, -half.y, half.z), Vector3(half.x, -half.y, half.z),
+		Vector3(half.x, -half.y, -half.z), Vector3(-half.x, -half.y, -half.z),
+		color.darkened(0.24))
+	var mesh: ArrayMesh = tool.commit()
+	mesh.resource_name = "VertexColorBox"
+	return mesh
+
+
+func _vertex_colored_cylinder_mesh(bottom_radius: float, top_radius: float,
+		height: float, color: Color, segments: int) -> ArrayMesh:
+	var tool: SurfaceTool = SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var half_height: float = height * 0.5
+	for index: int in range(segments):
+		var angle_a: float = float(index) / segments * TAU
+		var angle_b: float = float(index + 1) / segments * TAU
+		var bottom_a := Vector3(cos(angle_a) * bottom_radius, -half_height,
+			sin(angle_a) * bottom_radius)
+		var bottom_b := Vector3(cos(angle_b) * bottom_radius, -half_height,
+			sin(angle_b) * bottom_radius)
+		var top_a := Vector3(cos(angle_a) * top_radius, half_height,
+			sin(angle_a) * top_radius)
+		var top_b := Vector3(cos(angle_b) * top_radius, half_height,
+			sin(angle_b) * top_radius)
+		var facet_color: Color = color.lightened(0.06) if index % 2 == 0 else color.darkened(0.13)
+		if is_zero_approx(top_radius):
+			_add_triangle(tool, bottom_a, bottom_b, Vector3(0, half_height, 0), facet_color)
+		else:
+			_add_quad(tool, bottom_a, bottom_b, top_b, top_a, facet_color)
+		_add_triangle(tool, Vector3(0, -half_height, 0), bottom_b, bottom_a,
+			color.darkened(0.22))
+		if not is_zero_approx(top_radius):
+			_add_triangle(tool, Vector3(0, half_height, 0), top_a, top_b,
+				color.lightened(0.16))
+	var mesh: ArrayMesh = tool.commit()
+	mesh.resource_name = "VertexColorLowPolyCylinder"
+	return mesh
+
+
+func _add_quad(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
+		d: Vector3, color: Color) -> void:
+	_add_triangle(tool, a, b, c, color)
+	_add_triangle(tool, a, c, d, color)
+
+
+func _add_triangle(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
+		color: Color) -> void:
+	var normal: Vector3 = (b - a).cross(c - a).normalized()
+	for vertex: Vector3 in [a, b, c]:
+		tool.set_color(color)
+		tool.set_normal(normal)
+		tool.add_vertex(vertex)

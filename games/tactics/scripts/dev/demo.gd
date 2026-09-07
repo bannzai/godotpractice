@@ -1,8 +1,8 @@
 extends SceneTree
-## 28 秒の録画へ実入力を流す。戦闘状態は本番の入力処理だけが変更する。
+## 32 秒の録画へ実入力を流す。戦闘状態は本番の入力処理だけが変更する。
 ## 入力・時間経過・録画を伴うため一起動で一巡だけ実行する。
 
-const FRAME_LIMIT: int = 840
+const FRAME_LIMIT: int = 960
 
 var main: Node
 var campaign: Node
@@ -10,6 +10,7 @@ var frames: int = 0
 var step: int = 0
 var next_frame: int = 40
 var releases: Array[InputEvent] = []
+var story_seen: bool = false
 var moved: bool = false
 var forecasted: bool = false
 var attacked: bool = false
@@ -60,48 +61,54 @@ func _advance() -> void:
 			_click(Vector2(300, 433))
 			_wait(1, 42)
 		1:
+			if campaign.screen == "story":
+				story_seen = true
+				_click(Vector2(1025, 605))
+				_wait(2, 42)
+		2:
 			if campaign.screen == "play":
 				_click_cell(Vector2i(2, 5))
-				_wait(2, 35)
-		2:
+				_wait(3, 35)
+		3:
 			if main.selected == "hero":
 				_click_cell(Vector2i(4, 5))
-				_wait(3, 38)
-		3:
+				_wait(4, 38)
+		4:
 			var hero: Dictionary = campaign.unit_by_id("hero")
 			if Vector2i(hero.x, hero.y) == Vector2i(4, 5):
 				moved = true
 				_click_cell(Vector2i(5, 5))
-				_wait(4, 55)
-		4:
+				_wait(5, 55)
+		5:
 			if main.target == "e1" and not campaign.preview("hero", "e1").is_empty():
 				forecasted = true
 				_key(KEY_ENTER)
-				_wait(5, 30)
-		5:
+				_wait(6, 30)
+		6:
 			if campaign.unit_by_id("hero").acted:
 				attacked = true
 				_key(KEY_E)
-				_wait(6, 30)
-		6:
+				_wait(7, 30)
+		7:
 			if campaign.phase == "player" and campaign.turn >= 2:
 				_select_wounded()
-		7:
+		8:
 			if main.selected == healing_id:
 				# 薬ボタンもマウスの押下と解放で操作する。
-				_click(Vector2(1120, 465))
-				_wait(8, 30)
-		8:
-			var unit: Dictionary = campaign.unit_by_id(healing_id)
-			healed = unit.hp > previous_hp and unit.items == previous_items - 1
-			_key(KEY_E)
-			_wait(9, 30)
+				_click(Vector2(1060, 485))
+				_wait(9, 30)
 		9:
+			var unit: Dictionary = campaign.unit_by_id(healing_id)
+			if not unit.is_empty():
+				healed = unit.hp > previous_hp and unit.items == previous_items - 1
+				_key(KEY_E)
+				_wait(10, 30)
+		10:
 			# 次の自軍フェーズでは選択範囲を表示し、最後まで盤面を見せる。
 			if campaign.phase == "player" and campaign.screen == "play":
 				var hero: Dictionary = campaign.unit_by_id("hero")
 				_click_cell(Vector2i(hero.x, hero.y))
-				_wait(10, FRAME_LIMIT)
+				_wait(11, FRAME_LIMIT)
 
 
 func _select_wounded() -> void:
@@ -111,11 +118,11 @@ func _select_wounded() -> void:
 			previous_hp = unit.hp
 			previous_items = unit.items
 			_click_cell(Vector2i(unit.x, unit.y))
-			_wait(7, 35)
+			_wait(8, 35)
 			return
 	# 回復が不要な戦闘結果なら、状態を捏造せず次の敵フェーズへ進める。
 	_key(KEY_E)
-	_wait(9, 30)
+	_wait(7, 30)
 
 
 func _wait(value: int, delay_frames: int) -> void:
@@ -160,9 +167,9 @@ func _click(point: Vector2) -> void:
 
 
 func _finish() -> void:
-	print("demo 検証: 移動=%s 予測=%s 攻撃=%s 敵軍=%s 回復=%s" % [
-		moved, forecasted, attacked, enemy_phase_seen, healed])
-	if moved and forecasted and attacked and enemy_phase_seen:
+	print("demo 検証: 物語=%s 移動=%s 予測=%s 攻撃=%s 敵軍=%s 回復=%s" % [
+		story_seen, moved, forecasted, attacked, enemy_phase_seen, healed])
+	if story_seen and moved and forecasted and attacked and enemy_phase_seen and healed:
 		print("demo OK")
 		quit(0)
 	else:

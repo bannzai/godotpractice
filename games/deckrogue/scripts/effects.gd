@@ -48,7 +48,7 @@ func _sparks(root: Control, kind: String, tint: Color) -> void:
 	sparks.amount = 34 if kind == "death" else 22
 	sparks.lifetime = 0.85 if kind == "death" else 0.62
 	sparks.lifetime_randomness = 0.18
-	sparks.texture = load("res://assets/art/fx_spark.svg")
+	sparks.texture = load("res://assets/art/fx_spark.png")
 	sparks.color = tint
 	sparks.direction = Vector2.UP
 	sparks.spread = 180.0
@@ -86,7 +86,7 @@ func _sparks(root: Control, kind: String, tint: Color) -> void:
 
 func _flash(root: Control, tint: Color) -> void:
 	var flash := Sprite2D.new()
-	flash.texture = load("res://assets/art/fx_glow.svg")
+	flash.texture = load("res://assets/art/fx_glow.png")
 	flash.modulate = tint
 	flash.scale = Vector2.ONE * 0.7
 	var blend := CanvasItemMaterial.new()

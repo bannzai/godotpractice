@@ -55,7 +55,7 @@ func _prepare() -> void:
 
 ## 押下・解放は記録中の一度の操作なので非冪等。
 func _inputs(frame: int) -> void:
-	for at: int in [45, 560, 650]:
+	for at: int in [45, 51, 560, 650]:
 		_tap(frame, at, KEY_ENTER)
 	for at: int in [75, 120, 165, 230]:
 		_tap(frame, at, KEY_SPACE)

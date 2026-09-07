@@ -58,31 +58,36 @@ func _act() -> void:
 			_step = 2
 			_next_action_frame = frames + 24
 		2:
-			await _click(main.first_focus, "最初の戦闘ノードを選択")
+			await _click(_button("案内を読み飛ばす"), "初回チュートリアルをスキップ")
+			_check(main.tutorial_step == -1, "実クリックでチュートリアルを閉じる")
 			_step = 3
-			_next_action_frame = frames + 24
+			_next_action_frame = frames + 18
 		3:
+			await _click(main.first_focus, "最初の戦闘ノードを選択")
+			_step = 4
+			_next_action_frame = frames + 24
+		4:
 			await _play_card()
 			if _cards_played >= 2:
-				_step = 4
+				_step = 5
 			_next_action_frame = frames + 8
-		4:
+		5:
 			if run.phase == "result":
 				_reached_result = true
 				_check(not run.won, "体力を変更せず、敵の行動で敗北する")
 				print("録画到達: 敗北結果 / フレーム %d / ターン終了 %d 回" % [frames, _turns_ended])
-				_step = 5
+				_step = 6
 				_next_action_frame = frames + 45
 			else:
 				_check(run.phase == "battle", "ターン終了時の場面は戦闘")
 				await _key(KEY_E)
 				_turns_ended += 1
 				_next_action_frame = frames + 55
-		5:
-			await _click(_button("タイトルへ"), "敗北結果からタイトルへ戻る")
-			_step = 6
-			_next_action_frame = frames + 15
 		6:
+			await _click(_button("表紙へ戻る"), "敗北結果から表紙へ戻る")
+			_step = 7
+			_next_action_frame = frames + 15
+		7:
 			_check(run.phase == "title", "結果からタイトルへ復帰")
 			_completed = true
 			print("録画到達: タイトルへの復帰 / フレーム %d" % frames)
@@ -92,7 +97,7 @@ func _act() -> void:
 func _play_card() -> void:
 	_check(run.phase == "battle", "カードを実クリックする前に戦闘へ到達")
 	if run.phase != "battle":
-		_step = 4
+		_step = 5
 		return
 	var chosen: int = -1
 	for index: int in range(run.hand.size()):
@@ -107,7 +112,7 @@ func _play_card() -> void:
 			break
 	if chosen < 0:
 		_check(false, "録画で使用できるカードがある")
-		_step = 4
+		_step = 5
 		return
 	var name: String = Catalog.CARDS[run.hand[chosen]].name
 	var energy_before: int = run.energy

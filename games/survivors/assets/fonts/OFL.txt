@@ -1,3 +1,4 @@
+Copyright 2020 The RocknRoll Project Authors (https://github.com/fontworks-fonts/RocknRoll)
 Copyright 2021 The Zen Maru Gothic Project Authors (https://github.com/googlefonts/zen-marugothic)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

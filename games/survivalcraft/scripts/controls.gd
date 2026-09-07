@@ -14,6 +14,8 @@ static func configure() -> void:
 	_bind("mine", KEY_Q, JOY_BUTTON_RIGHT_SHOULDER, JOY_AXIS_TRIGGER_RIGHT, 1.0)
 	_bind("place", KEY_R, JOY_BUTTON_LEFT_SHOULDER, JOY_AXIS_TRIGGER_LEFT, 1.0)
 	_bind("craft_menu", KEY_E, JOY_BUTTON_X)
+	_bind("map_menu", KEY_M, JOY_BUTTON_BACK)
+	_bind("tutorial_skip", KEY_H, JOY_BUTTON_B)
 	_bind("eat", KEY_F, JOY_BUTTON_Y)
 	_bind("pause_game", KEY_ESCAPE, JOY_BUTTON_START)
 	_bind("next_slot", KEY_TAB, JOY_BUTTON_DPAD_RIGHT)

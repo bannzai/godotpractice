@@ -35,10 +35,24 @@ func _capture_scenes() -> void:
 	await _tap(KEY_ENTER)
 	await create_timer(0.4).timeout
 	await _capture("select")
+	await _tap(KEY_RIGHT)
+	await _capture("select-highlight")
+	await _tap(KEY_LEFT)
 	_main._settings()
 	await _capture("settings")
 	await _tap(KEY_ESCAPE)
-	await _tap(KEY_ENTER)
+	_main.start_song()
+	await _capture("tutorial-coral")
+	await _tap(KEY_F)
+	await _capture("tutorial-mint")
+	await _tap(KEY_J)
+	_key(KEY_F, true)
+	await create_timer(0.4).timeout
+	await _capture("tutorial-hold")
+	_key(KEY_F, false)
+	await process_frame
+	await _capture("tutorial-complete")
+	_main._finish_tutorial()
 	await create_timer(0.4).timeout
 	_main.manual_time = Rules.note_time(_state.notes[0], _state.chart) - 1.0
 	await _capture("play")
