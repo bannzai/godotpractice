@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><defs>
-<linearGradient id="night" x2="0" y2="1"><stop stop-color="#101c2c"/><stop offset=".7" stop-color="#173b42"/><stop offset="1" stop-color="#385557"/></linearGradient>
-<linearGradient id="cape" x2=".8" y2="1"><stop stop-color="#e39470"/><stop offset=".42" stop-color="#b65d50"/><stop offset="1" stop-color="#592e3d"/></linearGradient>
-<linearGradient id="stone" x2=".7" y2="1"><stop stop-color="#82928a"/><stop offset=".48" stop-color="#385b61"/><stop offset="1" stop-color="#152d3b"/></linearGradient>
-<linearGradient id="gold" x2=".8" y2="1"><stop stop-color="#f2e6ca"/><stop offset=".35" stop-color="#d9b66f"/><stop offset="1" stop-color="#886943"/></linearGradient>
-<linearGradient id="ghost" x2="0" y2="1"><stop stop-color="#f2e6ca"/><stop offset=".28" stop-color="#92bbad"/><stop offset="1" stop-color="#173b42" stop-opacity=".08"/></linearGradient>
-<radialGradient id="glow"><stop stop-color="#f2d59a" stop-opacity=".65"/><stop offset=".35" stop-color="#dcaa63" stop-opacity=".19"/><stop offset="1" stop-color="#d9b66f" stop-opacity="0"/></radialGradient>
-</defs><path d="M44 82Q13 76 22 51Q33 39 46 48Q64 34 76 48Q88 78 44 82Z" fill="url(#gold)" stroke="#f2e6ca" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /><path d="M46 68Q34 39 52 19M48 34Q22 32 21 12Q43 8 48 34M49 28Q52 7 77 10Q77 30 49 34" fill="#789182" stroke="#d9b66f" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" /><path d="M46 51L39 57L43 74M54 51L58 63L52 77M30 20L42 29M69 16L54 28" fill="none" stroke="#173b42" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" /></svg>
