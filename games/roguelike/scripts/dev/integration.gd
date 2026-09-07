@@ -58,6 +58,14 @@ func _keyboard_cycle() -> void:
 	direction = _open_direction(true)
 	await _key(Demo.STEP_KEYS[direction])
 	_check(run.player_pos == before + direction, "Q E Z C で斜め移動")
+	before = run.player_pos
+	direction = _open_direction(false)
+	var held_turns: int = run.turns
+	await _held_key(Demo.STEP_KEYS[direction], 0.3)
+	_check(
+		run.player_pos == before + direction and run.turns == held_turns + 1,
+		"キーを移動間隔より長く押しても一手だけ進む"
+	)
 	var turns: int = run.turns
 	await _key(KEY_I)
 	await _key(KEY_ENTER)
@@ -205,6 +213,19 @@ func _key(code: Key) -> void:
 	event.physical_keycode = code
 	event.keycode = code
 	await _press(event)
+
+
+func _held_key(code: Key, seconds: float) -> void:
+	var event: InputEventKey = InputEventKey.new()
+	event.physical_keycode = code
+	event.keycode = code
+	event.pressed = true
+	Input.parse_input_event(event)
+	await create_timer(seconds).timeout
+	var release: InputEventKey = event.duplicate()
+	release.pressed = false
+	Input.parse_input_event(release)
+	await create_timer(0.25).timeout
 
 
 func _pad(button: JoyButton) -> void:

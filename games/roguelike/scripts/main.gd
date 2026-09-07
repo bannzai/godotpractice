@@ -43,6 +43,7 @@ var pending_result: bool = false
 var tutorial_active: bool = false
 var tutorial_seen: bool = false
 var tutorial_page: int = 0
+var stick_axis: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -66,7 +67,7 @@ func _process(delta: float) -> void:
 		layer.position.x = base_x + sin(clock_time * 0.15) * (index + 1) * 4
 	if run.status != "playing" or not modal_kind.is_empty() or busy or cooldown > 0:
 		return
-	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	var direction := stick_axis
 	if direction.length() > 0.5:
 		_step(
 			Vector2i(
@@ -78,7 +79,10 @@ func _process(delta: float) -> void:
 
 # 一つの入力イベントは一つのプレイヤー操作として消費する。
 func _input(event: InputEvent) -> void:
-	if event is InputEventJoypadMotion or event.is_echo():
+	if event is InputEventJoypadMotion:
+		_update_stick_axis(event)
+		return
+	if event.is_echo():
 		return
 	if _handle_global_input(event):
 		return
@@ -103,6 +107,13 @@ func _input(event: InputEvent) -> void:
 				return
 		return
 	get_viewport().set_input_as_handled()
+
+
+func _update_stick_axis(event: InputEventJoypadMotion) -> void:
+	if event.axis == JOY_AXIS_LEFT_X:
+		stick_axis.x = event.axis_value
+	elif event.axis == JOY_AXIS_LEFT_Y:
+		stick_axis.y = event.axis_value
 
 
 func _handle_global_input(event: InputEvent) -> bool:
