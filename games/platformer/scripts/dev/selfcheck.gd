@@ -8,6 +8,7 @@ var failed: bool = false
 func _initialize() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_map_and_tutorial()
 	_check_run_reset_and_rewards()
 	_check_damage_and_game_over()
 	_check_timer_and_pause()
@@ -79,6 +80,37 @@ func _new_session() -> Node:
 	var session: Node = load("res://scripts/session.gd").new()
 	session.reset_run()
 	return session
+
+
+func _check_map_and_tutorial() -> void:
+	var session: Node = _new_session()
+	session.title()
+	_check(session.phase == "title", "画面遷移: タイトルを表示できる")
+	session.reset_run_to_map()
+	_check(session.phase == "map", "画面遷移: タイトルから地図へ進む")
+	_check(session.unlocked_stage == 0 and session.stage == 0, "地図: 最初は草原だけ解放")
+	_check(not session.select_stage(1), "地図: 未解放の洞窟を選べない")
+	_check(session.phase == "map" and session.stage == 0, "地図: 選択拒否で状態を変えない")
+	_check(session.select_stage(0), "地図: 解放済みの草原を選べる")
+	_check(session.phase == "playing" and session.stage == 0, "地図: 草原選択でプレイ開始")
+	session.start_tutorial()
+	_check(session.tutorial_step == 0 and not session.tutorial_seen, "案内: 移動から開始")
+	session.advance_tutorial()
+	_check(session.tutorial_step == 1 and not session.tutorial_seen, "案内: ジャンプへ進む")
+	session.advance_tutorial()
+	_check(session.tutorial_step == 2 and not session.tutorial_seen, "案内: ダッシュへ進む")
+	session.advance_tutorial()
+	_check(session.tutorial_step == 3 and session.tutorial_seen, "案内: 3段階で完了")
+	session.finish_stage()
+	_check(session.phase == "stage_clear", "地図: 草原のゴールで中間結果へ進む")
+	_check(session.advance_to_map(), "地図: 中間結果から地図へ戻れる")
+	_check(
+		session.phase == "map" and session.unlocked_stage == 1,
+		"地図: 草原クリア後に洞窟を解放"
+	)
+	_check(session.select_stage(1), "地図: 解放後の洞窟を選べる")
+	_check(session.phase == "playing" and session.stage == 1, "地図: 洞窟選択でプレイ開始")
+	session.free()
 
 
 func _check_run_reset_and_rewards() -> void:
@@ -243,4 +275,7 @@ func _check_animation_images(kind: String, animation: StringName, frames: Sprite
 		var pixels: Image = frame.atlas.get_image().get_region(Rect2i(frame.region))
 		_check(pixels.get_used_rect().has_area(), label + ": 透明な空画像ではない")
 		distinct[hash(pixels.get_data())] = true
-	_check(distinct.size() == 6, "%s %s: 6枚すべての描画が異なる" % [kind, animation])
+	_check(
+		distinct.size() == 6,
+		"%s %s: 6枚すべての描画が異なる" % [kind, animation]
+	)

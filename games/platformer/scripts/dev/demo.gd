@@ -32,13 +32,19 @@ func _physics_process(delta: float) -> bool:
 		phase_age = 0.0
 		print("demo: %.2f 秒 %s" % [elapsed, session.phase])
 	if session.phase == "title":
-		_key(KEY_ENTER, phase_age > 0.6 and phase_age < 0.7)
+		_key(KEY_ENTER, phase_age > 0.12 and phase_age < 0.22)
+	elif session.phase == "map":
+		_key(KEY_ENTER, phase_age > 0.12 and phase_age < 0.22)
 	elif session.phase == "playing":
-		_drive(delta)
+		if session.stage == 0 and not session.tutorial_seen:
+			_release_movement()
+			_key(KEY_ENTER, phase_age > 0.12 and phase_age < 0.22)
+		else:
+			_drive(delta)
 	else:
 		_release_movement()
 		if session.phase == "stage_clear":
-			_key(KEY_ENTER, phase_age > 0.55 and phase_age < 0.65)
+			_key(KEY_ENTER, phase_age > 0.12 and phase_age < 0.22)
 		elif session.phase == "complete":
 			finished = true
 		elif session.phase in ["dead", "game_over"]:
@@ -58,7 +64,7 @@ func _process(_delta: float) -> bool:
 				" y=", game.route.player.position.y, " seconds=", session.seconds)
 			push_error("demo: 30秒以内に2ステージを完走できない")
 		else:
-			print("demo OK: 2ステージを実キー入力だけで完走")
+			print("demo OK: 地図と案内を経由し2ステージを実キー入力だけで完走")
 	if frame == 898:
 		quit(0 if finished else 1)
 	return false

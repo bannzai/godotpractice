@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://dnmf5qddj8gr5"
-path="res://.godot/imported/NotoSansJP[wght].ttf-2c65527b8057f3ff5aa1441092ccf3eb.fontdata"
+uid="uid://b0ga42wm51318"
+path="res://.godot/imported/MochiyPopOne-Regular.ttf-243a6aef553e5fe0fc10c63a1ae0d362.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/NotoSansJP[wght].ttf"
-dest_files=["res://.godot/imported/NotoSansJP[wght].ttf-2c65527b8057f3ff5aa1441092ccf3eb.fontdata"]
+source_file="res://assets/fonts/MochiyPopOne-Regular.ttf"
+dest_files=["res://.godot/imported/MochiyPopOne-Regular.ttf-243a6aef553e5fe0fc10c63a1ae0d362.fontdata"]
 
 [params]
 

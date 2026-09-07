@@ -24,7 +24,7 @@ func _capture_scenes() -> bool:
 	var session: Node = root.get_node("Session")
 	root.add_child(main)
 	await create_timer(0.5).timeout
-	if not await _capture("tmp/screenshot-title.png"):
+	if not await _capture_intro(main):
 		return false
 	if not await _capture_play(main, session):
 		return false
@@ -43,9 +43,32 @@ func _capture_scenes() -> bool:
 	return true
 
 
-func _capture_play(main: DeliveryGame, session: Node) -> bool:
-	main.start_run()
+func _capture_intro(main: DeliveryGame) -> bool:
+	if not await _capture("tmp/screenshot-title.png"):
+		return false
+	if not await _capture_maps(main):
+		return false
+	return true
+
+
+func _capture_maps(main: DeliveryGame) -> bool:
+	main._start_new_run_map()
 	await create_timer(0.40).timeout
+	if not await _capture("tmp/screenshot-map-meadow.png"):
+		return false
+	main._update_map_preview(1)
+	await create_timer(0.15).timeout
+	if not await _capture("tmp/screenshot-map-locked.png"):
+		return false
+	main._update_map_preview(0)
+	return true
+
+
+func _capture_play(main: DeliveryGame, session: Node) -> bool:
+	main._select_map_stage(0)
+	await create_timer(0.40).timeout
+	if not await _capture_tutorial(main, session):
+		return false
 	main.route.player.position.x = 510
 	await create_timer(0.45).timeout
 	if not await _capture("tmp/screenshot-meadow.png"):
@@ -69,12 +92,41 @@ func _capture_play(main: DeliveryGame, session: Node) -> bool:
 	return true
 
 
+func _capture_tutorial(main: DeliveryGame, session: Node) -> bool:
+	if not await _capture("tmp/screenshot-tutorial-move.png"):
+		return false
+	session.advance_tutorial()
+	main._show_tutorial_step()
+	await create_timer(0.15).timeout
+	if not await _capture("tmp/screenshot-tutorial-jump.png"):
+		return false
+	session.advance_tutorial()
+	main._show_tutorial_step()
+	await create_timer(0.15).timeout
+	if not await _capture("tmp/screenshot-tutorial-dash.png"):
+		return false
+	session.advance_tutorial()
+	main._show_tutorial_step()
+	await create_timer(0.15).timeout
+	return true
+
+
 func _capture_results(main: DeliveryGame, session: Node) -> bool:
+	if not await _capture_stage_results(main, session):
+		return false
+	return await _capture_game_over(main, session)
+
+
+func _capture_stage_results(main: DeliveryGame, session: Node) -> bool:
 	session.finish_stage()
 	await create_timer(0.45).timeout
 	if not await _capture("tmp/screenshot-stage-clear.png"):
 		return false
 	main._continue()
+	await create_timer(0.40).timeout
+	if not await _capture("tmp/screenshot-map-cave.png"):
+		return false
+	main._select_map_stage(1)
 	await create_timer(0.40).timeout
 	main.route.player.position = Vector2(2460, 528)
 	await create_timer(0.45).timeout
@@ -84,10 +136,16 @@ func _capture_results(main: DeliveryGame, session: Node) -> bool:
 	await create_timer(0.45).timeout
 	if not await _capture("tmp/screenshot-complete.png"):
 		return false
+	return true
+
+
+func _capture_game_over(main: DeliveryGame, session: Node) -> bool:
 	main.start_run()
 	for attempt: int in 3:
 		session.damage(true, "穴に落ちた")
 		await create_timer(0.45).timeout
+		if attempt == 0 and not await _capture("tmp/screenshot-dead.png"):
+			return false
 		if session.phase == "dead":
 			main._continue()
 	if not await _capture("tmp/screenshot-game-over.png"):
@@ -100,8 +158,7 @@ func _capture_window_modes() -> bool:
 	event.physical_keycode = KEY_F11
 	event.pressed = true
 	Input.parse_input_event(event)
-	await create_timer(0.5).timeout
-	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+	if not await _wait_for_window_mode(DisplayServer.WINDOW_MODE_FULLSCREEN):
 		push_error("F11 で全画面に切り替わらない")
 		quit(1)
 		return false
@@ -109,30 +166,55 @@ func _capture_window_modes() -> bool:
 		return false
 	event.pressed = false
 	Input.parse_input_event(event)
-	await process_frame
+	await create_timer(0.25).timeout
 	event.pressed = true
 	Input.parse_input_event(event)
-	await create_timer(0.5).timeout
-	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:
+	if not await _wait_for_window_mode(DisplayServer.WINDOW_MODE_WINDOWED):
 		push_error("F11 でウィンドウに戻らない")
 		quit(1)
 		return false
 	event.pressed = false
 	Input.parse_input_event(event)
+	await create_timer(0.75).timeout
 	DisplayServer.window_set_size(Vector2i(960, 540))
-	await create_timer(0.3).timeout
+	await create_timer(0.75).timeout
 	return await _capture("tmp/screenshot-resized.png")
+
+
+func _wait_for_window_mode(expected_mode: int) -> bool:
+	# macOS の全画面遷移時間には幅があるため、固定待機ではなく最大2秒だけ状態を観測する。
+	for attempt: int in 20:
+		if DisplayServer.window_get_mode() == expected_mode:
+			return true
+		await create_timer(0.1).timeout
+	return false
 
 
 func _capture(path: String) -> bool:
 	await process_frame
 	await process_frame
-	var status: Error = root.get_viewport().get_texture().get_image().save_png(path)
+	var image: Image = root.get_viewport().get_texture().get_image()
+	if _image_is_black(image):
+		push_error("スクリーンショットが黒一色: %s" % path)
+		quit(1)
+		return false
+	var status: Error = image.save_png(path)
 	if status != OK:
 		push_error("スクリーンショット保存失敗: %s (%s)" % [path, error_string(status)])
 		quit(1)
 		return false
 	print("screenshot: " + path)
+	return true
+
+
+func _image_is_black(image: Image) -> bool:
+	var x_step: int = maxi(1, image.get_width() / 16)
+	var y_step: int = maxi(1, image.get_height() / 9)
+	for y: int in range(0, image.get_height(), y_step):
+		for x: int in range(0, image.get_width(), x_step):
+			var pixel: Color = image.get_pixel(x, y)
+			if maxf(pixel.r, maxf(pixel.g, pixel.b)) > 0.05:
+				return false
 	return true
 
 
@@ -153,18 +235,22 @@ func _capture_animation_sheet(main: DeliveryGame, kind: String) -> bool:
 	var labels: Dictionary[String, String] = {"idle": "待機", "run": "走る", "jump": "跳躍",
 		"fall": "落下", "stomp": "踏みつけ", "hurt": "被弾", "death": "退場",
 		"walk": "歩く", "attack": "攻撃"}
-	for column: int in 3:
-		main._label(gallery, ["開始  /  1枚目", "途中  /  3枚目", "終端  /  6枚目"][column],
-			Rect2(300 + column * 320, 65, 260, 28), 17)
+	for column: int in 6:
+		main._label(gallery, "%d枚目" % (column + 1),
+			Rect2(260 + column * 160, 65, 120, 28), 16,
+			DeliveryGame.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var spacing: float = 85.0 if kind == "player" else 115.0
+	var normalization: Vector2 = ActorFrames.normalized_scale(kind, frames)
+	var material: ShaderMaterial = ActorFrames.build_comic_material()
 	for row: int in states.size():
 		var y: float = 108 + row * spacing
 		main._label(gallery, labels[states[row]], Rect2(48, y + 18, 180, 35), 21)
-		for column: int in 3:
+		for column: int in 6:
 			var sprite: Sprite2D = Sprite2D.new()
-			sprite.texture = frames.get_frame_texture(states[row], [0, 2, 5][column])
-			sprite.position = Vector2(390 + column * 320, y + 34)
-			sprite.scale = Vector2.ONE * (1.0 if kind == "player" else 1.6)
+			sprite.texture = frames.get_frame_texture(states[row], column)
+			sprite.position = Vector2(320 + column * 160, y + 34)
+			sprite.scale = normalization * (0.72 if kind == "player" else 1.05)
+			sprite.material = material
 			gallery.add_child(sprite)
 	var captured: bool = await _capture("tmp/screenshot-animation-%s.png" % kind)
 	gallery.queue_free()

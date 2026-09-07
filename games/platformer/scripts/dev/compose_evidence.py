@@ -4,8 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 PROJECT = Path(__file__).resolve().parents[2]
 OUTPUT = PROJECT / "tmp"
-FONT = ImageFont.truetype(str(PROJECT / "assets/fonts/NotoSansJP[wght].ttf"), 20)
-FONT.set_variation_by_axes([600])
+FONT = ImageFont.truetype(str(PROJECT / "assets/fonts/MochiyPopOne-Regular.ttf"), 20)
 
 
 def compose(files, labels, destination, columns=3):
@@ -37,6 +36,54 @@ def main():
                "game-over": "ゲームオーバー", "fullscreen": "全画面", "resized": "960×540"}
     compose([f"screenshot-{name}.png" for name in screens], list(screens.values()),
             "evidence-screens.png")
+    compose([
+        "before/screenshot-title.png", "screenshot-title.png",
+        "before/screenshot-title.png", "screenshot-map-locked.png",
+        "before/screenshot-meadow.png", "screenshot-tutorial-move.png",
+    ], [
+        "変更前：タイトル", "変更後：コミック調タイトル",
+        "変更前：地図なし・タイトルから直接開始", "変更後：地図・ロック理由・行き先予告",
+        "変更前：共通HUDと画面下ガイド", "変更後：最小HUDと場面内チュートリアル",
+    ], "evidence-before-after.png", columns=2)
+    compose([
+        "screenshot-title.png", "comparison/actionadventure-title.png",
+        "comparison/fighter-title.png", "comparison/monsterquest-title.png",
+    ], [
+        "platformer：コミック郵便", "actionadventure：石造りの島",
+        "fighter：黄昏の闘技場", "monsterquest：森の調査手帳",
+    ], "evidence-identification-title.png", columns=2)
+    compose([
+        "screenshot-map-meadow.png", "comparison/actionadventure-select.png",
+        "comparison/fighter-select.png", "comparison/monsterquest-select.png",
+    ], [
+        "platformer：手描きの配達地図", "actionadventure：道具メニュー",
+        "fighter：闘士選択", "monsterquest：手持ち編成",
+    ], "evidence-identification-map.png", columns=2)
+    compose([
+        "screenshot-meadow.png", "comparison/actionadventure-play.png",
+        "comparison/fighter-play.png", "comparison/monsterquest-play.png",
+    ], [
+        "platformer：空の横スクロール", "actionadventure：見下ろし探索",
+        "fighter：対戦画面", "monsterquest：町の探索",
+    ], "evidence-identification-play.png", columns=2)
+    compose([
+        "screenshot-map-meadow.png", "screenshot-map-locked.png", "screenshot-map-cave.png",
+    ], [
+        "草原を選択", "洞窟のロック理由", "クリア後に洞窟を選択",
+    ], "evidence-map-states.png")
+    compose([
+        "screenshot-tutorial-move.png", "screenshot-tutorial-jump.png",
+        "screenshot-tutorial-dash.png",
+    ], [
+        "場面内の移動案内", "場面内のジャンプ案内", "場面内のダッシュ案内",
+    ], "evidence-tutorial.png")
+    compose([
+        "screenshot-effect-coin-1.png", "screenshot-effect-block-1.png",
+        "screenshot-effect-stomp-1.png", "screenshot-effect-clear-1.png",
+    ], [
+        "コイン：キラッ！", "ブロック：ガコン！",
+        "踏みつけ：ドン！", "配達完了：ゴール！",
+    ], "evidence-comic-effects.png", columns=2)
 
 
 if __name__ == "__main__":

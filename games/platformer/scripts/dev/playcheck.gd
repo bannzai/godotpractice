@@ -15,15 +15,17 @@ func _run() -> void:
 	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	await _frames(3)
-	_send_key(KEY_ENTER, true)
-	await _frames(2)
-	_send_key(KEY_ENTER, false)
-	await _frames(2)
-	_check(session.phase == "playing", "キーボード Enter でタイトルから開始")
-	if session.phase != "playing":
-		game.start_run()
+	await _tap_key(KEY_ENTER)
+	_check(session.phase == "map" and game.route == null, "キーボード Enter でタイトルから地図へ進む")
+	await _check_locked_cave()
+	await _tap_key(KEY_ENTER)
+	_check(session.phase == "playing" and session.stage == 0, "地図の草原を Enter で選んで開始")
 	await _frames(5)
+	_check(session.tutorial_step == 0 and is_instance_valid(game.tutorial_panel),
+		"初回の草原で移動チュートリアルを表示")
 	_check(game.route.player.is_on_floor(), "TileMap の地面に着地")
+	await _check_tutorial_progression()
+	await _frames(70)
 	var start_x: float = game.route.player.position.x
 	Input.action_press("move_right")
 	await _frames(25)
@@ -45,9 +47,11 @@ func _run() -> void:
 	await _check_enemy()
 	await _check_damage_and_restart()
 	await _check_pad_and_pause()
+	await _check_tutorial_skip()
 	await _check_effects_cleanup()
-	for stage_index: int in 2:
-		await _traverse(stage_index)
+	await _traverse(0)
+	await _check_meadow_unlock_and_cave_start()
+	await _traverse(1, false)
 	game._show_title()
 	_check(session.phase == "title" and game.route == null, "結果からタイトルへ戻る")
 	game.queue_free()
@@ -70,9 +74,64 @@ func _frames(count: int) -> void:
 		await physics_frame
 
 
+func _tap_key(key: Key) -> void:
+	_send_key(key, true)
+	await _frames(2)
+	_send_key(key, false)
+	await _frames(2)
+
+
 func _release() -> void:
 	for action: String in ["move_left", "move_right", "jump", "dash"]:
 		Input.action_release(action)
+
+
+func _check_locked_cave() -> void:
+	var cave_button: Button = _find_button("ひかりの洞窟")
+	_check(is_instance_valid(cave_button) and cave_button.disabled,
+		"草原の配達前は洞窟の旗がロックされる")
+	_check(_ui_has_text("風の草原へ配達すると\nこの旗がひらきます。"),
+		"ロック理由を地図に表示")
+	var stage_before: int = session.stage
+	_check(not session.select_stage(1) and session.phase == "map" and session.stage == stage_before,
+		"ロック中の洞窟は選択できない")
+
+
+func _check_tutorial_progression() -> void:
+	_send_key(KEY_RIGHT, true)
+	await _frames(2)
+	_send_key(KEY_RIGHT, false)
+	await _frames(2)
+	_check(session.tutorial_step == 1 and is_instance_valid(game.tutorial_panel),
+		"移動入力でジャンプ案内へ進む")
+	_send_key(KEY_SPACE, true)
+	await _frames(2)
+	_send_key(KEY_SPACE, false)
+	await _frames(2)
+	_check(session.tutorial_step == 2 and is_instance_valid(game.tutorial_panel),
+		"ジャンプ入力でダッシュ案内へ進む")
+	_send_key(KEY_SHIFT, true)
+	await _frames(2)
+	_send_key(KEY_SHIFT, false)
+	await _frames(2)
+	_check(session.tutorial_seen and session.tutorial_step == 3,
+		"ダッシュ入力でチュートリアルを完了")
+	_check(not is_instance_valid(game.tutorial_panel), "完了したチュートリアルを閉じる")
+
+
+func _find_button(text_fragment: String) -> Button:
+	for node: Node in game.ui.find_children("*", "Button", true, false):
+		var button: Button = node as Button
+		if text_fragment in button.text:
+			return button
+	return null
+
+
+func _ui_has_text(expected: String) -> bool:
+	for node: Node in game.ui.find_children("*", "Label", true, false):
+		if (node as Label).text == expected:
+			return true
+	return false
 
 
 func _check_arrow_keys() -> void:
@@ -177,7 +236,11 @@ func _check_damage_and_restart() -> void:
 	_check(session.phase == "game_over", "3回の落下でゲームオーバー")
 	game._continue()
 	await _frames(3)
-	_check(session.phase == "playing" and session.lives == 3, "結果から新しい配達を始める")
+	_check(session.phase == "map" and session.lives == 3 and game.route == null,
+		"ゲームオーバーの結果から新しい配達の地図へ戻る")
+	await _tap_key(KEY_ENTER)
+	_check(session.phase == "playing" and session.stage == 0,
+		"ゲームオーバー後の地図から草原を再開")
 
 
 func _send_key(key: Key, pressed: bool) -> void:
@@ -202,7 +265,13 @@ func _check_pad_and_pause() -> void:
 	await _frames(2)
 	_pad_button(false)
 	await _frames(2)
-	_check(session.phase == "playing", "パッド A ボタンでタイトルから開始")
+	_check(session.phase == "map", "パッド A ボタンでタイトルから地図へ進む")
+	_pad_button(true)
+	await _frames(2)
+	_pad_button(false)
+	await _frames(2)
+	_check(session.phase == "playing" and session.stage == 0,
+		"パッド A ボタンで地図の草原を開始")
 	if session.phase != "playing":
 		game.start_run()
 	await _frames(5)
@@ -231,6 +300,18 @@ func _check_pad_and_pause() -> void:
 	_check(session.phase == "playing", "パッド A ボタンで一時停止から再開")
 
 
+func _check_tutorial_skip() -> void:
+	session.tutorial_seen = false
+	game.start_run()
+	await _frames(4)
+	_check(session.tutorial_step == 0 and is_instance_valid(game.tutorial_panel),
+		"再表示したチュートリアルは移動案内から始まる")
+	await _tap_key(KEY_ENTER)
+	_check(session.tutorial_seen and session.tutorial_step == 3,
+		"Enter の実キー入力でチュートリアルをスキップ")
+	_check(not is_instance_valid(game.tutorial_panel), "スキップしたチュートリアルを閉じる")
+
+
 func _check_effects_cleanup() -> void:
 	game.start_run()
 	await _frames(4)
@@ -246,10 +327,11 @@ func _check_effects_cleanup() -> void:
 	_check(game.route.camera.offset.is_zero_approx(), "画面揺れが収束する")
 
 
-func _traverse(stage_index: int) -> void:
-	session.reset_run()
-	session.stage = stage_index
-	game._load_stage()
+func _traverse(stage_index: int, prepare_stage: bool = true) -> void:
+	if prepare_stage:
+		session.reset_run()
+		session.stage = stage_index
+		game._load_stage()
 	await _frames(4)
 	Input.action_press("move_right")
 	Input.action_press("dash")
@@ -284,3 +366,19 @@ func _traverse(stage_index: int) -> void:
 		"ステージ %d を入力だけで始点からゴールまで走破" % (stage_index + 1))
 	_check(game.route.camera.position.x <= game.route.camera.limit_right - 640,
 		"カメラは右端で停止")
+
+
+func _check_meadow_unlock_and_cave_start() -> void:
+	_check(session.phase == "stage_clear" and session.stage == 0, "草原の配達結果を表示")
+	game._continue()
+	await _frames(4)
+	_check(session.phase == "map" and session.unlocked_stage == 1 and game.route == null,
+		"草原クリア後に洞窟を解放して地図へ戻る")
+	var cave_button: Button = _find_button("ひかりの洞窟")
+	_check(is_instance_valid(cave_button) and not cave_button.disabled,
+		"地図の洞窟の旗を選択可能にする")
+	_check(not _ui_has_text("風の草原へ配達すると\nこの旗がひらきます。"),
+		"解放後は洞窟のロック理由を表示しない")
+	await _tap_key(KEY_ENTER)
+	_check(session.phase == "playing" and session.stage == 1 and game.route.stage == 1,
+		"解放した洞窟を Enter で選んで第2ステージを開始")

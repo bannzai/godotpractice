@@ -6,6 +6,7 @@ var kind: String = "walker"
 var mode: String = "walking"
 var direction: float = -1.0
 var sprite: AnimatedSprite2D
+var sprite_normalization: Vector2 = Vector2.ONE
 var age: float = 0.0
 var kick_grace: float = 0.0
 var hurt_time: float = 0.0
@@ -26,8 +27,10 @@ func _ready() -> void:
 	add_child(collision)
 	sprite = AnimatedSprite2D.new()
 	sprite.sprite_frames = ActorFrames.build(kind)
-	sprite.offset.y = -24
-	sprite.scale = Vector2(0.83, 0.83)
+	sprite_normalization = ActorFrames.normalized_scale(kind, sprite.sprite_frames)
+	sprite.offset.y = -24 / sprite_normalization.y
+	sprite.scale = Vector2(0.83, 0.83) * sprite_normalization
+	sprite.material = ActorFrames.build_comic_material()
 	add_child(sprite)
 	sprite.play("idle")
 
@@ -70,7 +73,10 @@ func _update_visual() -> void:
 		if absf(distance.x) < 115 and absf(distance.y) < 65:
 			state = "attack"
 	sprite.play(state)
-	sprite.scale = Vector2(0.83, 0.52 if mode in ["resting", "sliding"] else 0.83)
+	sprite.scale = (
+		Vector2(0.83, 0.52 if mode in ["resting", "sliding"] else 0.83)
+		* sprite_normalization
+	)
 	if mode == "sliding":
 		sprite.speed_scale = 1.8
 
