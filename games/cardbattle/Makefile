@@ -76,7 +76,7 @@ movie: import
 run: import
 	"$(GODOT)" --path .
 
-# 実入力を時刻ごとに投入した26秒のプレイ。起動だけの movie と別の検証成果物にする。
+# 実入力を時刻ごとに投入した36秒のプレイ。起動だけの movie と別の検証成果物にする。
 movie-play: import
 	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \

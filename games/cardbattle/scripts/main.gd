@@ -1,4 +1,4 @@
-extends Control
+extends "res://scripts/main_ui.gd"
 ## 入力と表示を担当。ルールと勝敗は Session.duel が所有する。
 ## 入力コールバックは押下ごとに選択・画面・音を進めるため非冪等。
 
@@ -9,17 +9,18 @@ const Backdrop = preload("res://scripts/starfield.gd")
 const Audio = preload("res://scripts/duel_audio.gd")
 const Actor = preload("res://scripts/card_actor.gd")
 const DUEL_THEME = preload("res://scenes/duel_theme.tres")
-const GOLD := Color("dfbc72")
-const TEAL := Color("58d6c0")
-const WHITE := Color("f3ead8")
-const MUTED := Color("9ab5c6")
+const GOLD := Color("d6b45f")
+const TEAL := Color("8fcaa5")
+const WHITE := Color("f2e7c5")
+const MUTED := Color("c0b38f")
+const INK := Color("173c2a")
+const BURGUNDY := Color("712f35")
 const PHASE_NAMES := {"draw": "ドロー", "main": "メイン", "battle": "バトル", "end": "エンド"}
 
 var state: RefCounted:
 	get:
 		return get_node("/root/Session").duel
 var screen: String = "title"
-var content: Control
 var effect: Control
 var audio: Node
 var backdrop: Control
@@ -36,10 +37,14 @@ var busy: bool = false
 var auto_phase: bool = false
 var auto_actions_paused: bool = false
 var show_help: bool = false
+var show_tutorial: bool = false
+var tutorial_seen: bool = false
+var tutorial_step: int = 0
+var selected_deck: int = 0
+var tournament_round: int = 0
 var cpu_time: float = 0.0
 var recent_messages: Array[String] = []
 var last_focus: String = ""
-var display_life: Array[float] = [8000.0, 8000.0]
 
 
 func _ready() -> void:
@@ -177,10 +182,17 @@ func _input(event: InputEvent) -> void:
 		_next_phase()
 		get_viewport().set_input_as_handled()
 	if event.is_action_pressed("duel_cancel"):
-		show_help = false
-		selected_zone = ""
-		selected_index = -1
-		_render()
+		if show_help:
+			show_help = false
+		elif show_tutorial:
+			_close_tutorial()
+		elif screen == "tournament":
+			screen = "title"
+			_render()
+		elif screen == "duel":
+			selected_zone = ""
+			selected_index = -1
+			_render()
 		get_viewport().set_input_as_handled()
 	if screen == "duel" and event.is_action_pressed("duel_previous_hand"):
 		_page(-1)
@@ -191,6 +203,7 @@ func _input(event: InputEvent) -> void:
 func start_duel(deck_index: int, seed_value: int = -1) -> void:
 	if seed_value < 0:
 		seed_value = int(Time.get_ticks_usec())
+	selected_deck = deck_index
 	get_node("/root/Session").start(deck_index, seed_value)
 	screen = "duel"
 	selected_zone = ""
@@ -199,6 +212,8 @@ func start_duel(deck_index: int, seed_value: int = -1) -> void:
 	hand_page = 0
 	busy = false
 	show_help = false
+	show_tutorial = not tutorial_seen
+	tutorial_step = 0
 	cpu_time = 0
 	recent_messages.clear()
 	display_life = [8000.0, 8000.0]
@@ -209,7 +224,7 @@ func start_duel(deck_index: int, seed_value: int = -1) -> void:
 
 
 func _render() -> void:
-	backdrop.duel = screen == "duel"
+	backdrop.duel = screen in ["duel", "tournament"]
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	if focus and content.is_ancestor_of(focus):
 		last_focus = str(focus.name)
@@ -219,12 +234,16 @@ func _render() -> void:
 	match screen:
 		"title":
 			_title()
+		"tournament":
+			_tournament()
 		"duel":
 			_duel()
 		"result":
 			_result()
 	if show_help:
 		_help()
+	elif show_tutorial and screen == "duel":
+		_tutorial()
 	if busy:
 		for child: Node in content.get_children():
 			if child is Button:
@@ -240,50 +259,111 @@ func _render() -> void:
 
 
 func _title() -> void:
-	_art("title_keyart", Rect2(692, 20, 578, 578))
-	_art("logo", Rect2(82, 60, 64, 64))
-	_label("星を結び、勝利を刻む。", Rect2(160, 78, 520, 35), 20, TEAL)
-	_label("星環の決闘", Rect2(75, 144, 730, 100), 76, WHITE)
-	_label("四つの属性と、四十枚の可能性。", Rect2(84, 252, 650, 45), 26, GOLD)
-	_label("相手のライフを削りきる、あなたの一手を。\n二つのデッキから選んで、星の守り手に挑もう。", Rect2(86, 317, 650, 90), 20, MUTED)
-	_label("日輪と月影、二つの宿命。", Rect2(832, 575, 398, 32), 20, GOLD)
+	_panel(Rect2(49, 43, 650, 630))
+	_label("花影杯　招待状", Rect2(82, 69, 540, 31), 19, TEAL)
+	_label("綺羅の決闘会", Rect2(78, 121, 590, 91), 65, WHITE)
+	_label("金の蔓が結ぶ、三つの対戦席。", Rect2(84, 222, 560, 39), 25, GOLD)
+	_label(
+		"四十枚の札を選び、温室のトーナメントへ。\nカードに刻まれた強さと効果を読み、相手のライフを0にしよう。",
+		Rect2(86, 286, 560, 78),
+		18,
+		MUTED
+	)
+	_framed_card_art("m11", Rect2(734, 52, 246, 344), "title_sun")
+	_framed_card_art("m23", Rect2(970, 83, 226, 316), "title_moon")
+	_label("参加する札束を選ぶ", Rect2(84, 401, 570, 34), 20, WHITE)
 	_button(
 		"deck0",
-		Catalog.deck_name(0) + "\n攻撃と強化で押し切る",
-		Rect2(85, 443, 335, 98),
-		func() -> void: start_duel(0)
+		Catalog.deck_name(0) + "\n攻撃と加護で押し切る　→ 大会表へ",
+		Rect2(83, 448, 278, 105),
+		_open_tournament.bind(0)
 	)
 	_button(
 		"deck1",
-		Catalog.deck_name(1) + "\n守備と罠で形勢を変える",
-		Rect2(440, 443, 335, 98),
-		func() -> void: start_duel(1)
+		Catalog.deck_name(1) + "\n守備と罠で形勢を変える　→ 大会表へ",
+		Rect2(378, 448, 278, 105),
+		_open_tournament.bind(1)
 	)
-	_button("help", "遊び方", Rect2(85, 563, 190, 49), _toggle_help)
+	_button("help", "綴じ本を開く", Rect2(83, 580, 184, 48), _toggle_help)
 	_button(
 		"audio",
-		"音: 切" if AudioServer.is_bus_mute(0) else "音: 入",
-		Rect2(296, 563, 190, 49),
+		"蓄音機: 切" if AudioServer.is_bus_mute(0) else "蓄音機: 入",
+		Rect2(285, 580, 184, 48),
 		_toggle_audio
 	)
+	_label("Zen Antique / 生成イラスト", Rect2(948, 650, 266, 25), 13, MUTED)
+
+
+func _open_tournament(deck_index: int) -> void:
+	selected_deck = deck_index
+	screen = "tournament"
+	show_help = false
+	_render()
+	_play_sound("transition")
+	_reveal_screen()
+
+
+func _tournament() -> void:
+	_panel(Rect2(55, 36, 1170, 648))
+	_label("花影杯　対戦表", Rect2(90, 63, 700, 55), 39, WHITE)
 	_label(
-		"矢印 / 十字キー: 選択    Enter / A: 決定    F11 / START: 全画面", Rect2(85, 653, 1100, 28), 15, MUTED
+		"金色に灯る対戦札を選ぶ。勝つと次の額縁が開く。",
+		Rect2(92, 119, 720, 30),
+		17,
+		TEAL
 	)
-	_label("オリジナルイラスト・音楽  /  日本語フォント: Noto Sans JP (OFL)", Rect2(85, 690, 1100, 22), 11, MUTED)
+	_label("使用札束　" + Catalog.deck_name(selected_deck), Rect2(864, 78, 315, 35), 18, GOLD)
+	_rule(Rect2(296, 292, 128, 4), GOLD)
+	_rule(Rect2(686, 292, 128, 4), GOLD)
+	_rule(Rect2(424, 292, 4, 71), GOLD)
+	_rule(Rect2(810, 222, 4, 73), GOLD)
+	var names: Array[String] = ["温室の管理人", "黄昏の調香師", "百花の館主"]
+	var notes: Array[String] = ["初戦　基本の召喚", "準決勝　守備と罠", "決勝　王の一手"]
+	var arts: Array[String] = ["m03", "m15", "m23"]
+	var xs: Array[float] = [104, 492, 878]
+	var ys: Array[float] = [185, 255, 115]
+	for round_index: int in range(3):
+		_framed_card_art(
+			arts[round_index], Rect2(xs[round_index], ys[round_index], 190, 266),
+			"tournament_art%d" % round_index
+		)
+		var label: String = names[round_index] + "\n" + notes[round_index]
+		var locked: bool = round_index != tournament_round
+		if round_index < tournament_round:
+			label += "\n勝利済み"
+		elif round_index > tournament_round:
+			label += "\n前の対戦で解放"
+		else:
+			label += "\n対戦する"
+		_button(
+			"round%d" % round_index,
+			label,
+			Rect2(xs[round_index] - 8, ys[round_index] + 283, 206, 86),
+			_start_tournament_duel.bind(round_index),
+			locked
+		)
+	_button("back", "招待状へ戻る", Rect2(88, 611, 205, 45), _back_title)
+	_button("help", "大会の遊び方", Rect2(975, 611, 205, 45), _toggle_help)
+
+
+func _start_tournament_duel(round_index: int) -> void:
+	if round_index != tournament_round:
+		return
+	start_duel(selected_deck)
 
 
 func _duel() -> void:
-	_panel(Rect2(24, 18, 872, 97))
+	_panel(Rect2(24, 18, 872, 91))
 	_life_bar(1, Rect2(43, 101, 257, 4), GOLD)
 	_life_bar(0, Rect2(599, 101, 257, 4), TEAL)
-	_label("星の守り手  /  CPU", Rect2(43, 29, 330, 25), 17, MUTED)
-	_label("あなた", Rect2(598, 29, 260, 25), 17, TEAL)
+	_label("対戦者  /  CPU", Rect2(43, 29, 330, 25), 16, MUTED)
+	_label("あなた  /  " + Catalog.deck_name(selected_deck), Rect2(598, 29, 280, 25), 15, TEAL)
 	_label("%04d" % roundi(display_life[1]), Rect2(42, 50, 270, 50), 35, WHITE, "life1")
 	_label("%04d" % roundi(display_life[0]), Rect2(596, 50, 270, 50), 35, WHITE, "life0")
 	_label("ライフ", Rect2(170, 76, 90, 22), 12, MUTED)
 	_label("ライフ", Rect2(725, 76, 90, 22), 12, MUTED)
 	_label(
-		"第 %d ターン\n%s" % [state.turn, "あなたの番" if state.turn_player == 0 else "CPU 思考中"],
+		"第 %d 席\n%s" % [state.turn, "あなたの手番" if state.turn_player == 0 else "相手が思案中"],
 		Rect2(333, 39, 245, 60),
 		19,
 		GOLD
@@ -325,6 +405,14 @@ func _zones(player: int, y: float) -> void:
 			card.exhausted = monster.attacked
 			card.bonus = monster.boost
 			card.selected = selected_zone == "monster%d" % player and selected_index == index
+			if player == 0:
+				var reason: String = _monster_unavailable(monster)
+				card.available = reason.is_empty()
+				card.unavailable_reason = reason
+			else:
+				card.available = _can_choose_target()
+				if card.available:
+					card.preview_text = _battle_preview(selected_index, index)
 			card.pressed.connect(_select.bind("monster%d" % player, index, monster.id))
 			card.focus_entered.connect(_inspect.bind(monster.id))
 			card.mouse_entered.connect(_inspect.bind(monster.id))
@@ -369,45 +457,132 @@ func _hand() -> void:
 		card.size = Vector2(113, 134)
 		card.card_id = hand[index]
 		card.selected = selected_zone == "hand" and selected_index == index
+		card.unavailable_reason = _hand_unavailable(hand[index])
+		card.available = card.unavailable_reason.is_empty()
 		card.pressed.connect(_select.bind("hand", index, hand[index]))
 		card.focus_entered.connect(_inspect.bind(hand[index]))
 		card.mouse_entered.connect(_inspect.bind(hand[index]))
 		content.add_child(card)
-	_button("prevhand", "‹ Q / LB", Rect2(605, 538, 126, 30), _page.bind(-1))
-	_button("nexthand", "E / RB ›", Rect2(746, 538, 136, 30), _page.bind(1))
+	_button("prevhand", "前の手札", Rect2(605, 538, 126, 30), _page.bind(-1))
+	_button("nexthand", "次の手札", Rect2(746, 538, 136, 30), _page.bind(1))
+
+
+func _hand_unavailable(id: String) -> String:
+	var reason := ""
+	if state.turn_player != 0:
+		reason = "相手の手番"
+	elif state.phase != "main":
+		reason = "メインで使用"
+	else:
+		var card: Dictionary = Catalog.card(id)
+		if card.type == "monster" and state.summoned:
+			reason = "召喚は使用済み"
+		elif card.type == "monster" and state.players[0].monsters.size() >= 5:
+			reason = "場が満員"
+		elif card.type == "trap" and state.players[0].spells.size() >= 5:
+			reason = "伏せ場が満員"
+		elif card.effect == "destroy" and state.players[1].monsters.is_empty():
+			reason = "破壊対象なし"
+		elif card.effect == "boost" and state.players[0].monsters.is_empty():
+			reason = "強化対象なし"
+		elif card.effect == "draw" and state.players[0].deck.size() < 2:
+			reason = "山札が不足"
+	return reason
+
+
+func _monster_unavailable(monster: Dictionary) -> String:
+	var reason := ""
+	if state.turn_player != 0:
+		reason = "相手の手番"
+	elif state.phase == "main":
+		if monster.changed:
+			reason = "表示変更済み"
+		elif monster.attacked:
+			reason = "攻撃後は変更不可"
+	elif state.phase != "battle":
+		reason = "メインかバトルで選ぶ"
+	elif state.turn == 1:
+		reason = "初手は攻撃不可"
+	elif monster.defense:
+		reason = "守備中"
+	elif monster.attacked:
+		reason = "攻撃済み"
+	return reason
+
+
+func _can_choose_target() -> bool:
+	return (
+		selected_zone == "monster0"
+		and selected_index >= 0
+		and state.phase == "battle"
+		and state.turn_player == 0
+	)
+
+
+func _battle_preview(attacker_index: int, target_index: int) -> String:
+	var preview := ""
+	if attacker_index < 0 or attacker_index >= state.players[0].monsters.size():
+		return preview
+	if target_index >= 0 and target_index < state.players[1].monsters.size():
+		var attacker: Dictionary = state.players[0].monsters[attacker_index]
+		var target: Dictionary = state.players[1].monsters[target_index]
+		var attack_power: int = state.power(attacker)
+		if target.defense:
+			var guard: int = Catalog.card(target.id).defense
+			if attack_power > guard:
+				preview = "破壊する"
+			elif attack_power < guard:
+				preview = "反撃 %d" % (guard - attack_power)
+			else:
+				preview = "互角"
+		else:
+			var target_power: int = state.power(target)
+			if attack_power > target_power:
+				preview = "破壊 +%d" % (attack_power - target_power)
+			elif attack_power < target_power:
+				preview = "自壊 -%d" % (target_power - attack_power)
+			else:
+				preview = "相打ち"
+	return preview
 
 
 func _sidebar() -> void:
-	_panel(Rect2(921, 18, 335, 690))
-	_art("logo", Rect2(942, 34, 37, 37))
-	_label("星環の決闘", Rect2(990, 34, 250, 41), 28, GOLD)
+	_paper_panel(Rect2(921, 18, 335, 690))
+	_label("卓上の記録", Rect2(944, 34, 250, 41), 27, INK)
 	_label(
 		"山札 %d   墓地 %d" % [state.players[0].deck.size(), state.players[0].grave.size()],
 		Rect2(945, 87, 285, 28),
 		16,
-		MUTED
+		Color("5c5138")
 	)
 	_button("grave", "墓地を見る", Rect2(1098, 85, 140, 31), _show_grave)
 	_detail()
 	_actions()
 	_button(
 		"phase",
-		"次のフェイズ  N / Y",
-		Rect2(940, 506, 298, 43),
+		_next_phase_label(),
+		Rect2(940, 505, 298, 48),
 		_next_phase,
 		state.turn_player != 0 or busy
 	)
 	_button(
-		"auto", "ドロー・エンド自動: " + ("入" if auto_phase else "切"), Rect2(940, 559, 298, 35), _toggle_auto
+		"auto", "封蝋の自動送り: " + ("入" if auto_phase else "切"), Rect2(940, 564, 298, 35), _toggle_auto
 	)
-	_button("help", "遊び方", Rect2(940, 604, 142, 35), _toggle_help)
+	_button("help", "綴じ本", Rect2(940, 610, 142, 35), _toggle_help)
 	_button(
 		"audio",
-		"音: " + ("切" if AudioServer.is_bus_mute(0) else "入"),
-		Rect2(1096, 604, 142, 35),
+		"蓄音機: " + ("切" if AudioServer.is_bus_mute(0) else "入"),
+		Rect2(1096, 610, 142, 35),
 		_toggle_audio
 	)
-	_label(state.message, Rect2(942, 652, 289, 46), 12, TEAL)
+	_label(state.message, Rect2(942, 657, 289, 42), 12, BURGUNDY)
+
+
+func _next_phase_label() -> String:
+	var next: Dictionary = {
+		"draw": "メイン", "main": "バトル", "battle": "エンド", "end": "相手の手番"
+	}
+	return "封蝋を押す　%sへ  [N / Y]" % next.get(state.phase, "次")
 
 
 func _detail() -> void:
@@ -417,17 +592,17 @@ func _detail() -> void:
 			content.remove_child(previous)
 			previous.queue_free()
 	if inspected_id.is_empty():
-		_label("カードを選択", Rect2(944, 133, 290, 36), 21, WHITE, "detail_name")
+		_label("札に触れて確かめる", Rect2(944, 133, 290, 36), 20, INK, "detail_name")
 		_label(
-			"手札や場のカードに触れると\nここに効果が表示されます。\n\n手札を決定して召喚・魔法・罠。\nバトルでは自分の攻撃役を選び、\n相手のカードを決定して攻撃。",
+			"金色の縁は、いま選べる札。\n使えない理由は札の上に現れます。\n\n攻撃役を選ぶと、相手の札に\n破壊・反撃・相打ちの予告が出ます。",
 			Rect2(944, 185, 289, 200),
 			17,
-			MUTED,
+			INK,
 			"detail_text"
 		)
 		return
 	var card: Dictionary = Catalog.card(inspected_id)
-	_label(card.name, Rect2(944, 130, 290, 36), 24, WHITE, "detail_name")
+	_label(card.name, Rect2(944, 130, 290, 36), 24, INK, "detail_name")
 	var actor := Actor.new()
 	actor.name = "detail_art"
 	actor.position = Vector2(948, 172)
@@ -436,36 +611,56 @@ func _detail() -> void:
 	var stats: String = "魔法" if card.type == "spell" else "罠・攻撃時に自動発動"
 	if card.type == "monster":
 		stats = "攻 %d   守 %d   /   ★%d・%s" % [card.attack, card.defense, card.level, card.attribute]
-	_label(stats, Rect2(944, 326, 291, 25), 15, GOLD, "detail_stats")
-	_label(card.text, Rect2(944, 366, 289, 77), 16, WHITE, "detail_text")
+	_label(stats, Rect2(944, 326, 291, 25), 15, BURGUNDY, "detail_stats")
+	_label(card.text, Rect2(944, 366, 289, 77), 16, INK, "detail_text")
 
 
 func _actions() -> void:
 	if selected_index < 0 or state.turn_player != 0 or busy:
 		return
 	if selected_zone == "hand" and selected_index < state.players[0].hand.size():
-		if state.phase != "main":
-			_label("メインフェイズで使用できます", Rect2(944, 450, 290, 43), 16, TEAL)
+		var selected_id: String = state.players[0].hand[selected_index]
+		var reason: String = _hand_unavailable(selected_id)
+		if not reason.is_empty():
+			_label("この札はまだ使えない：" + reason, Rect2(944, 450, 290, 43), 15, BURGUNDY)
 			return
-		var card: Dictionary = Catalog.card(state.players[0].hand[selected_index])
+		var card: Dictionary = Catalog.card(selected_id)
 		if card.type == "monster":
-			if state.summoned or state.players[0].monsters.size() >= 5:
-				_label("召喚済み、または場が満員です", Rect2(944, 450, 290, 43), 16, TEAL)
-				return
-			_button("summon", "攻撃召喚", Rect2(940, 451, 143, 43), _summon.bind(false))
-			_button("defend", "守備召喚", Rect2(1095, 451, 143, 43), _summon.bind(true))
+			_label(
+				"場へ出すと 攻%d / 守%d。今の手番から攻撃可。" % [card.attack, card.defense],
+				Rect2(944, 442, 290, 34),
+				13,
+				INK
+			)
+			_button("summon", "攻撃向きで召喚", Rect2(940, 477, 143, 27), _summon.bind(false))
+			_button("defend", "守備向きで召喚", Rect2(1095, 477, 143, 27), _summon.bind(true))
 		elif card.type == "spell":
-			_button("cast", "魔法を発動", Rect2(940, 451, 298, 43), _cast)
+			_label("発動後：" + card.text, Rect2(944, 442, 290, 34), 13, INK)
+			_button("cast", "この魔法を発動", Rect2(940, 477, 298, 27), _cast)
 		else:
-			_button("set", "罠を伏せる", Rect2(940, 451, 298, 43), _set_trap)
+			_label("伏せると相手の攻撃時に自動発動。", Rect2(944, 442, 290, 34), 13, INK)
+			_button("set", "この罠を伏せる", Rect2(940, 477, 298, 27), _set_trap)
 	elif selected_zone == "monster0":
 		if state.phase == "main":
-			_button("position", "攻撃 / 守備を切替", Rect2(940, 451, 298, 43), _change_position)
+			_label("表示を変えると今の手番では再変更できない。", Rect2(944, 442, 290, 34), 13, INK)
+			_button("position", "攻撃 / 守備を切替", Rect2(940, 477, 298, 27), _change_position)
 		elif state.phase == "battle":
 			if state.players[1].monsters.is_empty():
-				_button("attack", "直接攻撃", Rect2(940, 451, 298, 43), _attack.bind(-1))
+				var attacker: Dictionary = state.players[0].monsters[selected_index]
+				_label(
+					"結果予告：相手へ %d の直接ダメージ" % state.power(attacker),
+					Rect2(944, 442, 290, 34),
+					13,
+					BURGUNDY
+				)
+				_button("attack", "予告どおり直接攻撃", Rect2(940, 477, 298, 27), _attack.bind(-1))
 			else:
-				_label("相手のモンスターを選んで攻撃", Rect2(944, 450, 290, 43), 16, TEAL)
+				_label(
+					"金色に光る相手札を選ぶ。結果は札上に予告。",
+					Rect2(944, 450, 290, 43),
+					14,
+					BURGUNDY
+				)
 
 
 func _select(zone: String, index: int, id: String) -> void:
@@ -595,32 +790,47 @@ func _perform(success: bool) -> void:
 
 
 func _result() -> void:
-	_art("cards/m11" if state.winner == 0 else "cards/m23", Rect2(-55, 155, 435, 435))
-	_art("logo", Rect2(1035, 225, 200, 200))
-	_panel(Rect2(268, 105, 744, 505))
-	_label("決闘終了", Rect2(320, 140, 640, 38), 23, TEAL)
-	_label("あなたの勝利" if state.winner == 0 else "あなたの敗北", Rect2(319, 208, 646, 90), 55, GOLD)
-	_label(state.message, Rect2(329, 321, 620, 60), 21, WHITE)
+	_framed_card_art("m11" if state.winner == 0 else "m23", Rect2(65, 118, 285, 399))
+	_panel(Rect2(319, 94, 886, 536))
+	_label("花影杯　対戦結果", Rect2(375, 135, 710, 38), 23, TEAL)
+	_label("勝利の花が開いた" if state.winner == 0 else "花影はまだ閉じている", Rect2(373, 207, 755, 90), 48, GOLD)
+	_label(state.message, Rect2(383, 321, 700, 60), 21, WHITE)
 	_label(
 		(
 			"第 %d ターン  /  残りライフ %d  /  相手 %d"
 			% [state.turn, state.players[0].life, state.players[1].life]
 		),
-		Rect2(331, 401, 620, 35),
+		Rect2(385, 401, 680, 35),
 		19,
 		MUTED
 	)
-	_button("retry", "同じデッキで再戦", Rect2(326, 492, 305, 63), _retry)
-	_button("title", "タイトルへ", Rect2(650, 492, 305, 63), _back_title)
+	var continue_label: String = "同じ対戦札へ戻る"
+	if state.winner == 0:
+		continue_label = "優勝　大会表を最初から" if tournament_round == 2 else "次の対戦札を開く"
+	_button("continue", continue_label, Rect2(379, 489, 325, 62), _advance_tournament)
+	_button("retry", "この相手と再戦", Rect2(726, 489, 220, 62), _retry)
+	_button("title", "招待状へ", Rect2(967, 489, 190, 62), _back_title)
 
 
 func _retry() -> void:
-	start_duel(get_node("/root/Session").selected_deck)
+	start_duel(selected_deck)
+
+
+func _advance_tournament() -> void:
+	if state.winner == 0:
+		tournament_round = 0 if tournament_round >= 2 else tournament_round + 1
+	screen = "tournament"
+	show_help = false
+	show_tutorial = false
+	_render()
+	audio.set_scene("title")
+	_reveal_screen()
 
 
 func _back_title() -> void:
 	screen = "title"
 	show_help = false
+	show_tutorial = false
 	_render()
 	audio.set_scene("title")
 	_reveal_screen()
@@ -642,7 +852,53 @@ func _toggle_audio() -> void:
 
 
 func _toggle_help() -> void:
+	show_tutorial = false
 	show_help = not show_help
+	_render()
+
+
+func _tutorial() -> void:
+	var texts: Array[String] = [
+		"最初はドロー。右下の金の封蝋を押すと、札を使えるメインへ進みます。",
+		"金色に光る手札はいま使える札。暗い帯には使えない理由が直接出ます。",
+		"バトルでは自分の攻撃札、次に相手札を選択。相手札の帯で結果を予告します。",
+	]
+	var highlight: Panel
+	if tutorial_step == 0:
+		highlight = _highlight(Rect2(934, 499, 310, 61))
+	elif tutorial_step == 1:
+		highlight = _highlight(Rect2(29, 566, 862, 146))
+	else:
+		highlight = _highlight(Rect2(31, 158, 850, 337))
+	highlight.z_index = 4
+	var guide: Panel = _paper_panel(Rect2(932, 126, 313, 342))
+	guide.z_index = 5
+	_label(
+		"卓上指南　%d / 3" % (tutorial_step + 1), Rect2(953, 149, 270, 37), 23, INK
+	).z_index = 6
+	_label(texts[tutorial_step], Rect2(953, 207, 270, 118), 17, INK).z_index = 6
+	_label("光る場所を盤面で試せます。", Rect2(953, 333, 270, 31), 13, BURGUNDY).z_index = 6
+	_button("tutorial_skip", "指南を閉じる", Rect2(951, 397, 126, 42), _close_tutorial).z_index = 6
+	var next_button: Button = _button(
+		"tutorial_next",
+		"指南を終える" if tutorial_step == 2 else "次の説明",
+		Rect2(1088, 397, 137, 42),
+		_tutorial_next
+	)
+	next_button.z_index = 6
+
+
+func _tutorial_next() -> void:
+	if tutorial_step >= 2:
+		_close_tutorial()
+		return
+	tutorial_step += 1
+	_render()
+
+
+func _close_tutorial() -> void:
+	tutorial_seen = true
+	show_tutorial = false
 	_render()
 
 
@@ -650,25 +906,22 @@ func _help() -> void:
 	for child: Node in content.get_children():
 		if child is Button:
 			child.disabled = true
-	_panel(Rect2(171, 55, 938, 610))
-	_label("遊び方", Rect2(210, 77, 835, 52), 34, GOLD)
+	_paper_panel(Rect2(171, 55, 938, 610))
+	_label("花影杯の綴じ本", Rect2(210, 77, 835, 52), 34, INK)
 	_label(
 		(
-			"勝利条件  相手のライフ8000を0にする、または相手がドローできなくなる。\n\n"
-			+ "ドロー → メイン → バトル → エンド。N / Yで進行。自動はドローとエンドのみ。\n"
-			+ "メイン: 手札を選んで通常召喚を1回。場は5体、罠は5枚まで。生け贄は不要。\n"
-			+ "攻撃表示で召喚すればそのターンから攻撃可。ただし最初のターンは攻撃不可。\n"
-			+ "魔法は即発動。破壊は最も強い相手、強化は最も強い味方が自動で対象になる。\n"
-			+ "罠は伏せると相手の攻撃時に自動発動。攻守の切替はメイン中に1体1回。\n\n"
-			+ "バトル: 攻撃役を決定 → 相手を決定。相手がいなければ「直接攻撃」。\n"
-			+ "攻撃同士: 低い側を破壊し差分ダメージ。同値は両方破壊。\n"
-			+ "守備への攻撃: 上回れば破壊、下回れば攻撃側に差分ダメージ。同値は変化なし。\n\n"
-			+ "矢印 / 十字キー: 移動　Enter / A: 決定　Esc / B: 解除・閉じる\n"
-			+ "Q・E / LB・RB: 手札ページ　F11 / START: 全画面　マウスにも対応"
+			"勝利　相手のライフ8000を0にする、または相手がドローできなくなる。\n\n"
+			+ "一　封蝋を押して ドロー → メイン → バトル → エンド と進む。\n"
+			+ "二　メインでは金色に光る手札を選ぶ。通常召喚は1回、場と伏せ札は各5枚まで。\n"
+			+ "三　魔法は即発動。罠は伏せると相手の攻撃時に自動発動する。\n"
+			+ "四　バトルでは自分の攻撃札を選び、次に結果予告の出た相手札を選ぶ。\n\n"
+			+ "攻撃同士　低い側を破壊し、差分をライフから引く。同値は相打ち。\n"
+			+ "守備へ攻撃　守備を上回れば破壊、下回れば攻撃側が差分を受ける。\n\n"
+			+ "選べない理由と次に起きることは、札と封蝋の上へ直接表示される。"
 		),
 		Rect2(213, 147, 860, 433),
 		17,
-		WHITE
+		INK
 	)
 	_button("closehelp", "閉じる", Rect2(754, 591, 307, 47), _toggle_help).grab_focus()
 
@@ -693,127 +946,30 @@ func _play_sound(kind: String) -> void:
 		audio.play_effect(kind)
 
 
-func _panel(rect: Rect2) -> void:
-	var panel := Panel.new()
-	panel.position = rect.position
-	panel.size = rect.size
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_theme_stylebox_override(
-		"panel", _style(Color(0.04, 0.09, 0.14, 0.95), Color("355263"))
-	)
-	content.add_child(panel)
-
-
-func _label(value: String, rect: Rect2, pixels: int, color: Color, node_name: String = "") -> Label:
-	var label := Label.new()
-	if not node_name.is_empty():
-		label.name = node_name
-	label.text = value
-	label.position = rect.position
-	label.add_theme_font_size_override("font_size", pixels)
-	label.add_theme_color_override("font_color", color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.size = rect.size
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(label)
-	label.size = rect.size
-	label.set_deferred("size", rect.size)
-	return label
-
-
-func _art(art_name: String, rect: Rect2, node_name: String = "") -> void:
-	var art := TextureRect.new()
-	if not node_name.is_empty():
-		art.name = node_name
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.texture = load("res://assets/art/%s.svg" % art_name)
-	art.position = rect.position
-	art.size = rect.size
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(art)
-
-
-func _button(
-	node_name: String, value: String, rect: Rect2, action: Callable, unavailable: bool = false
-) -> Button:
-	var button := Button.new()
-	button.name = node_name
-	button.text = value
-	button.position = rect.position
-	button.size = rect.size
-	button.disabled = unavailable
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.pivot_offset = rect.size * 0.5
-	button.mouse_entered.connect(_button_motion.bind(button, Vector2.ONE * 1.025))
-	button.mouse_exited.connect(_button_motion.bind(button, Vector2.ONE))
-	button.button_down.connect(_button_motion.bind(button, Vector2.ONE * 0.975))
-	button.button_up.connect(_button_motion.bind(button, Vector2.ONE))
-	button.pressed.connect(action)
-	content.add_child(button)
-	return button
-
-
-func _style(background: Color, border: Color) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = background
-	box.border_color = border
-	box.set_corner_radius_all(8)
-	box.set_border_width_all(1)
-	box.content_margin_left = 8
-	box.content_margin_right = 8
-	return box
-
-
-func _life_bar(player: int, rect: Rect2, color: Color) -> void:
-	var bar := ProgressBar.new()
-	bar.name = "life_bar%d" % player
-	bar.position = rect.position
-	bar.size = rect.size
-	bar.max_value = 8000.0
-	bar.value = display_life[player]
-	bar.show_percentage = false
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_theme_stylebox_override("background", _style(Color("1b2b39"), Color.TRANSPARENT))
-	bar.add_theme_stylebox_override("fill", _style(color, Color.TRANSPARENT))
-	content.add_child(bar)
-	bar.size = rect.size
-	bar.set_deferred("size", rect.size)
-
-
 func _phase_track() -> void:
+	_rule(Rect2(58, 322, 521, 3), Color("8e713a"))
 	for index: int in PHASE_NAMES.size():
 		var phase: String = PHASE_NAMES.keys()[index]
 		var active: bool = state.phase == phase
-		var rect := Rect2(38 + index * 143, 308, 134, 30)
+		var rect := Rect2(38 + index * 143, 304, 134, 38)
 		var panel := Panel.new()
 		panel.position = rect.position
 		panel.size = rect.size
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_theme_stylebox_override(
-			"panel",
-			_style(
-				Color("244747") if active else Color("0d1c2a"), GOLD if active else Color("293d48")
-			)
+		var seal := _style(
+			BURGUNDY if active else Color("183c2a"), Color("f1d181") if active else Color("8e713a")
 		)
+		seal.set_corner_radius_all(19)
+		seal.set_border_width_all(2)
+		panel.add_theme_stylebox_override("panel", seal)
 		content.add_child(panel)
 		_label(
-			PHASE_NAMES[phase],
-			Rect2(rect.position + Vector2(25, 3), Vector2(105, 26)),
-			15,
-			GOLD if active else MUTED
+			"%d　%s" % [index + 1, PHASE_NAMES[phase]],
+			Rect2(rect.position + Vector2(8, 7), Vector2(118, 27)),
+			14,
+			WHITE if active else MUTED
 		)
-	_label("あなたの番" if state.turn_player == 0 else "相手の番", Rect2(670, 308, 211, 29), 18, TEAL)
-
-
-# 押下ごとの視覚フィードバックであり、現在の Tween を置き換えて重複を防ぐ。
-func _button_motion(button: Button, target: Vector2) -> void:
-	if button.has_meta("motion"):
-		var previous: Tween = button.get_meta("motion")
-		previous.kill()
-	var motion: Tween = button.create_tween()
-	motion.tween_property(button, "scale", target, 0.12).set_trans(Tween.TRANS_QUAD)
-	button.set_meta("motion", motion)
+	_label("あなたの手番" if state.turn_player == 0 else "相手が思案中", Rect2(670, 308, 211, 29), 18, TEAL)
 
 
 # ルールが確定したイベントを表示中のカードに適用するため非冪等。

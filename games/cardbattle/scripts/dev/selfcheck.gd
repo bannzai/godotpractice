@@ -409,10 +409,10 @@ func _check_cpu_matches() -> void:
 func _check_card_art() -> void:
 	var hashes: Array[String] = []
 	for card: Dictionary in Catalog.cards():
-		var path: String = "res://assets/art/cards/%s.svg" % card.id
+		var path: String = "res://assets/art/generated/%s.png" % card.id
 		_check(ResourceLoader.exists(path), "個別画像が存在する: " + card.id)
 		var hash: String = FileAccess.get_sha256(path)
-		_check(not hash.is_empty() and not hashes.has(hash), "カード固有の画像: " + card.id)
+		_check(not hash.is_empty() and not hashes.has(hash), "生成カード画像が固有: " + card.id)
 		hashes.append(hash)
 		var actor := Actor.new()
 		actor.setup(card.id, Vector2(320, 240))
@@ -420,3 +420,15 @@ func _check_card_art() -> void:
 		for action: String in Actor.ACTIONS:
 			_check(actor.animation_length(action) > 0.0, "アニメーションを読み込める: " + card.id + action)
 		actor.free()
+	_check(ResourceLoader.exists("res://assets/art/generated/card_frame.png"), "共通装飾枠が存在する")
+	_check(ResourceLoader.exists("res://assets/art/generated/table.png"), "木の机の背景が存在する")
+	var frame: Image = load("res://assets/art/generated/card_frame.png").get_image()
+	_check(frame.get_size() == Vector2i(530, 742), "共通装飾枠が表示用の寸法である")
+	for point: Vector2i in [Vector2i.ZERO, Vector2i(529, 0), Vector2i(0, 741),
+			Vector2i(529, 741), Vector2i(265, 371)]:
+		_check(frame.get_pixelv(point).a < 0.02, "共通装飾枠の窓と四隅が透明: %s" % point)
+	var table: Texture2D = load("res://assets/art/generated/table.png")
+	_check(table.get_size() == Vector2(1280, 720), "木の机が画面寸法である")
+	_check(ResourceLoader.exists("res://assets/fonts/ZenAntique-Regular.ttf"), "Zen Antiqueが存在する")
+	_check(not ResourceLoader.exists("res://assets/fonts/NotoSansJP.ttf"), "禁止フォントを含まない")
+	_check(ResourceLoader.exists("res://assets/audio/ambience.wav"), "机上の環境音が存在する")
