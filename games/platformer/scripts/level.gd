@@ -7,6 +7,27 @@ signal feedback_requested(kind: String, at: Vector2)
 const TILE: int = 48
 const WIDTHS: Array[int] = [100, 112]
 const NAMES: Array[String] = ["風の草原", "ひかりの洞窟"]
+const MEADOW_GAPS: Array[int] = [21, 22, 42, 43, 65, 66, 87, 88]
+const CAVE_GAPS: Array[int] = [20, 21, 39, 40, 61, 62, 81, 82, 99, 100]
+const MEADOW_GROUND_PROFILE: Array[Vector3i] = [
+	Vector3i(44, 49, 12), Vector3i(46, 48, 11),
+	Vector3i(67, 71, 12), Vector3i(69, 71, 11),
+	Vector3i(89, 95, 12), Vector3i(92, 95, 11),
+]
+const CAVE_GROUND_PROFILE: Array[Vector3i] = [
+	Vector3i(22, 27, 14), Vector3i(31, 36, 12), Vector3i(41, 46, 14),
+	Vector3i(52, 57, 12), Vector3i(63, 69, 11), Vector3i(74, 81, 12),
+	Vector3i(83, 88, 14), Vector3i(92, 99, 12),
+]
+const MEADOW_PLATFORMS: Array[Vector3i] = [
+	Vector3i(28, 4, 11), Vector3i(49, 4, 11), Vector3i(73, 4, 11),
+]
+const CAVE_PLATFORMS: Array[Vector3i] = [
+	Vector3i(25, 5, 10), Vector3i(53, 3, 9), Vector3i(74, 5, 10),
+	Vector3i(94, 4, 9),
+]
+const COMIC_THEME: Theme = preload("res://resources/delivery_theme.tres")
+const COMIC_OUTLINE: Shader = preload("res://resources/comic_outline.gdshader")
 var stage: int = 0
 var player: Courier
 var camera: Camera2D
@@ -22,10 +43,14 @@ var hit_stop: float = 0.0
 var shake_strength: float = 0.0
 var shake_time: float = 0.0
 var goal: Sprite2D
+var object_outline: ShaderMaterial
 
 
 func _ready() -> void:
 	session = get_node("/root/Session")
+	object_outline = ShaderMaterial.new()
+	object_outline.shader = COMIC_OUTLINE
+	object_outline.set_shader_parameter("outline_width_px", 2.0)
 	effects = RouteEffects.new()
 	add_child(effects)
 	_build_terrain()
@@ -69,50 +94,130 @@ func _build_terrain() -> void:
 	for x: int in WIDTHS[stage]:
 		if is_gap(x):
 			continue
-		for y: int in range(13, 16):
-			terrain.set_cell(Vector2i(x, y), 0 if y == 13 else 1, Vector2i.ZERO)
-	for start: int in [28, 49, 73]:
-		for x: int in range(start, start + 4):
-			terrain.set_cell(Vector2i(x, 11), 0, Vector2i.ZERO)
-		terrain.set_cell(Vector2i(start - 1, 12), 0, Vector2i.ZERO)
-	if stage == 1:
-		for x: int in range(86, 90):
-			terrain.set_cell(Vector2i(x, 10), 0, Vector2i.ZERO)
+		var top_row: int = _ground_top_row(x)
+		for y: int in range(top_row, 16):
+			terrain.set_cell(Vector2i(x, y), 0 if y == top_row else 1, Vector2i.ZERO)
+	var platforms: Array[Vector3i] = MEADOW_PLATFORMS if stage == 0 else CAVE_PLATFORMS
+	for platform: Vector3i in platforms:
+		for x: int in range(platform.x, platform.x + platform.y):
+			terrain.set_cell(Vector2i(x, platform.z), 0, Vector2i.ZERO)
+		# 草原の浮き足場には一段低い助走台を残し、既存の自動走破の跳躍周期を保つ。
+		if stage == 0:
+			terrain.set_cell(Vector2i(platform.x - 1, 12), 0, Vector2i.ZERO)
+	_build_landmarks()
 
 
 func is_gap(column: int) -> bool:
-	var gaps: Array[int] = [21, 22, 42, 43, 65, 66, 87, 88]
-	if stage == 1:
-		gaps = [20, 21, 39, 40, 61, 62, 81, 82, 99, 100]
+	var gaps: Array[int] = MEADOW_GAPS if stage == 0 else CAVE_GAPS
 	return column in gaps
+
+
+func _ground_top_row(column: int) -> int:
+	var result: int = 13
+	var profile: Array[Vector3i] = (
+		MEADOW_GROUND_PROFILE if stage == 0 else CAVE_GROUND_PROFILE
+	)
+	for band: Vector3i in profile:
+		if column >= band.x and column < band.y:
+			result = mini(result, band.z) if stage == 0 else band.z
+	return result
+
+
+func _surface_y(column: int) -> float:
+	for row: int in range(6, 16):
+		if terrain.get_cell_source_id(Vector2i(column, row)) != -1:
+			return float(row * TILE)
+	return 624.0
+
+
+func _build_landmarks() -> void:
+	var columns: Array[int] = [6, 36, 60, 84]
+	var captions: Array[String] = ["風車の丘 →", "大跳躍！", "雲海便  中継所", "郵便塔は目前！"]
+	if stage == 1:
+		columns = [5, 27, 55, 68, 90, 105]
+		captions = ["結晶坑道 →", "足元注意！", "灯をたどれ", "吊橋の上層", "深部  第三便", "出口は目前！"]
+	for index: int in columns.size():
+		_add_landmark(columns[index], captions[index], index)
+
+
+func _add_landmark(column: int, caption: String, index: int) -> void:
+	var marker: Node2D = Node2D.new()
+	marker.position = Vector2(column * TILE + 24, _surface_y(column))
+	marker.rotation = deg_to_rad(-2.0 if index % 2 == 0 else 2.0)
+	marker.z_index = -1
+	marker.set_meta("kind", "landmark")
+	add_child(marker)
+	var accent: Color = Color("ffcf57") if stage == 0 else Color("67edf0")
+	var post: Line2D = Line2D.new()
+	post.width = 9.0 if stage == 0 else 5.0
+	post.default_color = Color("6f4329") if stage == 0 else Color("45738c")
+	post.add_point(Vector2(0, -5))
+	post.add_point(Vector2(0, -72 if stage == 0 else -82))
+	marker.add_child(post)
+	var board: Polygon2D = Polygon2D.new()
+	board.polygon = _landmark_polygon()
+	board.color = Color("fff4c7") if stage == 0 else Color("142f52")
+	marker.add_child(board)
+	var border: Line2D = Line2D.new()
+	border.width = 6.0
+	border.default_color = Color("153e4a") if stage == 0 else accent
+	border.closed = true
+	for point: Vector2 in board.polygon:
+		border.add_point(point)
+	marker.add_child(border)
+	var label: Label = Label.new()
+	label.theme = COMIC_THEME
+	label.text = caption
+	label.position = Vector2(-69, -112 if stage == 0 else -127)
+	label.size = Vector2(138, 48 if stage == 0 else 62)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_color_override("font_color", Color("153e4a") if stage == 0 else Color("efffff"))
+	label.add_theme_color_override(
+		"font_outline_color", Color("fff4c7") if stage == 0 else Color("07162e")
+	)
+	label.add_theme_constant_override("outline_size", 3)
+	marker.add_child(label)
+
+
+func _landmark_polygon() -> PackedVector2Array:
+	if stage == 0:
+		return PackedVector2Array([
+			Vector2(-78, -116), Vector2(57, -116), Vector2(82, -92),
+			Vector2(57, -65), Vector2(-78, -65),
+		])
+	return PackedVector2Array([
+		Vector2(0, -145), Vector2(72, -121), Vector2(63, -69),
+		Vector2(0, -53), Vector2(-63, -69), Vector2(-72, -121),
+	])
 
 
 func _build_objects() -> void:
 	for column: int in [8, 9, 10, 17, 18, 29, 30, 31, 37, 38, 50, 51, 57, 58, 74, 75, 91]:
-		var y: float = 485 if column in [29, 30, 31, 50, 51, 74, 75] else 568
+		var y: float = _surface_y(column) - 56.0
 		spawn_item(Vector2(column * TILE + 24, y), "coin")
 	for column: int in [12, 34, 55, 78]:
 		var block: SupplyBlock = SupplyBlock.new()
-		block.position = Vector2(column * TILE + 24, 504)
+		block.position = Vector2(column * TILE + 24, _surface_y(column) - 120.0)
 		block.contents = "power" if column in [12, 55] else "coin"
 		block.opened.connect(_block_opened)
 		add_child(block)
+		block.sprite.material = object_outline
 		blocks.append(block)
 	for index: int in 7:
 		var enemy: TrailEnemy = TrailEnemy.new()
 		enemy.kind = "walker" if index % 2 == 0 else "shell"
 		var column: int = 16 + index * 11
-		var floor_y: int = 13
-		for row: int in range(10, 13):
-			if terrain.get_cell_source_id(Vector2i(column, row)) != -1:
-				floor_y = mini(floor_y, row)
-		enemy.position = Vector2(column * TILE + 24, floor_y * TILE)
+		enemy.position = Vector2(column * TILE + 24, _surface_y(column))
 		add_child(enemy)
 		enemies.append(enemy)
 	goal_x = (WIDTHS[stage] - 5) * TILE
 	goal = Sprite2D.new()
 	goal.texture = load("res://assets/images/goal.svg")
-	goal.position = Vector2(goal_x, 564)
+	goal.position = Vector2(goal_x, _surface_y(int(goal_x / TILE)) - 60.0)
+	goal.material = object_outline
 	add_child(goal)
 
 
@@ -120,6 +225,7 @@ func spawn_item(at: Vector2, kind: String) -> void:
 	var item: Sprite2D = Sprite2D.new()
 	item.texture = load("res://assets/images/%s.svg" % kind)
 	item.position = at
+	item.material = object_outline
 	item.set_meta("kind", kind)
 	item.set_meta("origin_y", at.y)
 	add_child(item)
@@ -131,6 +237,7 @@ func spawn_item(at: Vector2, kind: String) -> void:
 
 
 func _block_opened(at: Vector2, contents: String) -> void:
+	effects.burst("block", at)
 	if contents == "coin":
 		session.collect_coin()
 		sound_requested.emit("coin")

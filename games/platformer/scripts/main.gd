@@ -11,6 +11,7 @@ var panel: Control
 var hud: DeliveryHUD
 var status_label: Label
 var bgm: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var last_phase: String = ""
 var sky_time: float = 0.0
 var font: Font
@@ -18,6 +19,9 @@ var backdrop: RouteBackdrop
 var flash: ColorRect
 var shutdown_started: bool = false
 var frame_count: int = 0
+var tutorial_panel: Control
+var map_preview_title: Label
+var map_preview_detail: Label
 
 
 func _ready() -> void:
@@ -42,6 +46,10 @@ func _ready() -> void:
 	bgm.volume_db = -12
 	bgm.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	add_child(bgm)
+	ambience = AudioStreamPlayer.new()
+	ambience.volume_db = -24
+	ambience.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+	add_child(ambience)
 	var effects_layer: CanvasLayer = CanvasLayer.new()
 	effects_layer.layer = 10
 	add_child(effects_layer)
@@ -80,6 +88,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			session.phase = "paused"
 		elif session.phase == "paused":
 			_resume()
+	elif session.phase == "playing" and _tutorial_is_active():
+		_handle_tutorial_input(event)
 	elif event.is_action_pressed("confirm") and session.phase == "playing":
 		get_viewport().set_input_as_handled()
 
@@ -93,6 +103,9 @@ func _clear_ui() -> void:
 	hud = null
 	panel = null
 	status_label = null
+	tutorial_panel = null
+	map_preview_title = null
+	map_preview_detail = null
 
 
 func _remove_route() -> void:
@@ -104,32 +117,105 @@ func _remove_route() -> void:
 
 func _show_title() -> void:
 	_remove_route()
+	_set_ambience("")
 	session.title()
 	last_phase = "title"
 	_clear_ui()
 	_music("title")
-	var paper: Panel = _card(ui, Rect2(42, 64, 624, 526), Color("fff8e8"))
-	_label(paper, "風の郵便局  ・  小さな配達の物語", Rect2(34, 26, 550, 30), 18)
-	_picture(paper, "title_logo", Rect2(365, 65, 220, 66))
-	_label(paper, "そらいろ便", Rect2(29, 99, 560, 120), 80)
-	_label(paper, "風をたどって、ひかりを届けよう。", Rect2(35, 232, 560, 38), 24)
-	_label(paper, "草原を越え、青い洞窟の向こうへ。\n今日もポストが、あなたを待っています。",
-		Rect2(35, 296, 555, 82), 21)
-	var start: Button = _button(paper, "配達に出発する   →", Rect2(35, 407, 550, 68), start_run)
+	_generated_picture(ui, "title_background", Rect2(0, 0, 1280, 720))
+	var shade: ColorRect = ColorRect.new()
+	shade.color = Color(0.01, 0.08, 0.14, 0.32)
+	shade.size = Vector2(1280, 720)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(shade)
+	var paper: Panel = _comic_card(ui, Rect2(54, 76, 526, 550), Color("fff0bd"))
+	var burst: Label = _label(paper, "新しい配達だ！", Rect2(28, 27, 468, 45), 25,
+		Color("e7412b"), HORIZONTAL_ALIGNMENT_CENTER)
+	burst.add_theme_color_override("font_outline_color", Color("182a39"))
+	burst.add_theme_constant_override("outline_size", 7)
+	_label(paper, "そらいろ便", Rect2(24, 82, 478, 112), 74, Color("102f47"),
+		HORIZONTAL_ALIGNMENT_CENTER)
+	_label(paper, "風を追い越し、\nひかりの手紙を届けよう！", Rect2(38, 210, 450, 104), 30,
+		INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var speech: Panel = _speech_bubble(paper, Rect2(38, 328, 450, 88))
+	_label(speech, "まずは地図で行き先を選ぼう。", Rect2(20, 18, 410, 52), 21,
+		INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var start: Button = _button(paper, "ルート地図をひらく  →", Rect2(38, 446, 450, 68),
+		_start_new_run_map)
 	start.grab_focus()
-	var art: TextureRect = _picture(ui, "title_keyart", Rect2(680, 53, 575, 537))
-	var drift: Tween = art.create_tween().set_loops()
-	drift.tween_property(art, "position:y", 42.0, 2.4).set_trans(Tween.TRANS_SINE)
-	drift.tween_property(art, "position:y", 53.0, 2.4).set_trans(Tween.TRANS_SINE)
-	_card(ui, Rect2(42, 618, 1196, 76), Color("fff8e8"))
-	_label(ui, "← → / A D  移動     Space / Z  ジャンプ     Shift / X  ダッシュ",
-		Rect2(64, 629, 1160, 28), 18)
-	_label(ui, "パッド  左スティック・A・X    Esc / Start  休憩    F11  全画面    長押しで高く跳ぼう",
-		Rect2(64, 659, 1160, 26), 16)
 	_fade_in()
 
 
+func _start_new_run_map() -> void:
+	session.reset_run_to_map()
+	_show_world_map()
+
+
+func _show_world_map() -> void:
+	_remove_route()
+	_set_ambience("")
+	session.show_map()
+	last_phase = "map"
+	_clear_ui()
+	_music("title")
+	_generated_picture(ui, "world_map", Rect2(0, 0, 1280, 720))
+	var heading: Label = _label(ui, "配達ルートを選べ！", Rect2(34, 22, 520, 65), 38,
+		Color("fff2bd"))
+	heading.add_theme_color_override("font_outline_color", Color("12344a"))
+	heading.add_theme_constant_override("outline_size", 10)
+	var meadow: Button = _map_button(
+		ui,
+		"旗 1\n風の草原\nENTER / A で出発",
+		Rect2(444, 247, 202, 137),
+		func() -> void: _select_map_stage(0)
+	)
+	meadow.focus_entered.connect(func() -> void: _update_map_preview(0))
+	meadow.mouse_entered.connect(func() -> void: _update_map_preview(0))
+	var cave_unlocked: bool = session.unlocked_stage >= 1
+	var cave: Button = _map_button(
+		ui,
+		"旗 2\nひかりの洞窟\nENTER / A で出発" if cave_unlocked else "旗 2\nひかりの洞窟\nLOCKED",
+		Rect2(825, 31, 202, 137),
+		func() -> void: _select_map_stage(1)
+	)
+	cave.disabled = not cave_unlocked
+	if cave_unlocked:
+		cave.focus_entered.connect(func() -> void: _update_map_preview(1))
+		cave.mouse_entered.connect(func() -> void: _update_map_preview(1))
+	else:
+		var lock: Panel = _speech_bubble(ui, Rect2(991, 177, 260, 88))
+		_label(lock, "風の草原へ配達すると\nこの旗がひらきます。", Rect2(14, 11, 232, 66), 17,
+			INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var preview: Panel = _comic_card(ui, Rect2(884, 488, 354, 194), Color("fff0bd"))
+	_label(preview, "NEXT DELIVERY", Rect2(20, 14, 314, 28), 15, Color("e7412b"))
+	map_preview_title = _label(preview, "", Rect2(20, 45, 314, 42), 27)
+	map_preview_detail = _label(preview, "", Rect2(20, 91, 314, 80), 17)
+	var back: Button = _button(ui, "郵便局へ戻る", Rect2(28, 636, 206, 54), _show_title)
+	back.add_theme_font_size_override("font_size", 17)
+	var selected_stage: int = mini(session.stage, session.unlocked_stage)
+	_update_map_preview(selected_stage)
+	(cave if selected_stage == 1 and cave_unlocked else meadow).grab_focus()
+	_fade_in()
+
+
+func _update_map_preview(stage_index: int) -> void:
+	if not is_instance_valid(map_preview_title) or not is_instance_valid(map_preview_detail):
+		return
+	if stage_index == 0:
+		map_preview_title.text = "旗 1  風の草原"
+		map_preview_detail.text = "風車の島を駆けぬけ、\n右端のポストへ手紙を届ける。"
+	else:
+		map_preview_title.text = "旗 2  ひかりの洞窟"
+		map_preview_detail.text = "結晶の洞窟を越え、\n空のいちばん奥へ光を届ける。"
+
+
+func _select_map_stage(stage_index: int) -> void:
+	if session.select_stage(stage_index):
+		_load_stage()
+
+
 func start_run() -> void:
+	# 自動検証と既存呼び出し向けに、地図を経由せず第1ステージを始める互換入口を保つ。
 	session.reset_run()
 	_load_stage()
 
@@ -145,6 +231,9 @@ func _load_stage() -> void:
 	last_phase = "playing"
 	_build_hud()
 	_music("stage%d" % (session.stage + 1))
+	_set_ambience("wind" if session.stage == 0 else "cave_ambience")
+	if session.stage == 0 and not session.tutorial_seen:
+		_start_tutorial()
 	_fade_in()
 
 
@@ -152,14 +241,82 @@ func _build_hud() -> void:
 	hud = DeliveryHUD.new()
 	hud.route = route
 	ui.add_child(hud)
-	var help: Panel = _card(ui, Rect2(28, 670, 880, 32), Color("153e4a"))
-	_label(help, "← →  移動     Space  ジャンプ     Shift  ダッシュ     Esc  休憩",
-		Rect2(14, 1, 850, 28), 15, CREAM)
+
+
+func _start_tutorial() -> void:
+	session.start_tutorial()
+	_show_tutorial_step()
+
+
+func _tutorial_is_active() -> bool:
+	return (
+		session.phase == "playing"
+		and not session.tutorial_seen
+		and session.tutorial_step < 3
+	)
+
+
+func _handle_tutorial_input(event: InputEvent) -> void:
+	var completed_step: bool = false
+	match session.tutorial_step:
+		0:
+			completed_step = (
+				event.is_action_pressed("move_left") or event.is_action_pressed("move_right")
+			)
+		1:
+			completed_step = event.is_action_pressed("jump")
+		2:
+			completed_step = event.is_action_pressed("dash")
+	if completed_step:
+		session.advance_tutorial()
+		_show_tutorial_step()
+		return
+	var skip_pressed: bool = (
+		InputMap.has_action("tutorial_skip") and event.is_action_pressed("tutorial_skip")
+	)
+	if skip_pressed or event.is_action_pressed("confirm"):
+		_finish_tutorial()
+		get_viewport().set_input_as_handled()
+
+
+func _show_tutorial_step() -> void:
+	if is_instance_valid(tutorial_panel):
+		tutorial_panel.queue_free()
+		tutorial_panel = null
+	if not _tutorial_is_active():
+		return
+	var rects: Array[Rect2] = [
+		Rect2(62, 442, 410, 154),
+		Rect2(250, 335, 410, 154),
+		Rect2(493, 435, 410, 154),
+	]
+	var titles: Array[String] = ["まずは走ってみよう！", "段差はジャンプ！", "風を切ってダッシュ！"]
+	var keys: Array[String] = ["← →  /  A D  /  左スティック", "SPACE  /  Z  /  PAD A",
+		"SHIFT  /  X  /  PAD X"]
+	tutorial_panel = _speech_bubble(ui, rects[session.tutorial_step])
+	_label(tutorial_panel, "配達人のひとこと  %d / 3" % (session.tutorial_step + 1),
+		Rect2(19, 12, 372, 24), 15, Color("e7412b"))
+	_label(tutorial_panel, titles[session.tutorial_step], Rect2(19, 38, 372, 38), 24)
+	var key_label: Label = _label(tutorial_panel, keys[session.tutorial_step],
+		Rect2(19, 82, 372, 33), 18, Color("fff2bd"), HORIZONTAL_ALIGNMENT_CENTER)
+	key_label.add_theme_color_override("font_outline_color", Color("153e4a"))
+	key_label.add_theme_constant_override("outline_size", 7)
+	var skip_text: String = "TAB / Y で案内をスキップ" if InputMap.has_action(
+		"tutorial_skip") else "ENTER / A で案内をスキップ"
+	_label(tutorial_panel, skip_text, Rect2(19, 121, 372, 22), 13, Color("526b70"),
+		HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _finish_tutorial() -> void:
+	session.finish_tutorial()
+	if is_instance_valid(tutorial_panel):
+		tutorial_panel.queue_free()
+		tutorial_panel = null
 
 
 func _phase_changed() -> void:
 	last_phase = session.phase
-	if session.phase == "playing" or session.phase == "title":
+	if session.phase in ["playing", "title", "map"]:
 		return
 	if session.phase in ["dead", "game_over"]:
 		play_sound("death")
@@ -204,8 +361,8 @@ func _show_overlay() -> void:
 			action = "はじめから再挑戦"
 		"stage_clear":
 			title_text = "草原の配達、完了！"
-			detail = "次の目的地は、ひかりの洞窟。\n残り時間をスコアに加算しました。"
-			action = "洞窟へ進む   →"
+			detail = "地図に新しい旗が現れました！\n残り時間をスコアに加算しました。"
+			action = "ルート地図をひらく   →"
 		"complete":
 			title_text = "ひかりが届いた！"
 			detail = "すべての配達を達成\nスコア %06d   ・   コイン %d" % [session.score, session.coins]
@@ -227,10 +384,10 @@ func _continue() -> void:
 			session.begin_stage()
 			_load_stage()
 		"stage_clear":
-			session.advance_stage()
-			_load_stage()
+			if session.advance_to_map():
+				_show_world_map()
 		"game_over", "complete":
-			start_run()
+			_start_new_run_map()
 
 
 func _resume() -> void:
@@ -253,6 +410,24 @@ func _music(track_name: String) -> void:
 		bgm.play()
 
 
+func _set_ambience(track_name: String) -> void:
+	if not is_instance_valid(ambience):
+		return
+	if track_name.is_empty():
+		ambience.stop()
+		ambience.stream = null
+		return
+	# headless には音声出力がなく、即時終了時の WAV 再生リソース保持も避ける。
+	if DisplayServer.get_name() == "headless" or shutdown_started:
+		return
+	var track: AudioStreamWAV = load("res://assets/audio/%s.wav" % track_name)
+	track.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	track.loop_end = int(track.get_length() * track.mix_rate)
+	if ambience.stream != track or not ambience.playing:
+		ambience.stream = track
+		ambience.play()
+
+
 func play_sound(sound: String) -> void:
 	if DisplayServer.get_name() == "headless" or shutdown_started:
 		return
@@ -273,6 +448,36 @@ func _card(parent: Node, rect: Rect2, color: Color) -> Panel:
 	style.bg_color = color
 	result.add_theme_stylebox_override("panel", style)
 	parent.add_child(result)
+	return result
+
+
+func _comic_card(parent: Node, rect: Rect2, color: Color) -> Panel:
+	var result: Panel = Panel.new()
+	result.position = rect.position
+	result.size = rect.size
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = Color("142f3e")
+	style.set_border_width_all(6)
+	style.set_corner_radius_all(18)
+	style.shadow_color = Color(0.04, 0.10, 0.14, 0.34)
+	style.shadow_size = 10
+	style.shadow_offset = Vector2(8, 9)
+	result.add_theme_stylebox_override("panel", style)
+	parent.add_child(result)
+	return result
+
+
+func _speech_bubble(parent: Node, rect: Rect2) -> Panel:
+	var result: Panel = _comic_card(parent, rect, Color("fff7dc"))
+	var tail: Polygon2D = Polygon2D.new()
+	tail.polygon = PackedVector2Array([
+		Vector2(28, rect.size.y - 4),
+		Vector2(70, rect.size.y - 4),
+		Vector2(42, rect.size.y + 26),
+	])
+	tail.color = Color("fff7dc")
+	result.add_child(tail)
 	return result
 
 
@@ -306,10 +511,51 @@ func _button(parent: Node, text_value: String, rect: Rect2, action: Callable) ->
 	return button
 
 
+func _map_button(parent: Node, text_value: String, rect: Rect2, action: Callable) -> Button:
+	var button: Button = _button(parent, text_value, rect, action)
+	button.add_theme_font_size_override("font_size", 17)
+	button.add_theme_color_override("font_color", INK)
+	button.add_theme_color_override("font_hover_color", INK)
+	button.add_theme_color_override("font_pressed_color", INK)
+	button.add_theme_color_override("font_focus_color", INK)
+	button.add_theme_color_override("font_disabled_color", Color("526b70"))
+	button.add_theme_stylebox_override("normal", _map_button_style(Color("fff7dc"), 5))
+	button.add_theme_stylebox_override("hover", _map_button_style(Color("fff0a7"), 7))
+	button.add_theme_stylebox_override("pressed", _map_button_style(Color("ffd85c"), 7))
+	button.add_theme_stylebox_override("focus", _map_button_style(Color("fff0a7"), 9))
+	button.add_theme_stylebox_override("disabled", _map_button_style(Color("aaa99f"), 5))
+	return button
+
+
+func _map_button_style(color: Color, border_width: int) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_color = Color("e7412b") if border_width > 5 else Color("14354b")
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(64)
+	style.shadow_color = Color(0.03, 0.09, 0.13, 0.38)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(5, 6)
+	return style
+
+
 func _picture(parent: Node, file: String, rect: Rect2) -> TextureRect:
 	var picture: TextureRect = TextureRect.new()
 	picture.texture = load("res://assets/images/%s.svg" % file)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	picture.position = rect.position
+	picture.size = rect.size
+	parent.add_child(picture)
+	return picture
+
+
+func _generated_picture(parent: Node, file: String, rect: Rect2) -> TextureRect:
+	var picture: TextureRect = TextureRect.new()
+	picture.texture = load("res://assets/images/generated/%s.png" % file)
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	picture.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	picture.position = rect.position

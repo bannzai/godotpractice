@@ -4,8 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 PROJECT = Path(__file__).resolve().parents[2]
 OUTPUT = PROJECT / "tmp"
-FONT = ImageFont.truetype(str(PROJECT / "assets/fonts/NotoSansJP[wght].ttf"), 20)
-FONT.set_variation_by_axes([600])
+FONT = ImageFont.truetype(str(PROJECT / "assets/fonts/MochiyPopOne-Regular.ttf"), 20)
 
 
 def compose(files, labels, destination, columns=3):

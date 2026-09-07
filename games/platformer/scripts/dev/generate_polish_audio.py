@@ -13,7 +13,7 @@ import wave
 ASSETS = Path(__file__).resolve().parents[2] / "assets" / "audio"
 RATE = 32000
 TAU = math.tau
-LOOPS = ("title", "stage1", "stage2", "result", "game_over")
+LOOPS = ("title", "stage1", "stage2", "result", "game_over", "wind", "cave_ambience")
 EFFECTS = ("jump", "stomp", "coin", "power", "death", "clear", "hurt", "ui")
 
 
@@ -205,6 +205,40 @@ def music() -> None:
     ], "bell")
 
 
+def periodic_air(duration: float, cave: bool = False) -> array:
+    """整数周期の倍音だけで、継ぎ目のない風または洞窟の空気音を作る。"""
+    count = round(duration * RATE)
+    result = array("d", [0.0]) * count
+    tones = ((7, 0.21), (11, 0.16), (17, 0.11), (29, 0.07), (43, 0.04))
+    for index in range(count):
+        progress = index / count
+        air = sum(gain * math.sin(TAU * cycles * progress + cycles * 0.73)
+                  for cycles, gain in tones)
+        gust = (0.36 + 0.18 * math.sin(TAU * progress * 2)) * air
+        if cave:
+            result[index] = gust * 0.34 + 0.12 * math.sin(TAU * 6 * progress)
+        else:
+            result[index] = gust + 0.06 * math.sin(TAU * 23 * progress)
+    return result
+
+
+def ambience() -> None:
+    """舞台の印象をBGMとは別に伝える、循環する環境音を生成する。"""
+    wind = Mix(8.0, loop=True)
+    wind.add(periodic_air(8.0), 0.0, 0.52, -0.18)
+    wind.add(periodic_air(8.0), 0.0, 0.42, 0.24)
+    for start, note, pan in ((0.8, 91, -0.55), (3.1, 88, 0.48), (5.7, 95, 0.12)):
+        wind.note("bell", note, start, 0.34, 0.035, pan)
+    wind.write("wind")
+
+    cave = Mix(8.0, loop=True)
+    cave.add(periodic_air(8.0, True), 0.0, 0.38)
+    for start, note, pan in ((0.35, 84, -0.7), (1.9, 91, 0.55), (4.4, 79, 0.65),
+                             (6.15, 88, -0.35)):
+        cave.note("bell", note, start, 1.25, 0.11, pan)
+    cave.write("cave_ambience")
+
+
 def sweep(start_pitch: float, end_pitch: float, duration: float,
           noise_gain: float = 0.0) -> array:
     """位相を連続させた上昇・下降音。固定シードの雑音で同じ音を再現する。"""
@@ -293,6 +327,7 @@ def main() -> None:
     args = parser.parse_args()
     if not args.check:
         music()
+        ambience()
         effects()
     verify()
 

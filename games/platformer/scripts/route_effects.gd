@@ -5,6 +5,12 @@ extends Node2D
 const GOLD: Color = Color("ffe097")
 const MINT: Color = Color("83ffe0")
 const CORAL: Color = Color("ff8b8d")
+const INK: Color = Color("153e4a")
+const COMIC_THEME: Theme = preload("res://resources/delivery_theme.tres")
+const SOUND_WORDS: Dictionary[String, String] = {
+	"coin": "キラッ！", "block": "ガコン！", "land": "タッ！", "power": "ビカッ！",
+	"stomp": "ドン！", "hurt": "イテッ！", "death": "ズコー！", "clear": "ゴール！",
+}
 
 
 func burst(kind: String, at: Vector2, text: String = "") -> void:
@@ -21,8 +27,45 @@ func burst(kind: String, at: Vector2, text: String = "") -> void:
 	_particles(at, tint, amount, kind)
 	if kind != "land":
 		_ring(at, tint, 1.8 if kind == "clear" else 1.0)
+	var word_parent: Node = self
+	var word_at: Vector2 = at + Vector2(0, -82)
 	if not text.is_empty():
-		_number(at + Vector2(0, -34), text, tint)
+		word_parent = _number(at + Vector2(0, -34), text, tint)
+		word_at = Vector2(-40, -63)
+	var word: String = _sound_word(kind)
+	if not word.is_empty():
+		_comic_word(word_parent, word_at, word, tint, kind)
+
+
+func _sound_word(kind: String) -> String:
+	return SOUND_WORDS.get(kind, "")
+
+
+func _comic_word(parent: Node, at: Vector2, word: String, tint: Color, kind: String) -> void:
+	var label: Label = Label.new()
+	label.theme = COMIC_THEME
+	label.text = word
+	label.position = at - Vector2(100, 30)
+	label.size = Vector2(200, 68)
+	label.pivot_offset = label.size / 2.0
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 9
+	label.rotation = deg_to_rad(-8.0 if kind in ["stomp", "block", "hurt"] else 6.0)
+	label.add_theme_font_size_override("font_size", 35 if kind in ["clear", "death"] else 29)
+	label.add_theme_color_override("font_color", tint)
+	label.add_theme_color_override("font_outline_color", INK)
+	label.add_theme_constant_override("outline_size", 9)
+	parent.add_child(label)
+	label.scale = Vector2.ONE * 0.28
+	var tween: Tween = label.create_tween()
+	tween.tween_property(label, "scale", Vector2.ONE * 1.22, 0.12).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.10)
+	tween.tween_interval(0.16)
+	tween.tween_property(label, "position:y", label.position.y - 24.0, 0.18)
+	tween.parallel().tween_property(label, "modulate:a", 0.0, 0.18)
+	tween.tween_callback(label.queue_free)
 
 
 func _particles(at: Vector2, tint: Color, amount: int, kind: String) -> void:
@@ -70,7 +113,7 @@ func _ring(at: Vector2, tint: Color, strength: float) -> void:
 	tween.chain().tween_callback(ring.queue_free)
 
 
-func _number(at: Vector2, value: String, tint: Color) -> void:
+func _number(at: Vector2, value: String, tint: Color) -> Label:
 	var label: Label = Label.new()
 	label.text = value
 	label.position = at - Vector2(60, 15)
@@ -78,8 +121,7 @@ func _number(at: Vector2, value: String, tint: Color) -> void:
 	label.pivot_offset = Vector2(60, 20)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.z_index = 8
-	var theme: Theme = load("res://resources/delivery_theme.tres")
-	label.add_theme_font_override("font", theme.default_font)
+	label.theme = COMIC_THEME
 	label.add_theme_font_size_override("font_size", 23)
 	label.add_theme_color_override("font_color", tint)
 	label.add_theme_color_override("font_outline_color", Color("183442"))
@@ -92,3 +134,4 @@ func _number(at: Vector2, value: String, tint: Color) -> void:
 	tween.parallel().tween_property(label, "position:y", label.position.y - 36, 0.6)
 	tween.tween_property(label, "modulate:a", 0.0, 0.2)
 	tween.tween_callback(label.queue_free)
+	return label

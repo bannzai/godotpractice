@@ -9,6 +9,7 @@ const RUN_SPEED: float = 400.0
 const JUMP_SPEED: float = -740.0
 const GRAVITY: float = 1700.0
 var sprite: AnimatedSprite2D
+var sprite_normalization: Vector2 = Vector2.ONE
 var body_shape: CollisionShape2D
 var previous_feet: float = 0.0
 var coyote: float = 0.0
@@ -36,7 +37,9 @@ func _ready() -> void:
 	add_child(body_shape)
 	sprite = AnimatedSprite2D.new()
 	sprite.sprite_frames = ActorFrames.build("player")
-	sprite.offset.y = -36
+	sprite_normalization = ActorFrames.normalized_scale("player", sprite.sprite_frames)
+	sprite.offset.y = -36 / sprite_normalization.y
+	sprite.material = ActorFrames.build_comic_material()
 	add_child(sprite)
 	sprite.play("idle")
 	_update_visual()
@@ -91,7 +94,12 @@ func _update_visual() -> void:
 	(body_shape.shape as RectangleShape2D).size.y = height
 	body_shape.position.y = -height / 2.0
 	var growth: float = 1.0 + 0.10 * sin(transform_time * 28) if transform_time > 0 else 1.0
-	sprite.scale = Vector2(0.90 if session.powered else 0.72, height / 62.0) * growth * squash
+	sprite.scale = (
+		Vector2(0.90 if session.powered else 0.72, height / 62.0)
+		* sprite_normalization
+		* growth
+		* squash
+	)
 	if absf(velocity.x) > 1:
 		sprite.flip_h = velocity.x < 0
 	sprite.modulate.a = 0.42 if session.invulnerable > 0 and sin(anim_time * 28) < 0 else 1.0
