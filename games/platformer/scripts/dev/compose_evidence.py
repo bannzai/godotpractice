@@ -53,6 +53,13 @@ def main():
         "fighter：黄昏の闘技場", "monsterquest：森の調査手帳",
     ], "evidence-identification-title.png", columns=2)
     compose([
+        "screenshot-map-meadow.png", "comparison/actionadventure-select.png",
+        "comparison/fighter-select.png", "comparison/monsterquest-select.png",
+    ], [
+        "platformer：手描きの配達地図", "actionadventure：道具メニュー",
+        "fighter：闘士選択", "monsterquest：手持ち編成",
+    ], "evidence-identification-map.png", columns=2)
+    compose([
         "screenshot-meadow.png", "comparison/actionadventure-play.png",
         "comparison/fighter-play.png", "comparison/monsterquest-play.png",
     ], [
