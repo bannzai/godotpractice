@@ -34,8 +34,18 @@ func _capture_scenes() -> void:
 	await _capture("help")
 	main.close_modal()
 	main.start_new()
-	await create_timer(0.5).timeout
+	await create_timer(0.4).timeout
+	await _capture("tutorial-letter")
+	main._begin_tutorial()
+	await create_timer(0.25).timeout
+	await _capture("tutorial-step-1-highlight")
+	farm.selected_tool = 3
+	main._update_hud()
+	await create_timer(0.2).timeout
+	await _capture("highlight-unavailable")
+	main._skip_tutorial()
 	_prepare_field("spring")
+	await create_timer(0.35).timeout
 	await _capture("spring")
 	await _capture_tools()
 	main.open_menu()
@@ -48,10 +58,14 @@ func _capture_scenes() -> void:
 	await create_timer(0.2).timeout
 	await _capture("catalogue")
 	main.close_modal()
+	main._open_village_map()
+	await create_timer(0.5).timeout
+	await _capture("village-map")
 	main.open_shop()
 	await create_timer(0.3).timeout
 	await _capture("shop")
 	main.close_modal()
+	main._return_to_field()
 	farm.player_position = main.world.BED
 	main.world.refresh()
 	main.interact()

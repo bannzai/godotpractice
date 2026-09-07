@@ -60,7 +60,7 @@ func _tileset() -> TileSet:
 	var result := TileSet.new()
 	result.tile_size = Vector2i(TILE_SIZE, TILE_SIZE)
 	var source := TileSetAtlasSource.new()
-	source.texture = load("res://assets/tiles/terrain.svg") as Texture2D
+	source.texture = load("res://assets/tiles/terrain.png") as Texture2D
 	source.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
 	for x: int in 6:
 		source.create_tile(Vector2i(x, 0))
@@ -70,7 +70,7 @@ func _tileset() -> TileSet:
 
 func _prop(id: String, rect: Rect2) -> void:
 	var sprite := Sprite2D.new()
-	sprite.texture = load("res://assets/props/%s.svg" % id) as Texture2D
+	sprite.texture = load("res://assets/props/%s.png" % id) as Texture2D
 	sprite.centered = false
 	sprite.position = rect.position
 	sprite.scale = rect.size / sprite.texture.get_size()
@@ -109,7 +109,7 @@ func refresh() -> void:
 		var stage: int = Farm.crop_stage(index)
 		var crop := Sprite2D.new()
 		var stages: Array[String] = ["seed", "sprout", "growing", "ripe", "growing"]
-		crop.texture = load("res://assets/crops/%s_%s.svg" % [tile.crop, stages[stage]])
+		crop.texture = load("res://assets/crops/%s_%s.png" % [tile.crop, stages[stage]])
 		crop.position = cell_center(index) - Vector2(0, 5)
 		crop.scale = Vector2.ONE * 58.0 / crop.texture.get_width()
 		if stage == 4:
@@ -143,18 +143,31 @@ func _draw_selection() -> void:
 	var target: int = target_index()
 	if target >= 0:
 		var bounds := Rect2(cell_center(target) - Vector2(30, 30), Vector2(60, 60))
-		overlay.draw_style_box(_selection_style(), bounds)
+		var preview: Dictionary = Farm.tool_preview(target)
+		overlay.draw_style_box(_selection_style(bool(preview.ok)), bounds)
 	else:
-		overlay.draw_arc(_selection, 13, 0, TAU, 24, Color(1, 0.96, 0.72, 0.65), 2)
+		overlay.draw_arc(_selection, 13, 0, TAU, 24, Color("a83f2f"), 3)
+	_draw_nearby_marker(BED, Vector2(86, 46))
+	_draw_nearby_marker(WELL, Vector2(48, 42))
+	_draw_nearby_marker(SHIPPING, Vector2(60, 45))
+	_draw_nearby_marker(TOWN, Vector2(91, 54))
 
 
-func _selection_style() -> StyleBoxFlat:
+func _selection_style(can_use: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(1, 0.96, 0.74, 0.13)
-	style.border_color = Color("fff1ad")
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(8)
+	style.bg_color = Color("315c433d") if can_use else Color("a83f2f38")
+	style.border_color = Color("f2d174") if can_use else Color("a83f2f")
+	style.set_border_width_all(4)
+	style.set_corner_radius_all(3)
 	return style
+
+
+func _draw_nearby_marker(at: Vector2, size: Vector2) -> void:
+	var distance: float = Farm.player_position.distance_to(at)
+	var active: bool = distance < 86.0
+	var color := Color("f2d174") if active else Color("332c2652")
+	var width: float = 4.0 if active else 2.0
+	overlay.draw_rect(Rect2(at - size * 0.5, size), color, false, width)
 
 
 func cell_center(index: int) -> Vector2:
