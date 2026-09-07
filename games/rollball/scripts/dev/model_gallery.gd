@@ -8,6 +8,7 @@ const MODELS: Array[PackedScene] = [
 	preload("res://assets/models/train.tscn"),
 	preload("res://assets/models/plant.tscn"),
 ]
+const ClaySurface = preload("res://scripts/visuals/clay_surface.gd")
 const NAMES: Array[String] = ["ころころ玉", "アヒル", "ロボット", "汽車", "花鉢"]
 const STATES: Dictionary = {
 	"idle": "待機", "move": "移動", "collect": "巻き込み",
@@ -51,6 +52,7 @@ func _ready() -> void:
 		var x: float = (index - 2) * 1.85
 		_add_mesh(pedestal, Vector3(x, 0.04, 0), Color("699d94"))
 		var model: Node3D = MODELS[index].instantiate()
+		ClaySurface.style_tree(model)
 		add_child(model)
 		model.position = Vector3(x, 0.14 + (0.69 if index == 0 else 0.0), 0)
 		model.scale = Vector3.ONE * 1.38
@@ -97,10 +99,7 @@ func _build_labels(camera: Camera3D) -> void:
 func _add_mesh(mesh: Mesh, point: Vector3, color: Color, casts_shadow: bool = true) -> void:
 	var visual: MeshInstance3D = MeshInstance3D.new()
 	visual.mesh = mesh
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.85
-	visual.material_override = material
+	ClaySurface.style_mesh(visual, color)
 	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if casts_shadow \
 		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(visual)
@@ -112,7 +111,7 @@ func _label(text: String, font_size: int) -> Label:
 	var label: Label = Label.new()
 	label.text = text
 	label.add_theme_font_override("font",
-		preload("res://assets/fonts/MPLUSRounded1c-Medium.ttf"))
+		preload("res://assets/fonts/KosugiMaru-Regular.ttf"))
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", Color("24494b"))
 	return label

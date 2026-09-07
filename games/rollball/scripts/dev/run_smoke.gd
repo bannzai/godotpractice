@@ -18,7 +18,20 @@ func _run() -> void:
 	await create_timer(0.8).timeout
 	await _capture("run-title")
 	await _key(KEY_ENTER)
+	await create_timer(0.4).timeout
+	await _capture("run-stage-select")
+	await _key(KEY_RIGHT)
+	await _key(KEY_DOWN)
+	await _key(KEY_ENTER)
+	await create_timer(0.4).timeout
+	await _capture("run-tutorial")
+	for _step: int in range(3):
+		await _key(KEY_ENTER)
 	await create_timer(0.6).timeout
+	if game.get_node("/root/RunState").phase != "playing":
+		push_error("タイトルから部屋選択と初回案内を経て開始できない")
+		quit(1)
+		return
 	var before: Vector3 = game.ball.position
 	var event: InputEventKey = InputEventKey.new()
 	event.physical_keycode = KEY_W

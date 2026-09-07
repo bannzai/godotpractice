@@ -14,14 +14,14 @@
 
 ## オリジナル音源 (`assets/audio/`)
 
-- **素材名**: 玩具工房の音楽と効果音 (`title.wav`, `play.wav`, `urgent.wav`, `finish.wav`, `timeout.wav`, `music.wav`, `pickup.wav`, `bump.wav`, `win.wav`, `lose.wav`, `growth.wav`)
+- **素材名**: 玩具工房の音楽・環境音・効果音 (`title.wav`, `play.wav`, `urgent.wav`, `finish.wav`, `timeout.wav`, `ambience_atelier.wav`, `ambience_playroom.wav`, `music.wav`, `pickup.wav`, `bump.wav`, `win.wav`, `lose.wav`, `growth.wav`)
 - **作者**: 本プロジェクトで Codex を用いて制作
-- **入手 URL**: https://github.com/bannzai/godotpractice/blob/polish/rollball/games/rollball/scripts/dev/generate_audio.py
+- **入手 URL**: https://github.com/bannzai/godotpractice/blob/main/games/rollball/scripts/dev/generate_audio.py
 - **ライセンス**: 本プロジェクトのオリジナル生成物（第三者音源なし）
 - **クレジット表記**: **不要**
 - **改変**: 生成した波形を無圧縮 WAV として保存
 - **備考**: 外部音声・既存楽曲を使用せず、独自の音列と木琴・弦のプラック・ベース・ブラシ・ベルを数式合成。OpenAI 利用規約では、適用法の認める範囲で出力は利用者に帰属する。CC0 とは宣言しない。再生成: python3 scripts/dev/generate_audio.py。場面ごとに8〜15秒のループ。music.wav は従来入口との互換用に play.wav と同内容。
-- **生成**: Python 3 標準ライブラリによる数式合成（実装支援: Codex） / プロンプトの要点: 温かい玩具工房、木琴風の静かなループ、タイトル・プレイ・残り30秒・成功・失敗の場面別BGM、拾得・衝突・成長・成功・失敗が聞き分けられる短い音
+- **生成**: Python 3 標準ライブラリによる数式合成（実装支援: Codex） / プロンプトの要点: 柔らかい粘土玩具の世界、木琴風の静かなループ、タイトル・プレイ・残り30秒・成功・失敗の場面別BGM、紙を擦る音・粘土を置く音・遠い玩具のベルを重ねた部屋別環境音、拾得・衝突・成長・成功・失敗が聞き分けられる短い音
 
 ## オリジナル画像 (`assets/`)
 
@@ -65,3 +65,14 @@
 - **改変**: なし
 - **生成**: Codex による SVG と Godot Theme の直接記述。クリーム・青緑・コーラル・金の配色、糸玉・アヒル・ロボットの独自図案。日本語ロゴ文字は同梱フォントで描画。
 - **備考**: 画像生成モデルは使用していない。適用法の認める範囲で生成出力は利用者に帰属する。
+
+## 手直しラウンドの粘土表面と画用紙UI
+
+- **素材名**: 手続きノイズの法線マップと頂点カラーによる粘土表面、画用紙の繊維シェーダー、2つの部屋とおもちゃ箱型の選択画面
+- **作者**: 本プロジェクトで Codex を用いて制作
+- **入手 URL**: 外部取得なし。本リポジトリの `games/rollball/scripts/visuals/clay_surface.gd`、`room.gd`、`hud.gd`。
+- **ライセンス**: 本プロジェクトのオリジナル生成物（第三者素材なし、CC0とは宣言しない）
+- **クレジット表記**: 不要
+- **改変**: 第2ラウンドのプリミティブモデルとUIを、粘土アニメ風・紙工作風へ加工
+- **生成**: GDScript と Godot 組み込みの FastNoiseLite / NoiseTexture2D / CanvasItem shader / プリミティブ。固定seedの凹凸、指紋状の色むら、紙繊維状の輝度むらをコードで生成する。
+- **備考**: テクスチャ画像や外部モデルは追加していない。同じコードとseedから再現でき、外部素材のライセンス確認を必要としない。

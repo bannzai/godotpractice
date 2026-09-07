@@ -16,6 +16,7 @@ var ball_shape: SphereShape3D
 var camera: Camera3D
 var hud: Control
 var music: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var sound: AudioStreamPlayer
 var attached: Array[Node3D] = []
 var yaw: float = 0.0
@@ -35,6 +36,12 @@ var audio_stopped: bool = false
 var quitting: bool = false
 var quit_frame: int = 0
 var title_elapsed: float = 0.0
+var tutorial_step: int = 0
+var tutorial_actors: Node3D
+var target_highlight: Node3D
+var highlight_target: StaticBody3D
+var highlight_elapsed: float = 0.0
+var ambience_kind: String = ""
 
 
 func _ready() -> void:
@@ -46,12 +53,13 @@ func _ready() -> void:
 		quit_frame = int(arguments[quit_index + 1])
 		# 解放を待てないほど短い終了指定では、再生バッファを作らない。
 		audio_stopped = quit_frame > 0 and quit_frame <= 12
-	room = Room.new()
+	room = Room.new(RunState.selected_stage)
 	add_child(room)
 	items = Node3D.new()
 	add_child(items)
 	effects = Effects.new()
 	add_child(effects)
+	_create_target_highlight()
 	_create_ball()
 	camera = Camera3D.new()
 	camera.fov = 55.0
@@ -63,9 +71,17 @@ func _ready() -> void:
 	layer.add_child(hud)
 	hud.start_requested.connect(start_run)
 	hud.title_requested.connect(show_title)
+	hud.stage_select_requested.connect(show_stage_select)
+	hud.stage_changed.connect(select_stage)
+	hud.stage_start_requested.connect(begin_selected_stage)
+	hud.tutorial_next_requested.connect(next_tutorial_step)
+	hud.tutorial_skip_requested.connect(skip_tutorial)
 	music = AudioStreamPlayer.new()
 	music.volume_db = -12.0
 	add_child(music)
+	ambience = AudioStreamPlayer.new()
+	ambience.volume_db = -27.0
+	add_child(ambience)
 	sound = AudioStreamPlayer.new()
 	sound.volume_db = -9.0
 	add_child(sound)
@@ -85,31 +101,105 @@ func _unhandled_input(event: InputEvent) -> void:
 		var focused: Control = get_viewport().gui_get_focus_owner()
 		if focused is Button:
 			focused.pressed.emit()
-		else:
-			start_run()
+		elif RunState.phase == "title":
+			show_stage_select()
+		elif RunState.phase == "stage_select":
+			begin_selected_stage()
+		elif RunState.phase == "tutorial":
+			next_tutorial_step()
 		get_viewport().set_input_as_handled()
 	if event.is_action_pressed("cancel"):
-		show_title()
+		if RunState.phase == "tutorial":
+			skip_tutorial()
+		else:
+			show_title()
 
 
 func start_run() -> void:
 	RunState.start_run()
+	_clear_tutorial_actors()
 	_reset_world()
 	yaw = 0.0
 	_update_camera(1.0, true)
 	hud.show_mode("playing")
 	previous_phase = "playing"
 	_set_music("play")
+	_set_ambience(RunState.selected_stage)
+
+
+func show_stage_select() -> void:
+	RunState.open_stage_select()
+	_clear_tutorial_actors()
+	_reset_world()
+	_set_stage_camera()
+	hud.show_mode("stage_select")
+	hud.update_stage(RunState.selected_stage)
+	previous_phase = "stage_select"
+	_set_music("title")
+	_set_ambience(RunState.selected_stage)
+
+
+func select_stage(stage_id: String) -> void:
+	if not Room.has_stage(stage_id):
+		return
+	RunState.select_stage(stage_id)
+	_replace_room(stage_id)
+	_reset_world()
+	_set_stage_camera()
+	hud.update_stage(stage_id)
+	_set_ambience(stage_id)
+
+
+func begin_selected_stage() -> void:
+	if RunState.tutorial_seen:
+		start_run()
+	else:
+		show_tutorial()
+
+
+func show_tutorial() -> void:
+	RunState.begin_tutorial()
+	_reset_world()
+	tutorial_step = 0
+	_create_tutorial_actors()
+	_set_tutorial_step(0)
+	_set_tutorial_camera()
+	hud.show_mode("tutorial")
+	hud.update_tutorial(0)
+	previous_phase = "tutorial"
+	_set_music("title")
+	_set_ambience(RunState.selected_stage)
+
+
+func next_tutorial_step() -> void:
+	if RunState.phase != "tutorial":
+		return
+	tutorial_step += 1
+	if tutorial_step >= 3:
+		RunState.finish_tutorial()
+		start_run()
+		return
+	_set_tutorial_step(tutorial_step)
+	hud.update_tutorial(tutorial_step)
+
+
+func skip_tutorial() -> void:
+	if RunState.phase != "tutorial":
+		return
+	RunState.finish_tutorial()
+	start_run()
 
 
 func show_title() -> void:
 	RunState.reset()
+	_clear_tutorial_actors()
 	_reset_world()
 	camera.position = Vector3(17.0, 17.0, 23.0)
 	camera.look_at(Vector3(0.0, 0.0, -1.5))
 	hud.show_mode("title")
 	previous_phase = "title"
 	_set_music("title")
+	_set_ambience(RunState.selected_stage)
 
 
 func _reset_world() -> void:
@@ -119,10 +209,11 @@ func _reset_world() -> void:
 	for child: Node3D in attached:
 		child.free()
 	attached.clear()
-	for entry: Dictionary in Room.item_layout():
+	for entry: Dictionary in Room.item_layout(RunState.selected_stage):
 		_spawn_item(entry)
 	rolling.basis = Basis.IDENTITY
-	ball.position = Vector3(0.0, RunState.diameter * 0.5 + 0.02, 8.0)
+	var spawn: Vector3 = Room.stage_data(RunState.selected_stage).spawn
+	ball.position = spawn + Vector3.UP * (RunState.diameter * 0.5 + 0.02)
 	ball.velocity = Vector3.ZERO
 	bump_cooldown = 0.0
 	effect_time = 0.0
@@ -134,6 +225,8 @@ func _reset_world() -> void:
 	growth_stage = 0
 	core.play_state("idle")
 	demo_target = null
+	highlight_target = null
+	target_highlight.visible = false
 	_sync_size()
 
 
@@ -148,6 +241,7 @@ func _spawn_item(entry: Dictionary) -> StaticBody3D:
 	item.position = entry.position
 	var visual: Node3D = Room.make_item_visual(entry.size, entry.kind, entry.color)
 	visual.name = "Visual"
+	visual.rotation.y = float(entry.get("yaw", 0.0))
 	item.add_child(visual)
 	var collider: CollisionShape3D = CollisionShape3D.new()
 	var box: BoxShape3D = BoxShape3D.new()
@@ -172,6 +266,144 @@ func _create_ball() -> void:
 	core = BallScene.instantiate()
 	ClaySurface.style_tree(core)
 	rolling.add_child(core)
+
+
+func _create_target_highlight() -> void:
+	target_highlight = Node3D.new()
+	target_highlight.name = "NextToyHighlight"
+	add_child(target_highlight)
+	var ring: MeshInstance3D = MeshInstance3D.new()
+	var torus: TorusMesh = TorusMesh.new()
+	torus.inner_radius = 0.46
+	torus.outer_radius = 0.57
+	torus.rings = 24
+	torus.ring_segments = 8
+	ring.mesh = torus
+	var ring_material: StandardMaterial3D = StandardMaterial3D.new()
+	ring_material.albedo_color = Color("ffd76a")
+	ring_material.emission_enabled = true
+	ring_material.emission = Color("f4ad48")
+	ring_material.emission_energy_multiplier = 1.6
+	ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring.material_override = ring_material
+	target_highlight.add_child(ring)
+	var pointer: MeshInstance3D = MeshInstance3D.new()
+	var pointer_mesh: PrismMesh = PrismMesh.new()
+	pointer_mesh.size = Vector3(0.34, 0.48, 0.12)
+	pointer.mesh = pointer_mesh
+	pointer.position = Vector3(0.0, 1.15, 0.0)
+	pointer.rotation.z = PI
+	pointer.material_override = ring_material
+	target_highlight.add_child(pointer)
+	var caption: Label3D = Label3D.new()
+	caption.text = "つぎは これ！"
+	caption.font = load("res://assets/fonts/KosugiMaru-Regular.ttf")
+	caption.font_size = 42
+	caption.pixel_size = 0.009
+	caption.position = Vector3(0.0, 1.65, 0.0)
+	caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	caption.modulate = Color("fff7df")
+	caption.outline_modulate = Color("6b493e")
+	caption.outline_size = 12
+	target_highlight.add_child(caption)
+	target_highlight.visible = false
+
+
+func _replace_room(stage_id: String) -> void:
+	if is_instance_valid(room) and room.stage_id == stage_id:
+		return
+	if is_instance_valid(room):
+		room.free()
+	room = Room.new(stage_id)
+	add_child(room)
+	move_child(room, 0)
+
+
+func _set_stage_camera() -> void:
+	var spawn: Vector3 = Room.stage_data(RunState.selected_stage).spawn
+	if RunState.selected_stage == "playroom":
+		camera.position = Vector3(18.0, 19.0, 22.0)
+	else:
+		camera.position = Vector3(17.0, 17.0, 23.0)
+	camera.look_at(spawn.lerp(Vector3.ZERO, 0.55) + Vector3.UP * 0.7)
+
+
+func _set_tutorial_camera() -> void:
+	var spawn: Vector3 = Room.stage_data(RunState.selected_stage).spawn
+	camera.position = spawn + Vector3(6.6, 4.6, 7.4)
+	camera.look_at(spawn + Vector3(0.0, 0.75, -0.7))
+
+
+func _create_tutorial_actors() -> void:
+	_clear_tutorial_actors()
+	tutorial_actors = Node3D.new()
+	tutorial_actors.name = "TutorialActors"
+	add_child(tutorial_actors)
+	var spawn: Vector3 = Room.stage_data(RunState.selected_stage).spawn
+	for data: Dictionary in [
+		{"scene": preload("res://assets/models/duck.tscn"), "offset": Vector3(-1.5, 0, -1.0)},
+		{"scene": preload("res://assets/models/robot.tscn"), "offset": Vector3(1.5, 0, -1.25)},
+	]:
+		var actor: Node3D = data.scene.instantiate()
+		ClaySurface.style_tree(actor)
+		actor.position = spawn + data.offset
+		actor.rotation_degrees.y = 180.0
+		actor.scale = Vector3.ONE * 1.2
+		tutorial_actors.add_child(actor)
+
+
+func _clear_tutorial_actors() -> void:
+	if is_instance_valid(tutorial_actors):
+		tutorial_actors.free()
+	tutorial_actors = null
+
+
+func _set_tutorial_step(step: int) -> void:
+	core.play_state(["move", "bump", "collect"][step])
+	if not is_instance_valid(tutorial_actors):
+		return
+	var actors: Array[Node] = tutorial_actors.get_children()
+	if actors.size() < 2:
+		return
+	(actors[0] as Node3D).play_state(["move", "idle", "collect"][step])
+	(actors[1] as Node3D).play_state(["idle", "bump", "celebrate"][step])
+
+
+func _update_target_highlight(delta: float) -> void:
+	highlight_elapsed += delta
+	if is_instance_valid(highlight_target):
+		var highlighted_entry: Dictionary = highlight_target.get_meta("entry")
+		if not RunState.can_collect(highlighted_entry.size):
+			highlight_target = null
+	if not is_instance_valid(highlight_target) or highlight_target.get_parent() != items:
+		highlight_target = _nearest_collectible()
+	if not is_instance_valid(highlight_target):
+		target_highlight.visible = false
+		return
+	var entry: Dictionary = highlight_target.get_meta("entry")
+	var item_size: float = float(entry.size)
+	target_highlight.visible = true
+	target_highlight.position = highlight_target.position + Vector3.UP * (item_size * 0.06 + 0.04)
+	target_highlight.scale = Vector3.ONE * maxf(0.72, item_size * 1.32)
+	target_highlight.rotation.y = highlight_elapsed * 0.75
+	var pointer: MeshInstance3D = target_highlight.get_child(1)
+	pointer.position.y = 1.15 + sin(highlight_elapsed * 4.2) * 0.13
+
+
+func _nearest_collectible() -> StaticBody3D:
+	var nearest: StaticBody3D
+	var nearest_distance: float = INF
+	for item: StaticBody3D in items.get_children():
+		var entry: Dictionary = item.get_meta("entry")
+		if not RunState.can_collect(entry.size):
+			continue
+		if float(item.get_meta("available_at")) > Time.get_ticks_msec() / 1000.0:
+			continue
+		var distance: float = ball.position.distance_squared_to(item.position)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest = item
+	return nearest
 
 
 func _physics_process(delta: float) -> void:
@@ -222,6 +454,7 @@ func _physics_process(delta: float) -> void:
 		core.play_state("move" if travel.length() > 0.001 else "idle")
 	_sync_size()
 	_update_camera(delta)
+	_update_target_highlight(delta)
 	if RunState.phase != previous_phase:
 		_finish_run()
 
@@ -251,6 +484,17 @@ func _process(delta: float) -> void:
 		title_elapsed += delta
 		camera.position = Vector3(17.0 + sin(title_elapsed * 0.18) * 0.7, 17.0, 23.0)
 		camera.look_at(Vector3(0.0, 0.0, -1.5))
+	elif RunState.phase == "stage_select":
+		title_elapsed += delta
+		var focus: Vector3 = Room.stage_data(RunState.selected_stage).spawn.lerp(
+			Vector3.ZERO, 0.55
+		)
+		camera.position.x += sin(title_elapsed * 0.45) * delta * 0.12
+		camera.look_at(focus + Vector3.UP * 0.7)
+	elif RunState.phase == "tutorial":
+		highlight_elapsed += delta
+		if is_instance_valid(tutorial_actors):
+			tutorial_actors.rotation.y = sin(highlight_elapsed * 0.8) * 0.035
 	hud.update_values(effect_time, bump_cooldown)
 
 
@@ -280,6 +524,8 @@ func _attach_item(item: StaticBody3D) -> void:
 	visual.set_meta("anchor", rolling.basis.inverse() * direction.normalized())
 	visual.set_meta("entry", entry)
 	attached.append(visual)
+	if item == highlight_target:
+		highlight_target = null
 	items.remove_child(item)
 	item.queue_free()
 	var before_diameter: float = RunState.diameter
@@ -384,6 +630,19 @@ func _set_music(kind: String) -> void:
 	music_tween.tween_property(music, "volume_db", -12.0, 0.6)
 
 
+func _set_ambience(stage_id: String) -> void:
+	if ambience_kind == stage_id or audio_stopped:
+		return
+	ambience_kind = stage_id
+	if AudioServer.get_driver_name() == "Dummy" and not OS.has_feature("movie"):
+		return
+	ambience.stop()
+	ambience.stream = load("res://assets/audio/ambience_%s.wav" % stage_id)
+	ambience.stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	ambience.stream.loop_end = roundi(ambience.stream.get_length() * ambience.stream.mix_rate)
+	ambience.play()
+
+
 ## 開発用録画も通常と同じ移動・衝突・回収処理を通す。
 func _demo_direction() -> Vector3:
 	if not is_instance_valid(demo_target) or demo_target.get_parent() != items:
@@ -414,6 +673,9 @@ func stop_audio() -> void:
 	if is_instance_valid(sound):
 		sound.stop()
 		sound.stream = null
+	if is_instance_valid(ambience):
+		ambience.stop()
+		ambience.stream = null
 
 
 ## 音声スレッドが停止通知を消費してから終了するため、複数フレームを待つ。
