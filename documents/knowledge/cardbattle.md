@@ -40,6 +40,15 @@ OpenAIの組み込み`image_gen`へ参照画像なしで文章を渡し、24体�
 
 共有ファイルは変更範囲外なので、この作業では変更していない。`game-asset-search`には、画像を個別生成する時のIDとファイル名の対応表、ハッシュ重複検査、一覧画像、実寸表示、RGB/RGBAと透過点の検査、生成サービス向けCREDITS記録例を一つのチェックリストとして加える価値がある。`godot-development`には、親の`_draw()`と子CanvasItemの描画順、共通透過枠と原画の重ね方、Control再構築後に2フレーム待つ撮影例を追加すると再調査を減らせる。
 
+### 最終検証
+
+- `make test GAMES=cardbattle`はexit 0。gdlint、import、boot、16,270件の自己検証、固定seedのCPU対CPU 40局を通し、最大94操作で終局した。
+- `make screenshot GAMES=cardbattle`はexit 0で71枚を生成した。招待状、トーナメント表、指南3段階、選択可否、攻撃結果予告、勝敗、次戦解放、全30札、24体それぞれの5動作×3時点、9演出×3時点を一覧化して目視した。画像縮小後も人物の顔、枠、札上の理由表示に崩れはなかった。
+- `make movie GAMES=cardbattle`はexit 0で5.033秒、`make -C games/cardbattle movie-play`はexit 0で36.733秒の1280×720・30fps・音声付きMP4を生成した。後者は実入力だけで招待状、対戦表、指南の終了、召喚2回、罠のセット、攻撃役と対象の選択を通り、4ターン目まで到達した。抽出した16場面と末尾を目視した。
+- `make build-all GAMES=cardbattle`と`make build-web GAMES=cardbattle`はexit 0。macOS、Windows、Linux、Webの成果物を確認した。`make cardbattle-run`はGodot 4.7で可視ウィンドウと`cardbattle boot`を確認し、対象プロセスへCommand+Qを送ってexit 0で通常終了した。
+- webtunnelのrun 34107543204で`fix/cardbattle`のWebエクスポートを開き、WebGL2の利用とGodotの起動完了をDOMで確認した。ブラウザから招待状、対戦表、指南、フェイズ進行、召喚、相手手番、結果予告、実攻撃、敗北結果まで操作し、タイトル・プレイ・結果の実画面を目視した。ブラウザconsoleとpage errorは0件、dev server logにもWARNING、ERROR、リーク警告、HTTP 4xx・5xxはなかった。
+- import、check、selfcheck、screenshot、movie、movie-play、全エクスポートのログ全文を検査し、許容除外を含めてもWARNING、ERROR、リーク警告は0件だった。
+
 ## 採用するルール
 
 通常召喚は毎ターン1回、上級モンスターの生け贄は導入しない。召喚したターンも攻撃できるが、決闘の最初のターンだけバトルを行えない。守備表示同士の戦闘は行わず、攻撃表示のモンスターから攻撃する。罠は相手の攻撃宣言時に自動発動する。これらをゲーム内の遊び方にも表示する。
