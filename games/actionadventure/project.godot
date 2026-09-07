@@ -66,6 +66,10 @@ menu={
 "deadzone": 0.25,
 "events": [Object(InputEventKey,"physical_keycode":4194305), Object(InputEventKey,"physical_keycode":4194306), Object(InputEventJoypadButton,"button_index":6)]
 }
+map={
+"deadzone": 0.25,
+"events": [Object(InputEventKey,"physical_keycode":77), Object(InputEventJoypadButton,"button_index":4)]
+}
 fullscreen={
 "deadzone": 0.25,
 "events": [Object(InputEventKey,"physical_keycode":4194342)]

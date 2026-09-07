@@ -1,0 +1,1146 @@
+{
+  "generator": "scripts/dev/generate_pixel_assets.py",
+  "method": "source crops, fixed regional palette mapping, nearest-neighbor scaling, deterministic PNG encoding",
+  "outputs": {
+    "backgrounds/distant.png": {
+      "layer": "distant",
+      "palette": "coast",
+      "size": [
+        1280,
+        720
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crops": [
+        [
+          0,
+          160,
+          16,
+          176
+        ],
+        [
+          0,
+          112,
+          48,
+          160
+        ]
+      ],
+      "transform": "source crops and pixel geometry composed at 320x180; 4x nearest-neighbor",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          1280,
+          720
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "backgrounds/foreground.png": {
+      "layer": "foreground",
+      "palette": "forest",
+      "size": [
+        1280,
+        720
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crops": [
+        [
+          0,
+          160,
+          16,
+          176
+        ],
+        [
+          0,
+          112,
+          48,
+          160
+        ]
+      ],
+      "transform": "source crops and pixel geometry composed at 320x180; 4x nearest-neighbor",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          1280,
+          720
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "backgrounds/hero-keyart.png": {
+      "palette": "title",
+      "size": [
+        448,
+        448
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_crop": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "source_member": "Puny-Characters/Warrior-Blue.png",
+      "transform": "24px center crop from first 32px cell; palette mapping; 4x then 4x nearest-neighbor with pixel accents",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          448,
+          448
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "backgrounds/middle.png": {
+      "layer": "middle",
+      "palette": "ruins",
+      "size": [
+        1280,
+        720
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crops": [
+        [
+          0,
+          160,
+          16,
+          176
+        ],
+        [
+          0,
+          112,
+          48,
+          160
+        ]
+      ],
+      "transform": "source crops and pixel geometry composed at 320x180; 4x nearest-neighbor",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          1280,
+          720
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "backgrounds/title.png": {
+      "layer": "flattened title",
+      "palette": "title",
+      "size": [
+        1280,
+        720
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crops": [
+        [
+          0,
+          160,
+          16,
+          176
+        ],
+        [
+          0,
+          112,
+          48,
+          160
+        ]
+      ],
+      "transform": "three source-derived layers composed at 320x180; 4x nearest-neighbor",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          1280,
+          720
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "characters/boss.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "ember",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Orc-Soldier-Red.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "characters/charger.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "ember",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Orc-Grunt.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "characters/hero.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "title",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Warrior-Blue.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "characters/merchant.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "coast",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Human-Worker-Red.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "characters/ranger.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "forest",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Archer-Green.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "characters/splitter.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "ruins",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Slime.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "characters/villager.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "forest",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Human-Worker-Cyan.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "characters/wanderer.png": {
+      "layout": {
+        "columns": 4,
+        "motions": [
+          "idle",
+          "walk",
+          "action",
+          "hurt",
+          "defeat"
+        ]
+      },
+      "palette": "coast",
+      "size": [
+        224,
+        280
+      ],
+      "source": "source/puny-charactersorcs_included.zip",
+      "source_frame_size": [
+        32,
+        32
+      ],
+      "source_member": "Puny-Characters/Mage-Cyan.png",
+      "source_subject_bounds": [
+        4,
+        4,
+        28,
+        28
+      ],
+      "transform": "24px center crop from 32px cells; palette mapping; 2x nearest-neighbor; centered in 56px cells",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          224,
+          280
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "props/block.png": {
+      "palette": "ruins",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 3
+      }
+    },
+    "props/bomb.png": {
+      "palette": "ember",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        352,
+        128,
+        368,
+        144
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 5
+      }
+    },
+    "props/boomerang.png": {
+      "palette": "coast",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        272,
+        96,
+        288,
+        112
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "props/chest.png": {
+      "palette": "ember",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        32,
+        464,
+        48,
+        480
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "props/coin.png": {
+      "palette": "title",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        16,
+        464,
+        32,
+        480
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 4
+      }
+    },
+    "props/door.png": {
+      "palette": "ruins",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        0,
+        80,
+        32,
+        112
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 2
+      }
+    },
+    "props/grass.png": {
+      "palette": "forest",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        0,
+        496,
+        16,
+        512
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "props/heart.png": {
+      "palette": "ember",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        384,
+        128,
+        400,
+        144
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "props/key.png": {
+      "palette": "title",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        320,
+        128,
+        336,
+        144
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "props/potion.png": {
+      "palette": "coast",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        0,
+        400,
+        16,
+        416
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 4
+      }
+    },
+    "props/rock.png": {
+      "palette": "ruins",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        0,
+        64,
+        16,
+        80
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 4
+      }
+    },
+    "props/switch.png": {
+      "palette": "ruins",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        320,
+        128,
+        336,
+        144
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "props/treasure.png": {
+      "palette": "title",
+      "size": [
+        56,
+        56
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        48,
+        464,
+        64,
+        480
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          56,
+          56
+        ],
+        "unique_rgb_colors": 8
+      }
+    },
+    "scenery/arch.png": {
+      "palette": "ruins",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        0,
+        80,
+        64,
+        128
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 3
+      }
+    },
+    "scenery/column.png": {
+      "palette": "ruins",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        336,
+        240,
+        368,
+        288
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "scenery/crystals.png": {
+      "palette": "coast",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        256,
+        144,
+        320,
+        192
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "scenery/house.png": {
+      "palette": "forest",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        64,
+        416,
+        96,
+        448
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 7
+      }
+    },
+    "scenery/lily.png": {
+      "palette": "coast",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        0,
+        496,
+        16,
+        512
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "scenery/ruins.png": {
+      "palette": "ruins",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-dungeon-tileset.png",
+      "source_crop": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 4
+      }
+    },
+    "scenery/stall.png": {
+      "palette": "ember",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        144,
+        480,
+        192,
+        512
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "scenery/tree.png": {
+      "palette": "forest",
+      "size": [
+        112,
+        112
+      ],
+      "source": "source/punyworld-overworld-tileset_0.png",
+      "source_crop": [
+        0,
+        112,
+        48,
+        160
+      ],
+      "transform": "source crop; palette mapping; integer nearest-neighbor enlargement; optional pixel detail",
+      "verification": {
+        "palette_limit": 8,
+        "size": [
+          112,
+          112
+        ],
+        "unique_rgb_colors": 6
+      }
+    },
+    "terrain/tiles.png": {
+      "cells": [
+        {
+          "name": "grass",
+          "palette": "forest",
+          "source": "source/punyworld-overworld-tileset_0.png",
+          "source_crop": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        {
+          "name": "water",
+          "palette": "coast",
+          "source": "source/punyworld-overworld-tileset_0.png",
+          "source_crop": [
+            0,
+            160,
+            16,
+            176
+          ]
+        },
+        {
+          "name": "stone",
+          "palette": "ruins",
+          "source": "source/punyworld-dungeon-tileset.png",
+          "source_crop": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        {
+          "name": "earth",
+          "palette": "ember",
+          "source": "source/punyworld-overworld-tileset_0.png",
+          "source_crop": [
+            48,
+            0,
+            64,
+            16
+          ]
+        }
+      ],
+      "palettes": [
+        "forest",
+        "coast",
+        "ruins",
+        "ember"
+      ],
+      "size": [
+        224,
+        56
+      ],
+      "sources": [
+        "source/punyworld-overworld-tileset_0.png",
+        "source/punyworld-dungeon-tileset.png"
+      ],
+      "transform": "16px crops; palette mapping; nearest-neighbor resize to 56px",
+      "verification": {
+        "palette_limit": 32,
+        "size": [
+          224,
+          56
+        ],
+        "unique_rgb_colors": 10
+      }
+    }
+  },
+  "palettes": {
+    "coast": {
+      "colors": [
+        "#102a36",
+        "#244957",
+        "#36727a",
+        "#5d9b8b",
+        "#93c6a3",
+        "#d6d7a7",
+        "#e8b76b",
+        "#fff0bd"
+      ],
+      "purpose": "海岸・水路・旅人。青緑を中心に、灯りの琥珀色をアクセントにする。"
+    },
+    "ember": {
+      "colors": [
+        "#261d2e",
+        "#493047",
+        "#71414e",
+        "#9d594f",
+        "#c77b58",
+        "#e8a866",
+        "#f1d28a",
+        "#fff0bc"
+      ],
+      "purpose": "強敵・危険物。暗い紫褐色と赤熱した橙色を使う。"
+    },
+    "forest": {
+      "colors": [
+        "#142c32",
+        "#29483c",
+        "#3f674c",
+        "#66865b",
+        "#8fac72",
+        "#c6c184",
+        "#d59662",
+        "#f0dfad"
+      ],
+      "purpose": "森・草地・集落。暗い常緑色から乾いた葉色までを使う。"
+    },
+    "ruins": {
+      "colors": [
+        "#182735",
+        "#344252",
+        "#53616a",
+        "#768078",
+        "#9da28c",
+        "#c4c49f",
+        "#d39b60",
+        "#f2d99b"
+      ],
+      "purpose": "石造遺跡・構造物。青灰色の石と古い金属色を使う。"
+    },
+    "title": {
+      "colors": [
+        "#0b1c2d",
+        "#17374a",
+        "#285869",
+        "#3d7b78",
+        "#70a887",
+        "#b8c594",
+        "#e0ad62",
+        "#f7e3a1"
+      ],
+      "purpose": "タイトル画面・主人公キービジュアル。夜の藍、翡翠、灯りの金色を使う。"
+    }
+  },
+  "schema_version": 1,
+  "sources": [
+    {
+      "creator": "Shade",
+      "dimensions": [
+        432,
+        1040
+      ],
+      "license": "CC0-1.0",
+      "path": "source/punyworld-overworld-tileset_0.png",
+      "sha256": "14d285bde8dee96cb0113947c8cce4922b86bf1d033b19123112145c7cef3a38",
+      "size_bytes": 100044,
+      "title": "16x16 Puny World Tileset",
+      "url": "https://opengameart.org/content/16x16-puny-world-tileset",
+      "used_for": [
+        "terrain",
+        "props",
+        "scenery",
+        "backgrounds"
+      ]
+    },
+    {
+      "creator": "Shade",
+      "dimensions": [
+        416,
+        320
+      ],
+      "license": "CC0-1.0",
+      "path": "source/punyworld-dungeon-tileset.png",
+      "sha256": "3aa73f296b872c930465bc1c03858312b37dd1229b31d4718b888f643aa80de7",
+      "size_bytes": 24790,
+      "title": "16x16 Puny Dungeon Tileset",
+      "url": "https://opengameart.org/content/16x16-puny-dungeon-tileset",
+      "used_for": [
+        "terrain",
+        "props",
+        "scenery"
+      ]
+    },
+    {
+      "archive_members": [
+        "Puny-Characters/Archer-Green.png",
+        "Puny-Characters/Human-Worker-Cyan.png",
+        "Puny-Characters/Human-Worker-Red.png",
+        "Puny-Characters/Mage-Cyan.png",
+        "Puny-Characters/Orc-Grunt.png",
+        "Puny-Characters/Orc-Soldier-Red.png",
+        "Puny-Characters/Slime.png",
+        "Puny-Characters/Warrior-Blue.png"
+      ],
+      "creator": "Shade",
+      "license": "CC0-1.0",
+      "path": "source/puny-charactersorcs_included.zip",
+      "sha256": "861ad0bfcff9fcd8cb6bbc8d494783203ed148186c9252943f6841ea9f3eb66b",
+      "size_bytes": 510693,
+      "title": "Puny Characters",
+      "url": "https://opengameart.org/content/puny-characters",
+      "used_for": [
+        "characters",
+        "hero-keyart"
+      ]
+    }
+  ]
+}

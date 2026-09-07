@@ -26,6 +26,8 @@ static func run(state: Node) -> Array[String]:
 	state.set_flag("switch")
 	state.set_flag("switch")
 	_expect(state.has_flag("switch") and state.flags.size() == 1, "仕掛けの重複防止", failures)
+	state.set_flag("map-owned")
+	_expect(state.has_flag("map-owned"), "羊皮紙の地図を取得", failures)
 	state.checkpoint = 7
 	state.room = 11
 	_expect(state.damage(99) and state.mode == "gameover", "体力ゼロでゲームオーバー", failures)
@@ -41,6 +43,7 @@ static func run(state: Node) -> Array[String]:
 	state.new_game()
 	_expect(state.load_game(TEST_SAVE), "保存データの復帰", failures)
 	_expect(state.snapshot() == saved, "保存前後で全進行を維持", failures)
+	_expect(state.has_flag("map-owned"), "保存後も羊皮紙の地図を維持", failures)
 	_check_invalid(state, saved, failures)
 	var file: FileAccess = FileAccess.open(TEST_SAVE, FileAccess.WRITE)
 	if file != null:

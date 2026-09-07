@@ -37,19 +37,23 @@ func _event(frame: int) -> void:
 		40: _key(KEY_ENTER, true)
 		42: _key(KEY_ENTER, false)
 		65:
-			_check(state.mode == "play", "開始入力")
-			_key(KEY_D, true)
-		95:
-			_key(KEY_D, false)
-			_key(KEY_W, true)
-		112:
-			_key(KEY_W, false)
-			_key(KEY_E, true)
-		114: _key(KEY_E, false)
-		145: _key(KEY_ESCAPE, true)
+			_check(state.mode == "dialogue" and main.tutorial_step == 0, "長老の初回案内")
+			_key(KEY_ENTER, true)
+		67: _key(KEY_ENTER, false)
+		85: _key(KEY_ENTER, true)
+		87: _key(KEY_ENTER, false)
+		105: _key(KEY_ENTER, true)
+		107: _key(KEY_ENTER, false)
+		125:
+			_check(state.mode == "play" and state.has_flag("map-owned"), "案内完了で地図を入手")
+			_key(KEY_M, true)
+		127: _key(KEY_M, false)
+		145:
+			_check(state.mode == "map", "実入力で羊皮紙の地図を開く")
+			_key(KEY_ESCAPE, true)
 		147: _key(KEY_ESCAPE, false)
 		165:
-			state.mode = "play"
+			_check(state.mode == "play", "羊皮紙の地図を閉じる")
 			world.enter_room(2, Vector2(740, 390), false)
 			world.facing = Vector2.RIGHT
 		180, 202: _key(KEY_J, true)
