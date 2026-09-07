@@ -51,6 +51,8 @@ func _demo_frame(frame: int) -> void:
 		45:
 			_click("深層へ潜る")
 		47:
+			_click("案内を飛ばす")
+		49:
 			# 通常開始後、経路を再現できる seed だけを固定する。HP や敵は変更しない。
 			if run.status == "playing":
 				run.start_run(DEMO_SEED)
@@ -131,7 +133,7 @@ static func next_step(state: Node, target: Vector2i) -> Vector2i:
 
 static func find_button(node: Node, caption: String) -> Button:
 	for button: Node in node.find_children("*", "Button", true, false):
-		if button is Button and button.text.begins_with(caption) and button.is_visible_in_tree():
+		if button is Button and button.text.contains(caption) and button.is_visible_in_tree():
 			return button
 	return null
 

@@ -4,6 +4,7 @@ extends Node
 signal shutdown_finished
 
 var music: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var effects: Array[AudioStreamPlayer] = []
 var current_track: String = ""
 var muted: bool = false
@@ -21,6 +22,9 @@ func _ready() -> void:
 	music = AudioStreamPlayer.new()
 	music.volume_db = -12
 	add_child(music)
+	ambience = AudioStreamPlayer.new()
+	ambience.volume_db = -24
+	add_child(ambience)
 	for index: int in range(4):
 		var player := AudioStreamPlayer.new()
 		player.volume_db = -8
@@ -32,6 +36,7 @@ func track(name: String) -> void:
 	# headless は音声出力がなく、即終了時の WAV 再生保持も避ける。
 	if shutting_down or DisplayServer.get_name() == "headless":
 		return
+	_set_ambience(name.begins_with("floor") or name == "boss")
 	if current_track == name:
 		return
 	current_track = name
@@ -42,6 +47,20 @@ func track(name: String) -> void:
 	if not muted:
 		music.play()
 		has_played = true
+
+
+func _set_ambience(enabled: bool) -> void:
+	if enabled and ambience.stream == null:
+		var stream: AudioStreamWAV = load("res://assets/audio/ambience.wav")
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_end = int(stream.get_length() * stream.mix_rate)
+		ambience.stream = stream
+		if not muted:
+			ambience.play()
+			has_played = true
+	elif not enabled and ambience.stream != null:
+		ambience.stop()
+		ambience.stream = null
 
 
 # 入力イベントに対して一度発音するため、反復呼び出しでは別の音を重ねる。
@@ -66,6 +85,7 @@ func set_muted(value: bool) -> void:
 		if not previous.is_empty():
 			track(previous)
 	music.volume_db = -80 if muted else -12
+	ambience.volume_db = -80 if muted else -24
 	for player: AudioStreamPlayer in effects:
 		player.volume_db = -80 if muted else -8
 
@@ -75,6 +95,8 @@ func stop_all() -> void:
 		return
 	music.stop()
 	music.stream = null
+	ambience.stop()
+	ambience.stream = null
 	for player: AudioStreamPlayer in effects:
 		player.stop()
 		player.stream = null

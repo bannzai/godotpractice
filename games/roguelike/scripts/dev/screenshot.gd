@@ -38,7 +38,8 @@ func _run() -> void:
 
 func _capture_scenes() -> bool:
 	for capture: Callable in [
-		_capture_opening, _capture_menus, _capture_floors, _capture_effects, _capture_results
+		_capture_opening, _capture_menus, _capture_depth_map,
+		_capture_floors, _capture_effects, _capture_results
 	]:
 		if not await capture.call():
 			return false
@@ -58,9 +59,21 @@ func _capture_opening() -> bool:
 	main._close_modal()
 	main.start_new(609)
 	await create_timer(0.55).timeout
+	if not await _capture_tutorial():
+		return false
+	main._skip_tutorial()
 	# この一枚は fixture を使わず、通常の開始直後の視界を記録する。
 	if not await _capture("play"):
 		return false
+	return true
+
+
+func _capture_tutorial() -> bool:
+	for page: int in range(3):
+		if not await _capture("tutorial-%d" % (page + 1)):
+			return false
+		if page < 2:
+			main._tutorial_next()
 	return true
 
 
@@ -87,10 +100,27 @@ func _capture_menus() -> bool:
 	main._close_modal()
 	main.board.map_open = true
 	main.board.queue_redraw()
+	main._update_hud()
 	if not await _capture("map"):
 		return false
 	main.board.map_open = false
 	main.board.queue_redraw()
+	main._update_hud()
+	return true
+
+
+func _capture_depth_map() -> bool:
+	run.player_pos = run.dungeon.stairs
+	run.dungeon.update_visibility(run.player_pos)
+	run.changed.emit()
+	main._interact()
+	await process_frame
+	if main.modal_kind != "depth":
+		push_error("地下図が階層間に表示されなかった")
+		return false
+	if not await _capture("depth-map"):
+		return false
+	main._close_modal()
 	return true
 
 
@@ -99,6 +129,8 @@ func _capture_floors() -> bool:
 		_floor_fixture(depth)
 		await create_timer(0.6).timeout
 		if not await _capture("floor-%d" % depth):
+			return false
+		if depth == 1 and not await _capture("highlight-enemy"):
 			return false
 	# 5階 fixture は番人と最深階の通常敵を同じ視界へ置く。
 	if not await _capture("boss"):
