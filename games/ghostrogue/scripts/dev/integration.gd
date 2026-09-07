@@ -57,6 +57,8 @@ func _run_checks() -> void:
 	await _joy(JOY_BUTTON_A)
 	await _settle()
 	_check(run.mode == "map", "ゲームパッド A で地図へ進む")
+	await _click_name("SkipTutorial")
+	_check(run.tutorial_step == run.TUTORIAL_COMPLETE, "案内を実クリックで飛ばせる")
 	_button("Branch0").grab_focus()
 	await _joy(JOY_BUTTON_DPAD_RIGHT)
 	var focused: Control = root.gui_get_focus_owner()
@@ -141,6 +143,9 @@ func _act_on_run() -> void:
 
 
 func _preferred_branch() -> int:
+	var tutorial_branch: int = run.tutorial_required_branch()
+	if tutorial_branch >= 0:
+		return tutorial_branch
 	for kind: String in ["living", "grave", "story", "police", "rest", "battle", "boss"]:
 		for branch: int in range(run.route[run.depth].size()):
 			if run.route[run.depth][branch].kind == kind:
@@ -178,6 +183,7 @@ func _check_reserve_promotion() -> void:
 	var catalog: Script = load("res://scripts/catalog.gd")
 	main.busy = true
 	run.new_run(20260907)
+	run.skip_tutorial()
 	run.begin_journey()
 	run.depth = 1
 	run.route_choices.assign([0])

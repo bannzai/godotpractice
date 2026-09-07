@@ -1,54 +1,98 @@
 extends Node2D
-## 背景専用の Canvas に光を置き、文字のコントラストを保つ。
+## CC0 写真へポスタリゼーションと網点を重ねる背景専用 Canvas。
+
+const SOURCES: Dictionary = {
+	"town": "res://assets/external/streets/street-01.webp",
+	"graveyard": "res://assets/external/streets/graveyard-01.webp",
+	"river": "res://assets/external/streets/river-01.webp",
+	"house": "res://assets/external/streets/house-01.webp",
+}
 
 var scene_name: String = ""
 var darkness: int = 0
 var elapsed: float = 0.0
-var far_layer: Sprite2D
-var near_layer: Sprite2D
+var district: int = 0
+var background: TextureRect
+var rust: TextureRect
 var fog: Sprite2D
 var flashlight: PointLight2D
 var tint: CanvasModulate
+var shader_material: ShaderMaterial
+var focus_target: Vector2 = Vector2(905, 390)
+var focus_locked: bool = false
 
 
 func setup(scene: String) -> void:
-	if not is_instance_valid(far_layer):
-		var canvas := CanvasLayer.new()
-		canvas.layer = -20
-		add_child(canvas)
-		_make_layer(canvas, "night_sky")
-		far_layer = _make_layer(canvas, "town_far")
-		near_layer = _make_layer(canvas, "town_near")
-		fog = _make_layer(canvas, "fog")
-		tint = CanvasModulate.new()
-		canvas.add_child(tint)
-		flashlight = PointLight2D.new()
-		flashlight.texture = load("res://assets/art/flashlight.svg")
-		flashlight.color = Color(0.93, 0.91, 0.74)
-		flashlight.texture_scale = 1.9
-		flashlight.energy = 0.65
-		canvas.add_child(flashlight)
+	if not is_instance_valid(background):
+		_create_layers()
 	if scene_name == scene:
 		return
 	scene_name = scene
-	var setting: String = "town"
-	if scene in ["grave", "graveyard", "rest"]:
-		setting = "graveyard"
-	elif scene in ["living", "story", "boss", "house"]:
-		setting = "house"
-	far_layer.texture = load("res://assets/art/%s_far.svg" % setting)
-	near_layer.texture = load("res://assets/art/%s_near.svg" % setting)
+	_apply_source()
 	set_darkness(darkness)
 
 
-func _make_layer(parent: Node, image: String) -> Sprite2D:
-	var layer := Sprite2D.new()
-	layer.centered = false
-	layer.texture = load("res://assets/art/%s.svg" % image)
-	layer.position = Vector2(-16, -10)
-	layer.scale = Vector2(1.03, 1.03)
-	parent.add_child(layer)
-	return layer
+func set_district(value: int) -> void:
+	district = clampi(value, 0, 11)
+	if scene_name == "map":
+		_apply_source()
+
+
+func aim_at(point: Vector2, locked: bool = true) -> void:
+	focus_target = point
+	focus_locked = locked
+
+
+func _create_layers() -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = -20
+	add_child(canvas)
+	background = TextureRect.new()
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shader_material = ShaderMaterial.new()
+	shader_material.shader = load("res://assets/shaders/gekiga.gdshader")
+	background.material = shader_material
+	canvas.add_child(background)
+	rust = TextureRect.new()
+	rust.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rust.texture = load("res://assets/external/textures/rust.webp")
+	rust.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rust.stretch_mode = TextureRect.STRETCH_TILE
+	rust.modulate = Color("21000036")
+	rust.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(rust)
+	fog = Sprite2D.new()
+	fog.centered = false
+	fog.texture = load("res://assets/art/fog.svg")
+	fog.position = Vector2(-16, -10)
+	fog.scale = Vector2(1.03, 1.03)
+	canvas.add_child(fog)
+	tint = CanvasModulate.new()
+	canvas.add_child(tint)
+	flashlight = PointLight2D.new()
+	flashlight.texture = load("res://assets/art/flashlight.svg")
+	flashlight.color = Color("ffe18d")
+	flashlight.texture_scale = 2.5
+	flashlight.energy = 0.9
+	canvas.add_child(flashlight)
+
+
+func _apply_source() -> void:
+	if not is_instance_valid(background):
+		return
+	var setting: String = "town"
+	if scene_name == "map":
+		setting = ["town", "river", "house", "graveyard"][district % 4]
+	elif scene_name in ["grave", "graveyard", "rest"]:
+		setting = "graveyard"
+	elif scene_name in ["living", "boss", "house"]:
+		setting = "house"
+	elif scene_name == "story":
+		setting = "river"
+	background.texture = load(SOURCES[setting])
 
 
 func set_darkness(value: int) -> void:
@@ -56,21 +100,23 @@ func set_darkness(value: int) -> void:
 	if not is_instance_valid(tint):
 		return
 	var amount: float = float(darkness) / 100.0
-	tint.color = Color(0.91, 0.96, 0.99).lerp(Color(0.92, 0.54, 0.56), amount * 0.65)
-	flashlight.color = Color(0.93, 0.91, 0.74).lerp(Color(1.0, 0.58, 0.4), amount * 0.5)
+	tint.color = Color.WHITE.lerp(Color("a83838"), amount * 0.46)
+	flashlight.color = Color("ffe18d").lerp(Color("ff3b2d"), amount * 0.68)
+	shader_material.set_shader_parameter("darkness", amount)
 
 
-# 視差と光の揺れは経過時間によって進む演出なので、フレームごとに変化する。
 func _process(delta: float) -> void:
-	if not is_instance_valid(far_layer):
+	if not is_instance_valid(background):
 		return
 	elapsed += delta
-	far_layer.position.x = -16.0 + sin(elapsed * 0.13) * 5.0
-	near_layer.position.x = -16.0 + sin(elapsed * 0.13) * 11.0
+	background.position.x = sin(elapsed * 0.12) * 4.0
+	background.size.x = 1288.0
+	rust.position.x = sin(elapsed * 0.19) * 10.0
 	fog.position.x = -16.0 + sin(elapsed * 0.21) * 14.0
-	fog.modulate.a = 0.64 + sin(elapsed * 0.42) * 0.18
-	var target: Vector2 = get_viewport().get_mouse_position()
-	if target.length() < 10.0:
-		target = Vector2(905, 390)
-	flashlight.position = flashlight.position.lerp(target, 1.0 - exp(-delta * 1.4))
-	flashlight.energy = 0.65 + sin(elapsed * 2.1) * 0.055
+	fog.modulate.a = 0.28 + sin(elapsed * 0.42) * 0.10
+	if not focus_locked:
+		var mouse: Vector2 = get_viewport().get_mouse_position()
+		if mouse.length() > 10.0:
+			focus_target = mouse
+	flashlight.position = flashlight.position.lerp(focus_target, 1.0 - exp(-delta * 3.2))
+	flashlight.energy = 0.88 + sin(elapsed * 7.7) * 0.10

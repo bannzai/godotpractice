@@ -1,11 +1,12 @@
 extends RefCounted
 ## 画面要素の生成は親へノードを追加するため非冪等。再描画時は画面の所有者が破棄する。
 
-const PAPER := Color("e6dec9")
-const MUTED := Color("a2b8ba")
-const RED := Color("d4776d")
-const GOLD := Color("d4b582")
-const INK := Color("13232ddd")
+const PAPER := Color("f0e6bd")
+const MUTED := Color("a9aaa2")
+const RED := Color("d32222")
+const GOLD := Color("ffd447")
+const GHOST := Color("d7fbff")
+const INK := Color("050505ee")
 
 
 static func label(
@@ -27,9 +28,13 @@ static func panel(parent: Node, rect: Rect2, color: Color = INK) -> Panel:
 	var node := Panel.new()
 	var box := StyleBoxFlat.new()
 	box.bg_color = color
-	box.border_color = Color("738b8966")
-	box.set_border_width_all(1)
-	box.set_corner_radius_all(3)
+	box.border_color = GOLD
+	box.border_width_left = 5
+	box.border_width_top = 2
+	box.border_width_right = 2
+	box.border_width_bottom = 5
+	box.shadow_color = Color("000000bb")
+	box.shadow_size = 10
 	node.add_theme_stylebox_override("panel", box)
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(node)
@@ -53,7 +58,8 @@ static func button(
 	if value.contains("\n"):
 		var lines: PackedStringArray = value.split("\n", true, 1)
 		label(node, lines[0], Rect2(16, 7, rect.size.x - 32, 29), 20)
-		label(node, lines[1], Rect2(16, 39, rect.size.x - 32, rect.size.y - 43), 14, MUTED)
+		var hint_color: Color = RED if lines[1].contains("闇 +") else MUTED
+		label(node, lines[1], Rect2(16, 39, rect.size.x - 32, rect.size.y - 43), 14, hint_color)
 	node.pivot_offset = rect.size * 0.5
 	node.pressed.connect(callback)
 	node.mouse_entered.connect(_react.bind(node, true))
@@ -88,11 +94,9 @@ static func bar(
 	node.max_value = maximum
 	node.value = value
 	var empty := StyleBoxFlat.new()
-	empty.bg_color = Color("0a171f")
-	empty.set_corner_radius_all(3)
+	empty.bg_color = Color("090909")
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = color
-	fill.set_corner_radius_all(3)
 	node.add_theme_stylebox_override("background", empty)
 	node.add_theme_stylebox_override("fill", fill)
 	parent.add_child(node)
