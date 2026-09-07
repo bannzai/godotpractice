@@ -1,10 +1,32 @@
 extends Node3D
 
+const ClaySurface = preload("res://scripts/visuals/clay_surface.gd")
+
 const WOOD: Color = Color("bc895b")
 const DARK_WOOD: Color = Color("78523f")
 const TEAL: Color = Color("76b5b0")
 const CREAM: Color = Color("fff0ca")
 const CORAL: Color = Color("e98f79")
+const LILAC: Color = Color("aaa0c8")
+const SKY: Color = Color("9fd4d6")
+const STAGES: Array[Dictionary] = [
+	{
+		"id": "atelier",
+		"name": "おもちゃのアトリエ",
+		"caption": "棚のまわりを渦巻く、小さな工作室",
+		"preview": "木の床・本棚・作業机\n細かな玩具がたっぷり",
+		"paper_color": Color("f2b49f"),
+		"spawn": Vector3(0.0, 0.0, 8.0),
+	},
+	{
+		"id": "playroom",
+		"name": "ひだまりプレイルーム",
+		"caption": "丸いラグと積み木の島をめぐる部屋",
+		"preview": "桃色タイル・大きな窓\n広い輪っかの道",
+		"paper_color": Color("aebcdb"),
+		"spawn": Vector3(-3.5, 0.0, 8.8),
+	},
+]
 const ITEM_SCENES: Array[PackedScene] = [
 	preload("res://assets/models/duck.tscn"),
 	preload("res://assets/models/robot.tscn"),
@@ -15,62 +37,95 @@ const ITEM_COLORS: Array[Color] = [
 	Color("ed987c"), Color("79bbb4"), Color("ebc25f"),
 	Color("a3b784"), Color("a7a6cd"), Color("dfad80"),
 ]
-const FURNITURE: Array[Dictionary] = [
+const ATELIER_FURNITURE: Array[Dictionary] = [
 	{"kind": 0, "position": Vector3(-9.5, 0.0, -12.0), "size": Vector3(6.0, 3.8, 1.5)},
 	{"kind": 1, "position": Vector3(8.0, 0.0, -10.0), "size": Vector3(5.0, 2.3, 3.0)},
 	{"kind": 2, "position": Vector3(-11.5, 0.0, 2.5), "size": Vector3(3.0, 1.6, 5.0)},
 	{"kind": 3, "position": Vector3(11.6, 0.0, 5.0), "size": Vector3(2.0, 2.6, 4.0)},
 ]
+const PLAYROOM_FURNITURE: Array[Dictionary] = [
+	{"kind": 1, "position": Vector3(-9.2, 0.0, -7.8), "size": Vector3(4.6, 2.1, 3.3)},
+	{"kind": 3, "position": Vector3(10.8, 0.0, -8.2), "size": Vector3(2.4, 2.0, 5.2)},
+	{"kind": 2, "position": Vector3(-11.7, 0.0, 6.4), "size": Vector3(3.0, 1.5, 4.8)},
+	{"kind": 0, "position": Vector3(8.8, 0.0, 10.8), "size": Vector3(7.0, 3.4, 1.5)},
+]
 
-static var _materials: Dictionary = {}
+var stage_id: String
 
+
+func _init(chosen_stage: String = "atelier") -> void:
+	stage_id = chosen_stage if has_stage(chosen_stage) else "atelier"
 
 # Godot がシーンに追加した一度だけ、床・家具・照明の子ノードを構築する。
 func _ready() -> void:
 	_build_floor()
 	_build_walls()
-	for furniture: Dictionary in FURNITURE:
+	for furniture: Dictionary in furniture_layout(stage_id):
 		_build_furniture(furniture)
-	_build_atelier_details()
+	if stage_id == "playroom":
+		_build_playroom_details()
+	else:
+		_build_atelier_details()
 	_build_lighting()
 
 
-static func item_layout() -> Array[Dictionary]:
+static func has_stage(chosen_stage: String) -> bool:
+	for stage: Dictionary in STAGES:
+		if stage.id == chosen_stage:
+			return true
+	return false
+
+
+static func stage_data(chosen_stage: String) -> Dictionary:
+	for stage: Dictionary in STAGES:
+		if stage.id == chosen_stage:
+			return stage
+	return STAGES[0]
+
+
+static func furniture_layout(chosen_stage: String) -> Array[Dictionary]:
+	return PLAYROOM_FURNITURE if chosen_stage == "playroom" else ATELIER_FURNITURE
+
+
+static func item_layout(chosen_stage: String = "atelier") -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for row: int in range(15):
-		for column: int in range(15):
-			var point: Vector3 = Vector3(-11.2 + column * 1.6, 0.0, -11.2 + row * 1.6)
-			if _inside_furniture(point):
-				continue
-			var distance: float = Vector2(point.x, point.z - 8.0).length()
-			if distance < 1.15:
-				continue
-			var item_size: float = 0.45
-			if distance > 5.0:
-				item_size = 0.65
-			if distance > 9.0:
-				item_size = 0.9
-			if distance > 14.0:
-				item_size = 1.2
-			var index: int = row * 15 + column
-			result.append({
-				"position": point,
-				"size": item_size,
-				"kind": index % 4,
-				"color": ITEM_COLORS[index % ITEM_COLORS.size()],
-			})
+	var spawn: Vector3 = stage_data(chosen_stage).spawn
+	var stage_turn: float = 0.37 if chosen_stage == "playroom" else 0.0
+	for index: int in range(260):
+		var progress: float = float(index) / 259.0
+		var radius: float = 1.15 + sqrt(float(index)) * 0.82
+		var angle: float = index * 2.399963 + stage_turn + sin(float(index) * 0.19) * 0.16
+		var center: Vector3 = spawn.lerp(Vector3.ZERO, progress * 0.78)
+		var width: float = 0.86 if chosen_stage == "playroom" else 1.0
+		var point: Vector3 = center + Vector3(cos(angle) * radius * width, 0.0,
+			sin(angle) * radius)
+		point += Vector3(sin(float(index) * 0.73), 0.0, cos(float(index) * 0.51)) * 0.24
+		if absf(point.x) > 13.7 or absf(point.z) > 13.7:
+			continue
+		if _inside_furniture(point, chosen_stage) or point.distance_to(spawn) < 0.95:
+			continue
+		var tier: int = mini(index / 52, 4)
+		var item_size: float = [0.42, 0.58, 0.78, 1.02, 1.24][tier]
+		result.append({
+			"position": point,
+			"size": item_size,
+			"kind": (index + (1 if chosen_stage == "playroom" else 0)) % 4,
+			"color": ITEM_COLORS[(index * 5 + tier) % ITEM_COLORS.size()],
+			"yaw": fposmod(angle * 0.47, TAU),
+		})
 	return result
 
 
 # 呼び出し側がシーンに追加するため、毎回独立した表示ノードを返す。
 static func make_item_visual(item_size: float, kind: int, _color: Color) -> Node3D:
 	var visual: Node3D = ITEM_SCENES[posmod(kind, ITEM_SCENES.size())].instantiate()
+	ClaySurface.style_tree(visual)
 	visual.scale = Vector3.ONE * item_size
 	return visual
 
 
-static func _inside_furniture(point: Vector3) -> bool:
-	for furniture: Dictionary in FURNITURE:
+static func _inside_furniture(point: Vector3, chosen_stage: String) -> bool:
+	for furniture: Dictionary in furniture_layout(chosen_stage):
 		var center: Vector3 = furniture["position"]
 		var half: Vector3 = furniture["size"] * 0.5
 		if absf(point.x - center.x) < half.x + 1.1:
@@ -81,6 +136,9 @@ static func _inside_furniture(point: Vector3) -> bool:
 
 # 部屋生成時だけ呼び、見た目と物理床を同じ座標に配置する。
 func _build_floor() -> void:
+	if stage_id == "playroom":
+		_build_playroom_floor()
+		return
 	_solid_box(Vector3(30, 0.5, 30), Vector3(0, -0.25, 0), WOOD, false)
 	for plank: int in range(20):
 		_box(self, Vector3(30, 0.006, 0.025), Vector3(0, 0.004, -15 + plank * 1.5),
@@ -97,8 +155,28 @@ func _build_floor() -> void:
 			Vector3(0, 0.034, -1.6 + stripe * 2.3), Color("c6cfab"))
 
 
+func _build_playroom_floor() -> void:
+	_solid_box(Vector3(30, 0.5, 30), Vector3(0, -0.25, 0), Color("d99b91"), false)
+	for row: int in range(10):
+		for column: int in range(10):
+			var tile_color: Color = Color("edb4a7") if (row + column) % 2 == 0 else Color("e7a89d")
+			_box(self, Vector3(2.92, 0.008, 2.92),
+				Vector3(-13.5 + column * 3.0, 0.006, -13.5 + row * 3.0), tile_color)
+	_cylinder(self, 7.25, 7.25, 0.035, Vector3(0.8, 0.028, 0.6), Color("f2db9b"))
+	_cylinder(self, 6.45, 6.45, 0.042, Vector3(0.8, 0.052, 0.6), Color("9cc9c2"))
+	for spoke: int in range(12):
+		var angle: float = spoke * TAU / 12.0
+		var patch: MeshInstance3D = _box(self, Vector3(0.18, 0.009, 4.8),
+			Vector3(0.8 + cos(angle) * 3.0, 0.078, 0.6 + sin(angle) * 3.0),
+			Color("c5ded0"))
+		patch.rotation.y = -angle
+
+
 # 手前はカメラを遮らない高さにし、衝突形状はほかの壁と揃える。
 func _build_walls() -> void:
+	if stage_id == "playroom":
+		_build_playroom_walls()
+		return
 	_solid_box(Vector3(30, 5, 0.4), Vector3(0, 2.5, -15), TEAL)
 	_solid_box(Vector3(0.4, 5, 30), Vector3(-15, 2.5, 0), TEAL.darkened(0.12))
 	_solid_box(Vector3(0.4, 5, 30), Vector3(15, 2.5, 0), TEAL.lightened(0.12))
@@ -130,6 +208,42 @@ func _build_walls() -> void:
 		art.position = center + Vector3(0, -0.45, 0.25)
 		art.rotation_degrees.y = -15
 		add_child(art)
+
+
+func _build_playroom_walls() -> void:
+	_solid_box(Vector3(30, 5, 0.4), Vector3(0, 2.5, -15), SKY)
+	_solid_box(Vector3(0.4, 5, 30), Vector3(-15, 2.5, 0), LILAC.lightened(0.12))
+	_solid_box(Vector3(0.4, 5, 30), Vector3(15, 2.5, 0), CORAL.lightened(0.2))
+	var front: StaticBody3D = StaticBody3D.new()
+	front.set_meta("obstacle", true)
+	_collision(front, Vector3(30, 5, 0.4), Vector3(0, 2.5, 15))
+	add_child(front)
+	_box(self, Vector3(30, 0.2, 0.5), Vector3(0, 0.1, 15), Color("8f6576"))
+	for side: float in [-1.0, 1.0]:
+		_box(self, Vector3(0.16, 1.2, 29.5), Vector3(side * 14.72, 0.72, 0), CREAM)
+		for dot: int in range(12):
+			_sphere(self, Vector3(side * 14.58, 1.0 + (dot % 2) * 0.26, -13.2 + dot * 2.35),
+				Vector3(0.13, 0.13, 0.06), ITEM_COLORS[dot % ITEM_COLORS.size()])
+	_box(self, Vector3(29.5, 1.2, 0.16), Vector3(0, 0.72, -14.72), CREAM)
+	_build_playroom_window()
+
+
+func _build_playroom_window() -> void:
+	_box(self, Vector3(12.5, 3.65, 0.18), Vector3(0.0, 3.05, -14.67), Color("80697e"))
+	_box(self, Vector3(12.15, 3.3, 0.2), Vector3(0.0, 3.05, -14.53), CREAM)
+	_box(self, Vector3(11.75, 2.95, 0.2), Vector3(0.0, 3.05, -14.38), Color("b9e2df"))
+	_sphere(self, Vector3(-3.7, 3.55, -14.16), Vector3(0.72, 0.72, 0.04), Color("f4cb69"))
+	for cloud_index: int in range(4):
+		var cloud: Node3D = Node3D.new()
+		cloud.position = Vector3(-1.6 + cloud_index * 2.55,
+			2.55 + (cloud_index % 2) * 0.72, -14.12)
+		add_child(cloud)
+		for puff: int in range(4):
+			_sphere(cloud, Vector3((puff - 1.5) * 0.24, 0.1 if puff in [1, 2] else 0.0, 0),
+				Vector3(0.29, 0.2, 0.04), Color("fff8e8"))
+	for mullion_x: float in [-3.9, 0.0, 3.9]:
+		_box(self, Vector3(0.16, 3.12, 0.18), Vector3(mullion_x, 3.05, -13.98), CREAM)
+	_box(self, Vector3(11.9, 0.16, 0.18), Vector3(0, 3.05, -13.98), CREAM)
 
 
 # 窓の各層に距離をつけ、追従カメラの移動で遠景と窓枠に視差を出す。
@@ -200,6 +314,30 @@ func _build_atelier_details() -> void:
 		cap.rotation.z = PI / 2.0
 
 
+func _build_playroom_details() -> void:
+	for arch_index: int in range(7):
+		var block_color: Color = ITEM_COLORS[arch_index % ITEM_COLORS.size()]
+		_box(self, Vector3(0.72, 0.72, 0.2),
+			Vector3(-6.0 + arch_index * 2.0, 3.65 + sin(arch_index * 0.7) * 0.28, -14.45),
+			block_color)
+	for index: int in range(16):
+		var angle: float = index * TAU / 16.0
+		var bead: MeshInstance3D = _sphere(self,
+			Vector3(cos(angle) * 6.0 + 0.8, 0.16, sin(angle) * 6.0 + 0.6),
+			Vector3(0.11, 0.08, 0.11), ITEM_COLORS[index % ITEM_COLORS.size()])
+		bead.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	for tower: int in range(3):
+		for level: int in range(3 + tower):
+			_box(self, Vector3(0.52, 0.42, 0.52),
+				Vector3(-12.9 + tower * 12.8, 0.23 + level * 0.43, -10.8 + tower * 8.7),
+				ITEM_COLORS[(tower + level) % ITEM_COLORS.size()])
+	for index: int in range(4):
+		var display: Node3D = make_item_visual(0.72, index + 1, CREAM)
+		display.position = Vector3(6.4 + index * 1.55, 3.36, 10.75)
+		display.rotation_degrees.y = 165.0
+		add_child(display)
+
+
 # 家具の各部品をまとめて生成するため、部屋初期化時に一度呼ぶ。
 func _build_furniture(data: Dictionary) -> void:
 	var body: StaticBody3D = StaticBody3D.new()
@@ -253,35 +391,27 @@ func _build_lighting() -> void:
 	var environment: WorldEnvironment = WorldEnvironment.new()
 	environment.environment = Environment.new()
 	environment.environment.background_mode = Environment.BG_COLOR
-	environment.environment.background_color = Color("dfc9a7")
+	environment.environment.background_color = (
+		Color("d7cde2") if stage_id == "playroom" else Color("dfc9a7")
+	)
 	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.environment.ambient_light_color = Color("fff2db")
 	environment.environment.ambient_light_energy = 0.3
 	add_child(environment)
 	var sun: DirectionalLight3D = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55, -30, 0)
-	sun.light_color = Color("fff1d9")
+	sun.light_color = Color("fff4dd") if stage_id == "playroom" else Color("fff1d9")
 	sun.light_energy = 0.65
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 45
 	add_child(sun)
 
 
-# 再利用可能な材質を色ごとに保持し、小物ごとの材質生成を避ける。
-static func _material(color: Color) -> StandardMaterial3D:
-	if not _materials.has(color):
-		var material: StandardMaterial3D = StandardMaterial3D.new()
-		material.albedo_color = color
-		material.roughness = 0.88
-		_materials[color] = material
-	return _materials[color]
-
-
 # 呼び出しごとに指定した親へ新しい形状を追加する生成関数。
 static func _mesh(parent: Node3D, mesh: Mesh, point: Vector3, color: Color) -> MeshInstance3D:
 	var instance: MeshInstance3D = MeshInstance3D.new()
 	instance.mesh = mesh
-	instance.material_override = _material(color)
+	ClaySurface.style_mesh(instance, color)
 	instance.position = point
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(instance)

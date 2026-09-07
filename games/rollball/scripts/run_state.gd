@@ -7,8 +7,11 @@ const INITIAL_DIAMETER: float = 0.8
 const TARGET_DIAMETER: float = 3.2
 const TIME_LIMIT: float = 180.0
 const COLLECT_RATIO: float = 0.72
+const DEFAULT_STAGE: String = "atelier"
 
 var phase: String = "title"
+var selected_stage: String = DEFAULT_STAGE
+var tutorial_seen: bool = false
 var diameter: float = INITIAL_DIAMETER
 var remaining: float = TIME_LIMIT
 var volumes: Array[float] = []
@@ -18,15 +21,36 @@ var collected: int:
 
 
 func reset() -> void:
+	_reset_run_values()
 	phase = "title"
-	diameter = INITIAL_DIAMETER
-	remaining = TIME_LIMIT
-	volumes.clear()
 	changed.emit()
 
 
+func open_stage_select() -> void:
+	_reset_run_values()
+	phase = "stage_select"
+	changed.emit()
+
+
+func select_stage(stage_id: String) -> void:
+	if stage_id.is_empty() or selected_stage == stage_id:
+		return
+	selected_stage = stage_id
+	changed.emit()
+
+
+func begin_tutorial() -> void:
+	_reset_run_values()
+	phase = "tutorial"
+	changed.emit()
+
+
+func finish_tutorial() -> void:
+	tutorial_seen = true
+
+
 func start_run() -> void:
-	reset()
+	_reset_run_values()
 	phase = "playing"
 	changed.emit()
 
@@ -71,3 +95,9 @@ func _update_diameter() -> void:
 	for volume: float in volumes:
 		total_volume += volume
 	diameter = pow(pow(INITIAL_DIAMETER, 3.0) + 6.0 * total_volume / PI, 1.0 / 3.0)
+
+
+func _reset_run_values() -> void:
+	diameter = INITIAL_DIAMETER
+	remaining = TIME_LIMIT
+	volumes.clear()

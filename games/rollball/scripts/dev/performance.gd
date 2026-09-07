@@ -1,7 +1,7 @@
 extends SceneTree
 ## 描画と通常の物理処理を実測する。時刻・入力・音声・保存に副作用があるため一度だけ実行する。
 
-const EXPECTED_ITEMS: int = 189
+const MINIMUM_ITEMS: int = 100
 const MINIMUM_FPS: float = 60.0
 
 var game: Node3D
@@ -27,9 +27,9 @@ func _run() -> void:
 	game.start_run()
 	await process_frame
 	var initial_count: int = game.items.get_child_count()
-	_check(initial_count == EXPECTED_ITEMS, "開始時に 189 個の物体が存在する")
-	var idle: Dictionary = await _measure("非操作・189 物体", 5.0)
-	_check(game.items.get_child_count() == EXPECTED_ITEMS, "非操作中に物体数を維持する")
+	_check(initial_count >= MINIMUM_ITEMS, "開始時に100個以上の物体が存在する")
+	var idle: Dictionary = await _measure("非操作・%d物体" % initial_count, 5.0)
+	_check(game.items.get_child_count() == initial_count, "非操作中に物体数を維持する")
 	var state: Node = root.get_node("RunState")
 	_check(state.phase == "playing", "非操作計測をプレイ中に行う")
 	game.demo_mode = true
@@ -100,8 +100,7 @@ func _check(condition: bool, label: String) -> void:
 
 
 func _finish() -> void:
-	game.music.stop()
-	game.sound.stop()
+	await game.prepare_shutdown()
 	game.queue_free()
 	for _frame: int in range(4):
 		await process_frame

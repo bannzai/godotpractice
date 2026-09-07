@@ -5,6 +5,7 @@ var game: Node3D
 var state: Node
 var elapsed: float = 0.0
 var started: bool = false
+var menu_step: int = 0
 var sent_events: int = 0
 var last_axes: Vector2 = Vector2.ZERO
 var result_time: float = 0.0
@@ -23,16 +24,15 @@ func _run() -> void:
 	while elapsed < 25.0:
 		await physics_frame
 		elapsed += 1.0 / Engine.physics_ticks_per_second
-		if elapsed >= 1.3 and not started:
-			_key(KEY_ENTER, true)
-			_key(KEY_ENTER, false)
+		_drive_intro()
+		if state.phase == "playing":
 			started = true
 		if state.phase == "playing":
 			var direction: Vector3 = game._demo_direction().rotated(Vector3.UP, -game.yaw)
 			# 短い停止を挟む実入力で、成長の各段階を録画に残す。
 			var stick: Vector2 = Vector2(direction.x, direction.z)
-			if elapsed < 12.0:
-				stick *= 0.65 if fmod(elapsed - 1.3, 2.0) < 1.0 else 0.0
+			if elapsed < 13.0:
+				stick *= 0.65 if fmod(elapsed - 3.2, 2.0) < 1.0 else 0.0
 			_axes(stick)
 		else:
 			_axes(Vector2.ZERO)
@@ -59,6 +59,18 @@ func _run() -> void:
 		return
 	print("demo OK")
 	quit(0)
+
+
+func _drive_intro() -> void:
+	var timings: Array[float] = [0.8, 1.15, 1.45, 1.8, 2.15, 2.5, 2.85]
+	if menu_step >= timings.size() or elapsed < timings[menu_step]:
+		return
+	var key: Key = [KEY_ENTER, KEY_RIGHT, KEY_DOWN, KEY_ENTER, KEY_ENTER, KEY_ENTER, KEY_ENTER][
+		menu_step
+	]
+	_key(key, true)
+	_key(key, false)
+	menu_step += 1
 
 
 func _key(key: Key, pressed: bool) -> void:
