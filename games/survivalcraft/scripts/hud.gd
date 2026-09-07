@@ -404,9 +404,11 @@ func _build_map(box: Control) -> void:
 	camera.look_at(Vector3(16, 3.5, 16))
 	camera.fov = 42
 	camera.current = true
+	var close_hint: String = ("M / View でも閉じられます。" if model.phase == "play"
+		else "「戻る」でタイトルへ戻ります。")
 	_label(box, "紙の模型で、木立・浜・家の位置を確かめる。\n\n"
 		+ "黄色い中心が出発地点。\n木立は島の四方にあります。\n浜の内側で家を折ると守りやすい。\n\n"
-		+ "次の工作\n→ %s\n\nM / View でも閉じられます。" % _next_goal(),
+		+ "次の工作\n→ %s\n\n%s" % [_next_goal(), close_hint],
 		Vector2(700, 94), 17, Vector2(225, 370))
 
 
