@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://cajjuxt7s3t4n"
-path="res://.godot/imported/MPLUSRounded1c-Medium.ttf-502201cb7493346fb6dba9c0132b4817.fontdata"
+uid="uid://qw5okpalyyrb"
+path="res://.godot/imported/PottaOne-Regular.ttf-db9f4b1597ee820c9eebfecac1c5eca8.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/MPLUSRounded1c-Medium.ttf"
-dest_files=["res://.godot/imported/MPLUSRounded1c-Medium.ttf-502201cb7493346fb6dba9c0132b4817.fontdata"]
+source_file="res://assets/fonts/PottaOne-Regular.ttf"
+dest_files=["res://.godot/imported/PottaOne-Regular.ttf-db9f4b1597ee820c9eebfecac1c5eca8.fontdata"]
 
 [params]
 

@@ -172,13 +172,42 @@ def effects() -> None:
     save_audio("engine", samples)
 
 
+def ambience() -> None:
+    """ガレージの機械音と、コース脇の観客のざわめきを周期波で作る。"""
+    duration = 4
+    garage_samples = [0.0] * (RATE * duration)
+    for index in range(len(garage_samples)):
+        t = index / RATE
+        hum = math.sin(math.tau * 55 * t) * 0.08
+        neon = math.sin(math.tau * 110 * t) * (0.025 + 0.01 * math.sin(math.tau * 2 * t))
+        garage_samples[index] = hum + neon
+    for start, note in [(0.5, 91), (1.5, 84), (2.5, 96), (3.5, 79)]:
+        tone(garage_samples, start, 0.12, note, 0.18, "bell")
+    save_audio("garage", garage_samples)
+
+    crowd_samples = [0.0] * (RATE * duration)
+    rng = random.Random(1987)
+    phases = [rng.random() * math.tau for _index in range(14)]
+    frequencies = [83, 97, 109, 127, 139, 151, 173, 191, 211, 233, 257, 281, 307, 331]
+    for index in range(len(crowd_samples)):
+        t = index / RATE
+        murmur = sum(math.sin(math.tau * frequency * t + phases[voice])
+                     for voice, frequency in enumerate(frequencies)) / len(frequencies)
+        wave = 0.48 + 0.2 * math.sin(math.tau * 0.5 * t) + 0.1 * math.sin(math.tau * 1.5 * t)
+        crowd_samples[index] = murmur * wave * 0.45
+    for start, note in [(0.25, 76), (1.0, 79), (2.25, 83), (3.0, 79)]:
+        tone(crowd_samples, start, 0.32, note, 0.12, "bell")
+    save_audio("crowd", crowd_samples)
+
+
 def main() -> None:
     portraits()
     ui_images()
     for name, bpm, shift, busy in [("title", 116, 0, False), ("race", 144, 0, True), ("final", 170, 2, True), ("results", 108, 5, False)]:
         music(name, bpm, shift, busy)
     effects()
-    print("潮風カート: SVG 12 点、BGM 4 曲、SE 8 音を生成")
+    ambience()
+    print("潮風カート: SVG 12 点、BGM 4 曲、SE 8 音、環境音 2 点を生成")
 
 
 if __name__ == "__main__":

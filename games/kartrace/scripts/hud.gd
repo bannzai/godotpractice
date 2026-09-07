@@ -1,38 +1,58 @@
 extends Control
-## レースの値は autoload から読み、画面内には表示状態だけを保持する。
+## レース状態を、80年代アーケード筐体とコース内計器の表現へ変換する。
 
 signal start_requested
+signal garage_requested
+signal course_requested
 signal title_requested
 signal kart_selected(kind: int)
 
 const Course = preload("res://scripts/course_data.gd")
-const CREAM: Color = Color("fff3d8")
-const INK: Color = Color("183e50")
-const MINT: Color = Color("4ce0c5")
+const INK: Color = Color("07142e")
+const NIGHT: Color = Color("101044")
+const CYAN: Color = Color("20f6ff")
+const MAGENTA: Color = Color("ff2d95")
+const YELLOW: Color = Color("ffe74a")
+const WHITE: Color = Color("fff9df")
+const MUTED: Color = Color("7581a6")
 const PORTRAITS: Array[String] = ["otter", "fox", "owl"]
 const ITEMS: Array[String] = ["pulse", "buoy", "turbo"]
+
 var state: Node
 var menu: Control
+var garage: Control
+var tutorial: Control
 var race: Control
 var result: Control
-var place: Label
 var lap: Label
 var timer: Label
 var lap_timer: Label
 var speed: Label
+var gear: Label
 var item: Label
+var item_hint: Label
 var item_icon: TextureRect
 var notice: Label
 var center: Label
 var standings: Label
 var best: Label
 var choice: Label
+var garage_choice: Label
 var cards: Array[Button] = []
 var map: Control
+var garage_map: Control
+var gauge: Control
 var flash: ColorRect
+var active_poster: Panel
+var tutorial_title: Label
+var tutorial_detail: Label
+var tutorial_steps: Array[Panel] = []
 var result_reveal: float = 1.0
+var tutorial_step: int = 0
+var gauge_speed: float = 0.0
 var last_phase: String = ""
 var popup_tween: Tween
+var pulse_clock: float = 0.0
 
 
 func _ready() -> void:
@@ -41,40 +61,57 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	theme = _theme()
 	_build_menu()
+	_build_garage()
+	_build_tutorial()
 	_build_race()
 	_build_results()
+	var scanlines: Control = Control.new()
+	scanlines.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scanlines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scanlines.draw.connect(_draw_scanlines.bind(scanlines))
+	add_child(scanlines)
 	flash = ColorRect.new()
 	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	flash.color = Color(1, 0.94, 0.8, 0)
+	flash.color = Color(1, 0.9, 0.3, 0)
 	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(flash)
 
 
 func _theme() -> Theme:
 	var skin: Theme = Theme.new()
-	skin.default_font = load("res://assets/fonts/MPLUSRounded1c-Medium.ttf")
+	skin.default_font = load("res://assets/fonts/PottaOne-Regular.ttf")
 	skin.default_font_size = 20
-	skin.set_color("font_color", "Label", CREAM)
+	skin.set_color("font_color", "Label", WHITE)
 	for mode: String in ["normal", "hover", "pressed", "focus"]:
 		var style: StyleBoxFlat = StyleBoxFlat.new()
-		style.bg_color = MINT if mode == "normal" else Color("ffcd77")
-		style.set_corner_radius_all(14)
-		style.content_margin_left = 20
-		style.content_margin_right = 20
-		style.border_color = CREAM
-		style.set_border_width_all(3 if mode == "focus" else 0)
+		style.bg_color = MAGENTA if mode == "normal" else YELLOW
+		style.border_color = CYAN if mode in ["normal", "focus"] else WHITE
+		style.set_border_width_all(4 if mode == "focus" else 2)
+		style.content_margin_left = 16
+		style.content_margin_right = 16
 		skin.set_stylebox(mode, "Button", style)
-		skin.set_color("font_color" + ("" if mode == "normal" else "_" + mode), "Button", INK)
+		skin.set_color("font_color" + ("" if mode == "normal" else "_" + mode),
+			"Button", INK if mode != "normal" else WHITE)
 	return skin
 
 
-func _panel(parent: Control, rect: Rect2, color: Color = Color("183e50ed")) -> Panel:
+func _solid(parent: Control, rect: Rect2, color: Color) -> ColorRect:
+	var block: ColorRect = ColorRect.new()
+	block.color = color
+	block.position = rect.position
+	block.size = rect.size
+	block.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(block)
+	return block
+
+
+func _panel(parent: Control, rect: Rect2, color: Color = Color("07142ee8"),
+		border: Color = CYAN, width: int = 2) -> Panel:
 	var panel: Panel = Panel.new()
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = color
-	style.set_corner_radius_all(20)
-	style.border_color = Color("54827f")
-	style.set_border_width_all(1)
+	style.border_color = border
+	style.set_border_width_all(width)
 	panel.add_theme_stylebox_override("panel", style)
 	parent.add_child(panel)
 	panel.position = rect.position
@@ -83,12 +120,13 @@ func _panel(parent: Control, rect: Rect2, color: Color = Color("183e50ed")) -> P
 
 
 func _label(parent: Control, text: String, pos: Vector2, font_size: int = 24,
-		color: Color = CREAM) -> Label:
+		color: Color = WHITE) -> Label:
 	var label: Label = Label.new()
 	label.text = text
 	label.position = pos
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(label)
 	return label
 
@@ -98,6 +136,7 @@ func _image(parent: Control, path: String, rect: Rect2) -> TextureRect:
 	image.texture = load(path)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(image)
 	image.position = rect.position
@@ -112,7 +151,7 @@ func _button(parent: Control, text: String, rect: Rect2, action: Callable) -> Bu
 	button.position = rect.position
 	button.size = rect.size
 	button.pressed.connect(action)
-	button.mouse_entered.connect(func() -> void: button.modulate = Color("fff4ce"))
+	button.mouse_entered.connect(func() -> void: button.modulate = Color("fff5b7"))
 	button.mouse_exited.connect(func() -> void: button.modulate = Color.WHITE)
 	return button
 
@@ -120,131 +159,231 @@ func _button(parent: Control, text: String, rect: Rect2, action: Callable) -> Bu
 func _build_menu() -> void:
 	menu = Control.new()
 	add_child(menu)
-	_panel(menu, Rect2(38, 34, 510, 646))
-	_label(menu, "サンゴ湾サーキット", Vector2(70, 59), 20, MINT)
-	_label(menu, "潮風カート", Vector2(65, 82),  60)
-	_label(menu, "ひとつの島。３周の勝負。", Vector2(72, 173), 22)
-	_image(menu, "res://assets/ui/logo.svg", Rect2(355, 70, 155, 86))
-	_label(menu, "ドライバーを選ぼう", Vector2(72, 227), 18, Color("bad4cc"))
+	_solid(menu, Rect2(0, 0, 1280, 720), Color("08143b91"))
+	_solid(menu, Rect2(0, 0, 1280, 16), MAGENTA)
+	_solid(menu, Rect2(0, 704, 1280, 16), CYAN)
+	_label(menu, "ARCADE CABINET  1987 / BAY AREA", Vector2(44, 31), 18, CYAN)
+	_label(menu, "潮風カート", Vector2(42, 73), 72, YELLOW)
+	_label(menu, "NEON HARBOR GRAND PRIX", Vector2(49, 160), 27, MAGENTA)
+	_label(menu, "夕焼けの環状道路を、3周で奪い取れ。", Vector2(49, 207), 21)
+	_panel(menu, Rect2(43, 260, 690, 340), Color("080f32e8"), MAGENTA, 4)
+	_label(menu, "SELECT DRIVER", Vector2(66, 278), 21, CYAN)
 	for index: int in range(3):
-		var button: Button = _button(menu, "", Rect2(70 + index * 149, 263, 136, 132),
+		var button: Button = _button(menu, "", Rect2(65 + index * 218, 321, 196, 203),
 			func() -> void: kart_selected.emit(index))
 		cards.append(button)
-		_image(button, "res://assets/portraits/%s.svg" % PORTRAITS[index], Rect2(15, 4, 106, 106))
-		_label(button, ["しずく", "あかね", "すみれ"][index], Vector2(33, 103), 17, INK)
-	choice = _label(menu, "", Vector2(72, 414), 20)
-	_label(menu, "３周 / CPU ３台 / アイテム３種", Vector2(72, 457), 18, Color("bad4cc"))
-	_button(menu, "レースをはじめる  →", Rect2(70, 512, 446, 64),
-		func() -> void: start_requested.emit())
-	_label(menu, "← → 選択　Enter / A 決定", Vector2(85, 596), 18)
-	_label(menu, "F11 全画面　M 消音", Vector2(85, 630), 16, Color("bad4cc"))
-	_panel(menu, Rect2(895, 43, 340, 64))
-	_label(menu, "海風と、最後のひと押し。", Vector2(918, 60), 20)
-	_panel(menu, Rect2(603, 551, 632, 129))
-	_label(menu, "↑ アクセル　↓ ブレーキ・バック　← → ハンドル", Vector2(628, 570), 18)
-	_label(menu, "Space ドリフト　E アイテム　Esc タイトル", Vector2(628, 605), 18)
-	_label(menu, "パッド：RT / LT 加減速　左スティック　X ドリフト　B アイテム",
-		Vector2(628, 643), 15, Color("bad4cc"))
+		_image(button, "res://assets/portraits/%s.svg" % PORTRAITS[index],
+			Rect2(23, 11, 150, 150))
+		var driver: Label = _label(button, ["しずく", "あかね", "すみれ"][index],
+			Vector2(62, 160), 20, INK)
+		driver.size.x = 100
+	choice = _label(menu, "", Vector2(68, 546), 18, YELLOW)
+	_panel(menu, Rect2(777, 65, 458, 535), Color("111047e8"), CYAN, 4)
+	_label(menu, "NEXT MISSION", Vector2(817, 94), 20, MAGENTA)
+	_label(menu, "ガレージへ行く", Vector2(815, 137), 39, WHITE)
+	_label(menu, "車種を決めたら、壁のポスターから\n走るコースを選択する。",
+		Vector2(817, 201), 20, Color("c9d9ff"))
+	_label(menu, "←  →", Vector2(848, 299), 46, CYAN)
+	_label(menu, "ドライバーを選ぶ", Vector2(947, 311), 20)
+	_label(menu, "ENTER / A", Vector2(837, 380), 34, YELLOW)
+	_label(menu, "選んだ車種でガレージへ", Vector2(837, 428), 20)
+	_button(menu, "ENTER / A  ガレージへ進む", Rect2(815, 489, 382, 70),
+		func() -> void: garage_requested.emit())
+	_label(menu, "F11: 全画面  /  M: 消音", Vector2(50, 645), 17, Color("9aacd3"))
+
+
+func _build_garage() -> void:
+	garage = Control.new()
+	add_child(garage)
+	_solid(garage, Rect2(0, 0, 1280, 720), Color("21182ff0"))
+	_solid(garage, Rect2(0, 0, 1280, 83), Color("07142ef5"))
+	_label(garage, "PIT GARAGE", Vector2(38, 17), 42, YELLOW)
+	_label(garage, "壁のポスターから次のレースを選ぶ", Vector2(328, 30), 22, CYAN)
+	active_poster = _panel(garage, Rect2(52, 116, 689, 512), Color("171152"), MAGENTA, 7)
+	_solid(active_poster, Rect2(19, 18, 651, 70), MAGENTA)
+	_label(active_poster, "SUNSET CIRCUIT  /  ROUND 01", Vector2(39, 28), 25, WHITE)
+	garage_map = Control.new()
+	garage_map.position = Vector2(51, 118)
+	garage_map.size = Vector2(587, 245)
+	garage_map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	garage_map.draw.connect(_draw_garage_map)
+	active_poster.add_child(garage_map)
+	_label(active_poster, "サンゴ湾サーキット", Vector2(49, 373), 34, YELLOW)
+	_label(active_poster, "3 LAPS  /  CURVE  /  BRIDGE  /  BOOST", Vector2(51, 421), 18, CYAN)
+	garage_choice = _label(active_poster, "選択中：夕焼けの海上環状コース",
+		Vector2(50, 459), 18, WHITE)
+	for index: int in range(2):
+		var x: float = 780.0 + index * 225.0
+		var locked: Panel = _panel(garage, Rect2(x, 125, 195, 276),
+			Color("171a2de6"), MUTED, 3)
+		_label(locked, "LOCKED", Vector2(41, 27), 22, MUTED)
+		_label(locked, "整備中", Vector2(45, 91), 31, Color("9299b2"))
+		_label(locked, "今回は選択不可", Vector2(27, 198), 17, MUTED)
+		_label(locked, "新コースは\nピット完成後に解放", Vector2(25, 226), 14, MUTED)
+	_panel(garage, Rect2(780, 433, 420, 194), Color("07142ef2"), CYAN, 3)
+	_label(garage, "点滅中のポスターが選択対象", Vector2(807, 455), 18, CYAN)
+	_label(garage, "ENTER / A", Vector2(808, 497), 33, YELLOW)
+	_label(garage, "このコースのピットへ入る", Vector2(808, 542), 20)
+	_button(garage, "ENTER / A  このコースで走る", Rect2(805, 574, 369, 45),
+		func() -> void: course_requested.emit())
+	_label(garage, "ESC: タイトルへ戻る", Vector2(50, 664), 17, Color("a8b4d4"))
+
+
+func _build_tutorial() -> void:
+	tutorial = Control.new()
+	add_child(tutorial)
+	_solid(tutorial, Rect2(0, 0, 1280, 116), Color("07142ef4"))
+	_label(tutorial, "PIT CREW LESSON", Vector2(39, 17), 32, YELLOW)
+	_label(tutorial, "スタート前に計器と操作を3つだけ確認", Vector2(347, 29), 20, CYAN)
+	for index: int in range(3):
+		var step_panel: Panel = _panel(tutorial, Rect2(52 + index * 230, 143, 204, 85),
+			Color("07142ee8"), MUTED, 3)
+		tutorial_steps.append(step_panel)
+		_label(step_panel, "%02d" % (index + 1), Vector2(15, 12), 34, MUTED)
+		_label(step_panel, ["アクセル", "ハンドル", "ドリフト"][index],
+			Vector2(65, 22), 20)
+	_panel(tutorial, Rect2(52, 264, 748, 214), Color("07142ef0"), MAGENTA, 5)
+	tutorial_title = _label(tutorial, "", Vector2(91, 293), 42, YELLOW)
+	tutorial_detail = _label(tutorial, "", Vector2(92, 359), 24, WHITE)
+	_panel(tutorial, Rect2(850, 264, 380, 214), Color("111047eb"), CYAN, 4)
+	_label(tutorial, "SKIP TUTORIAL", Vector2(891, 291), 22, MAGENTA)
+	_label(tutorial, "ENTER / A", Vector2(890, 340), 34, YELLOW)
+	_label(tutorial, "すぐにスタートラインへ", Vector2(891, 391), 19)
+	_label(tutorial, "ESC でもスキップ", Vector2(891, 430), 16, Color("a8b4d4"))
+	_label(tutorial, "実際の入力を受け取ると、次のピットボードが点灯します。",
+		Vector2(54, 518), 18, CYAN)
 
 
 func _build_race() -> void:
 	race = Control.new()
 	race.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(race)
-	_panel(race, Rect2(30, 27, 172, 126))
-	place = _label(race, "1 位", Vector2(54, 28), 56, MINT)
-	lap = _label(race, "1 / 3 周", Vector2(57, 108), 21)
-	_panel(race, Rect2(475, 28, 330, 98))
-	timer = _label(race, "", Vector2(507, 38), 24)
-	lap_timer = _label(race, "", Vector2(505, 87), 19, MINT)
-	_panel(race, Rect2(1018, 28, 232, 113))
-	item_icon = _image(race, "res://assets/items/turbo.svg", Rect2(1032, 44, 66, 66))
-	item = _label(race, "", Vector2(1103, 48), 19)
-	_label(race, "E / B で使う", Vector2(1103, 84), 16, MINT)
-	_panel(race, Rect2(30, 555, 231, 136))
+	_panel(race, Rect2(24, 23, 198, 91), Color("07142edc"), MAGENTA, 3)
+	_label(race, "LAP", Vector2(43, 35), 18, CYAN)
+	lap = _label(race, "1 / 3", Vector2(42, 55), 37, YELLOW)
+	_panel(race, Rect2(466, 22, 349, 89), Color("07142edc"), CYAN, 3)
+	timer = _label(race, "", Vector2(500, 29), 27, YELLOW)
+	lap_timer = _label(race, "", Vector2(501, 70), 16, CYAN)
+	_panel(race, Rect2(1018, 22, 238, 111), Color("07142edc"), YELLOW, 3)
+	item_icon = _image(race, "res://assets/items/turbo.svg", Rect2(1032, 35, 70, 70))
+	item = _label(race, "", Vector2(1106, 37), 19, YELLOW)
+	item_hint = _label(race, "", Vector2(1107, 76), 15, CYAN)
+	_panel(race, Rect2(994, 523, 262, 175), Color("07142edc"), CYAN, 3)
 	map = Control.new()
 	race.add_child(map)
-	map.position = Vector2(46, 567)
+	map.position = Vector2(1017, 547)
+	map.size = Vector2(218, 126)
 	map.draw.connect(_draw_map)
-	_panel(race, Rect2(1018, 566, 232, 125))
-	speed = _label(race, "0", Vector2(1044, 566), 52)
-	_label(race, "km/h", Vector2(1163, 600), 21, MINT)
-	_label(race, "Space / X ドリフト", Vector2(1038, 650), 17)
-	center = _label(race, "", Vector2(400, 230), 86)
+	_panel(race, Rect2(20, 486, 291, 215), Color("07142edc"), MAGENTA, 3)
+	gauge = Control.new()
+	race.add_child(gauge)
+	gauge.position = Vector2(38, 497)
+	gauge.size = Vector2(255, 190)
+	gauge.draw.connect(_draw_gauge)
+	speed = _label(race, "000", Vector2(103, 609), 30, YELLOW)
+	gear = _label(race, "N", Vector2(225, 609), 36, MAGENTA)
+	center = _label(race, "", Vector2(400, 220), 88, YELLOW)
 	center.add_theme_color_override("font_outline_color", INK)
-	center.add_theme_constant_override("outline_size", 5)
+	center.add_theme_constant_override("outline_size", 8)
 	center.size = Vector2(480, 160)
 	center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	notice = _label(race, "", Vector2(300, 475), 31, MINT)
+	notice = _label(race, "", Vector2(305, 444), 31, CYAN)
 	notice.add_theme_color_override("font_outline_color", INK)
-	notice.add_theme_constant_override("outline_size", 4)
-	notice.size.x = 680
+	notice.add_theme_constant_override("outline_size", 6)
+	notice.size.x = 670
 	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
 func _build_results() -> void:
 	result = Control.new()
 	add_child(result)
-	_panel(result, Rect2(325, 42, 630, 638))
-	_label(result, "サンゴ湾サーキット", Vector2(485, 70), 20, MINT)
-	_label(result, "レース結果", Vector2(472, 107), 48)
-	_image(result, "res://assets/ui/trophy.svg", Rect2(364, 97, 84, 84))
-	standings = _label(result, "", Vector2(370, 217), 26)
-	best = _label(result, "", Vector2(381, 489), 22, MINT)
-	_button(result, "もう一度走る", Rect2(367, 532, 262, 66),
+	_solid(result, Rect2(0, 0, 1280, 720), Color("07142e75"))
+	_panel(result, Rect2(195, 38, 890, 632), Color("0a0c35f2"), MAGENTA, 6)
+	_solid(result, Rect2(216, 61, 848, 72), MAGENTA)
+	_label(result, "FINAL SCORE / サンゴ湾サーキット", Vector2(255, 78), 31, WHITE)
+	_label(result, "電光順位表", Vector2(250, 160), 28, CYAN)
+	standings = _label(result, "", Vector2(251, 211), 25, YELLOW)
+	best = _label(result, "", Vector2(681, 211), 22, CYAN)
+	_label(result, "次の走行を選ぶ", Vector2(251, 511), 19, WHITE)
+	_button(result, "ENTER / A  もう一度走る", Rect2(250, 550, 371, 70),
 		func() -> void: start_requested.emit())
-	_button(result, "タイトルへ", Rect2(649, 532, 262, 66),
+	_button(result, "タイトルへ戻る", Rect2(658, 550, 371, 70),
 		func() -> void: title_requested.emit())
-	_label(result, "Enter / A 再走　Esc タイトル", Vector2(451, 625), 18)
 
 
 func _process(delta: float) -> void:
-	# 結果表示に入ってからタイムを数え上げる視覚演出。
 	result_reveal = minf(1.0, result_reveal + delta * 1.5)
+	pulse_clock += delta
+	if is_instance_valid(active_poster) and garage.visible:
+		active_poster.modulate = Color.WHITE.lerp(CYAN, 0.08 + sin(pulse_clock * 5.0) * 0.05)
+
+
+func set_tutorial_step(value: int) -> void:
+	tutorial_step = clampi(value, 0, 2)
 
 
 func refresh() -> void:
 	menu.visible = state.phase == "title"
+	garage.visible = state.phase == "garage"
+	tutorial.visible = state.phase == "tutorial"
 	race.visible = state.phase in ["countdown", "racing"]
 	result.visible = state.phase == "results"
 	if state.phase != last_phase:
 		last_phase = state.phase
 		if state.phase == "results":
-			result_reveal = 0
+			result_reveal = 0.0
 		_transition()
 	if menu.visible:
-		choice.text = ["しずく：加速と曲がりやすさが得意", "あかね：最高速で追い抜く", "すみれ：安定したハンドリング"][state.selected_kart]
+		choice.text = ["しずく：加速と旋回が得意", "あかね：直線の最高速が得意",
+			"すみれ：小回りと立て直しが得意"][state.selected_kart]
 		for index: int in range(3):
-			cards[index].modulate = Color.WHITE if index == state.selected_kart else Color("8ba5a0")
+			cards[index].modulate = Color.WHITE if index == state.selected_kart else Color("5d6585")
+	if garage.visible:
+		garage_map.queue_redraw()
+	if tutorial.visible:
+		var titles: Array[String] = ["アクセル計器を点灯", "左右のラインを確認", "ドリフトを準備"]
+		var details: Array[String] = ["↑ または RT を押す", "← → または左スティックを倒す",
+			"SPACE / X を押す（E / B でも次へ）"]
+		tutorial_title.text = titles[tutorial_step]
+		tutorial_detail.text = details[tutorial_step]
+		for index: int in range(tutorial_steps.size()):
+			var active: bool = index == tutorial_step
+			tutorial_steps[index].modulate = CYAN if active else (
+				Color("89ffb4") if index < tutorial_step else Color("66708c"))
 	if race.visible and not state.racers.is_empty():
 		var player: Dictionary = state.racers[0]
-		place.text = "%d 位" % state.rank_of(0)
-		lap.text = "%d / 3 周" % mini(player.lap, 3)
-		timer.text = "タイム  %s" % format_time(
+		lap.text = "%d / 3" % mini(player.lap, 3)
+		timer.text = "TIME  %s" % format_time(
 			player.finish_time if player.finish_time >= 0 else state.elapsed)
 		var lap_seconds: float = state.elapsed - player.lap_started
 		if player.finish_time >= 0 and not player.lap_times.is_empty():
 			lap_seconds = player.lap_times.back()
-		lap_timer.text = "ラップ  " + format_time(lap_seconds)
-		speed.text = "%03d" % roundi(absf(player.speed) * 3.6)
-		item.text = ["パルス", "ブイ", "ターボ"][player.item - 1] if player.item > 0 else "空っぽ"
+		lap_timer.text = "LAP TIME  " + format_time(lap_seconds)
+		gauge_speed = absf(player.speed) * 3.6
+		speed.text = "%03d" % roundi(gauge_speed)
+		gear.text = "R" if player.speed < -1.0 else (
+			"N" if gauge_speed < 2.0 else ("1" if gauge_speed < 32.0 else (
+			"2" if gauge_speed < 62.0 else "3")))
+		gauge.queue_redraw()
+		item.text = ["PULSE", "BUOY", "TURBO"][player.item - 1] if player.item > 0 else "EMPTY"
+		item_hint.text = "E / B  FIRE" if player.item > 0 else "箱を通過して補給"
 		item_icon.visible = player.item > 0
 		if player.item > 0:
 			item_icon.texture = load("res://assets/items/%s.svg" % ITEMS[player.item - 1])
 		center.text = str(ceili(state.countdown)) if state.phase == "countdown" else ""
 		if player.finish_time >= 0:
-			center.text = "ゴール！"
+			center.text = "GOAL!"
 		if player.speed < -1:
-			center.text = "逆走中"
+			center.text = "WRONG WAY"
 		map.queue_redraw()
 	if result.visible:
 		standings.text = ""
 		var row: int = 1
-		for racer: Dictionary in state.results():
-			standings.text += "%d位  %-8s   %s\n\n" % [
-				row, racer.name, format_time(racer.finish_time * result_reveal)]
+		for racer_data: Dictionary in state.results():
+			standings.text += "%d  %-8s  %s\n\n" % [row, racer_data.name,
+				format_time(racer_data.finish_time * result_reveal)]
 			row += 1
-		best.text = "ベストタイム  " + format_time(state.best_time)
+		best.text = "BEST TIME\n\n" + format_time(state.best_time)
 
 
 static func format_time(seconds: float) -> String:
@@ -257,12 +396,52 @@ func _draw_map() -> void:
 	var points: PackedVector2Array = []
 	for index: int in range(65):
 		var point: Vector3 = Course.sample(index / 64.0 * Course.LENGTH)
-		points.append(Vector2(point.x * 1.9 + 100, point.z * 1.35 + 53))
-	map.draw_polyline(points, Color("739b99"), 8, true)
+		points.append(Vector2(point.x * 1.85 + 107, point.z * 1.25 + 61))
+	map.draw_polyline(points, MAGENTA, 7, true)
 	for index: int in range(state.racers.size() - 1, -1, -1):
 		var point: Vector3 = Course.sample(state.racers[index].progress)
-		map.draw_circle(Vector2(point.x * 1.9 + 100, point.z * 1.35 + 53),
-			6 if index == 0 else 4, MINT if index == 0 else Color("ffab80"))
+		map.draw_circle(Vector2(point.x * 1.85 + 107, point.z * 1.25 + 61),
+			6 if index == 0 else 4, YELLOW if index == 0 else CYAN)
+
+
+func _draw_garage_map() -> void:
+	garage_map.draw_rect(Rect2(0, 0, 587, 245), Color("080c2b"))
+	var points: PackedVector2Array = []
+	for index: int in range(97):
+		var point: Vector3 = Course.sample(index / 96.0 * Course.LENGTH)
+		points.append(Vector2(point.x * 4.15 + 290, point.z * 2.7 + 120))
+	garage_map.draw_polyline(points, Color("301a63"), 25, true)
+	garage_map.draw_polyline(points, CYAN, 7, true)
+	garage_map.draw_circle(points[0], 12, YELLOW)
+	garage_map.draw_string(theme.default_font, Vector2(24, 31), "COURSE PREVIEW",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 19, MAGENTA)
+
+
+func _draw_gauge() -> void:
+	var gauge_center: Vector2 = Vector2(126, 104)
+	var start: float = PI * 0.76
+	var finish: float = PI * 2.24
+	gauge.draw_arc(gauge_center, 88, start, finish, 48, Color("23305d"), 17, true)
+	gauge.draw_arc(gauge_center, 88, start,
+		lerpf(start, finish, clampf(gauge_speed / 120.0, 0.0, 1.0)), 48, MAGENTA, 10, true)
+	for index: int in range(11):
+		var angle: float = lerpf(start, finish, index / 10.0)
+		var outer: Vector2 = gauge_center + Vector2(cos(angle), sin(angle)) * 93
+		var inner: Vector2 = gauge_center + Vector2(cos(angle), sin(angle)) * 76
+		gauge.draw_line(inner, outer, YELLOW if index % 2 == 0 else CYAN, 3)
+	var needle_angle: float = lerpf(start, finish, clampf(gauge_speed / 120.0, 0.0, 1.0))
+	gauge.draw_line(gauge_center,
+		gauge_center + Vector2(cos(needle_angle), sin(needle_angle)) * 67, YELLOW, 6, true)
+	gauge.draw_circle(gauge_center, 10, CYAN)
+	gauge.draw_string(theme.default_font, Vector2(10, 24), "SPEED", HORIZONTAL_ALIGNMENT_LEFT,
+		-1, 17, CYAN)
+	gauge.draw_string(theme.default_font, Vector2(184, 24), "GEAR", HORIZONTAL_ALIGNMENT_LEFT,
+		-1, 17, MAGENTA)
+
+
+func _draw_scanlines(target: Control) -> void:
+	for y: int in range(0, 720, 6):
+		target.draw_line(Vector2(0, y), Vector2(1280, y), Color(0.02, 0.02, 0.1, 0.07), 1)
 
 
 func popup(text: String, impact: bool = false) -> void:
@@ -270,15 +449,15 @@ func popup(text: String, impact: bool = false) -> void:
 		popup_tween.kill()
 	notice.text = text
 	notice.modulate.a = 1
-	notice.scale = Vector2.ONE * 1.07
+	notice.scale = Vector2.ONE * 1.08
 	popup_tween = create_tween().set_parallel(true)
-	popup_tween.tween_property(notice, "scale", Vector2.ONE, 0.2)
+	popup_tween.tween_property(notice, "scale", Vector2.ONE, 0.16)
 	popup_tween.tween_property(notice, "modulate:a", 0.0, 0.5).set_delay(1.0)
 	if impact:
-		flash.color = Color(1.0, 0.94, 0.8, 0.38)
+		flash.color = Color(1.0, 0.17, 0.58, 0.4)
 	popup_tween.tween_property(flash, "color:a", 0.0, 0.2)
 
 
 func _transition() -> void:
-	flash.color = Color(0.07, 0.21, 0.26, 0.75)
-	create_tween().tween_property(flash, "color:a", 0.0, 0.4)
+	flash.color = Color(0.12, 0.96, 1.0, 0.54)
+	create_tween().tween_property(flash, "color:a", 0.0, 0.32)

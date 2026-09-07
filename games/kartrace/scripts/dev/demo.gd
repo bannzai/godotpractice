@@ -30,6 +30,14 @@ func _run() -> void:
 			key(KEY_ENTER, true)
 		if frame == 31:
 			key(KEY_ENTER, false)
+		if frame == 42:
+			key(KEY_ENTER, true)
+		if frame == 43:
+			key(KEY_ENTER, false)
+		if frame == 54:
+			key(KEY_ENTER, true)
+		if frame == 55:
+			key(KEY_ENTER, false)
 			key(KEY_UP, true)
 		if state.phase == "racing":
 			# 他のGUI検証へフォーカスが移っても、保持入力を実イベントで再送する。
