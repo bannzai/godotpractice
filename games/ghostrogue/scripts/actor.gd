@@ -6,6 +6,12 @@ signal motion_finished(motion: String)
 const DURATIONS: Dictionary = {
 	"idle": 2.4, "attack": 0.58, "hurt": 0.42, "dissolve": 0.9, "move": 0.65
 }
+const SPIRIT_ATLAS_PATH := "res://assets/generated/spirit-cutins.png"
+const SPIRIT_IDS: Array[String] = [
+	"child", "warrior", "water", "beast",
+	"headless", "doll", "crow", "monk",
+	"moth", "fox", "bride", "bell",
+]
 
 var character_id: String = ""
 var sprite: Sprite2D
@@ -33,12 +39,33 @@ func setup(id: String) -> void:
 		animator.animation_finished.connect(_on_motion_finished)
 	if character_id != id:
 		character_id = id
-		sprite.texture = load("res://assets/art/%s_body.svg" % id)
-		detail.texture = load("res://assets/art/%s_detail.svg" % id)
-		echo.texture = load("res://assets/art/%s.svg" % id)
+		if id in SPIRIT_IDS:
+			sprite.texture = _spirit_portrait(id)
+			echo.texture = null
+			detail.texture = null
+		else:
+			sprite.texture = load("res://assets/art/%s_body.svg" % id)
+			detail.texture = load("res://assets/art/%s_detail.svg" % id)
+			echo.texture = load("res://assets/art/%s.svg" % id)
 		detail.show_behind_parent = id in ["fox", "moth", "bride", "crow", "beast", "boss"]
 		_create_animations()
 	play_motion("idle")
+
+
+func _spirit_portrait(id: String) -> AtlasTexture:
+	var atlas: Texture2D = load(SPIRIT_ATLAS_PATH)
+	var index: int = SPIRIT_IDS.find(id)
+	var cell_size := Vector2(float(atlas.get_width()) / 4.0, float(atlas.get_height()) / 3.0)
+	var portrait := AtlasTexture.new()
+	portrait.atlas = atlas
+	portrait.region = Rect2(
+		float(index % 4) * cell_size.x,
+		float(index / 4) * cell_size.y,
+		cell_size.x,
+		cell_size.y
+	)
+	portrait.filter_clip = true
+	return portrait
 
 
 func _create_animations() -> void:
