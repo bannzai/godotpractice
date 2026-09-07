@@ -54,6 +54,8 @@ void fragment() {
 var _action: String = "attack"
 var _caption: String = ""
 var _portrait: AtlasTexture
+var _atlas_source: Texture2D
+var _atlas_region: Rect2
 var _panels: Array[Polygon2D] = []
 var _frames: Array[Line2D] = []
 var _accent_frames: Array[Line2D] = []
@@ -241,8 +243,11 @@ func _select_portrait(spirit_id: String) -> void:
 		cell_size.y
 	)
 	_portrait.filter_clip = true
+	_atlas_source = source
+	_atlas_region = _portrait.region
 	for panel: Polygon2D in _panels:
-		panel.texture = _portrait
+		# Shader 内で AtlasTexture の領域変換が失われないよう、元画像を絶対座標で切り出す。
+		panel.texture = _atlas_source
 
 
 func _apply_progress(value: float) -> void:
@@ -311,7 +316,7 @@ func _apply_panel(index: int, progress: float, entering: float, alpha: float,
 
 
 func _panel_uv(index: int, progress: float, impact: float) -> PackedVector2Array:
-	var texture_size: Vector2 = _portrait.get_size()
+	var texture_size: Vector2 = _atlas_region.size
 	var zoom: float = [1.08, 1.38, 1.68][index]
 	if _action == "attack":
 		zoom += progress * 0.24 + impact * 0.12
@@ -330,10 +335,10 @@ func _panel_uv(index: int, progress: float, impact: float) -> PackedVector2Array
 	var top_left: Vector2 = center - half_view
 	var bottom_right: Vector2 = center + half_view
 	return PackedVector2Array([
-		top_left,
-		Vector2(bottom_right.x, top_left.y),
-		bottom_right,
-		Vector2(top_left.x, bottom_right.y),
+		_atlas_region.position + top_left,
+		_atlas_region.position + Vector2(bottom_right.x, top_left.y),
+		_atlas_region.position + bottom_right,
+		_atlas_region.position + Vector2(top_left.x, bottom_right.y),
 	])
 
 

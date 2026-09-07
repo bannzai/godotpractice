@@ -138,7 +138,7 @@
 - **改変**: WAVからVorbis品質4のOGGへ変換し、ファイル名を変更
 - **備考**: fetch-asset.shでcrackleelectricityloop.wavを取得。
 
-## 画像生成による劇画素材 (`assets/generated/`) (`assets/generated/`)
+## 画像生成による劇画素材 (`assets/generated/`)
 
 - **素材名**: 夜を継ぐ者 タイトルキービジュアル (`title-keyart.png`)
 - **作者**: godotpractice / OpenAI
@@ -158,7 +158,7 @@
 - **備考**: 霊の名称と造形は本作固有。既存作品の固有名称・画像・ロゴは入力していない。
 - **生成**: OpenAI image generation / プロンプトの要点: 十二種類の日本怪異を等身の劇画ホラーで描く統一アトラス。太い墨線、網点、黒・懐中電灯の黄・血の赤・霊の青白。文字や既存作品要素なし。
 
-## 独自制作のシェーダ (`assets/shaders/`) (`assets/shaders/`)
+## 独自制作のシェーダ (`assets/shaders/`)
 
 - **素材名**: 劇画ポスタリゼーション・網点シェーダ (`gekiga.gdshader`)
 - **作者**: godotpractice

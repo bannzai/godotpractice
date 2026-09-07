@@ -11,7 +11,7 @@ const Effects := preload("res://scripts/effects.gd")
 const Sound := preload("res://scripts/sound.gd")
 const RouteView := preload("res://scripts/route_view.gd")
 const CutIn := preload("res://scripts/cut_in.gd")
-const NOTE_INK := Color("181108")
+const NOTE_INK := Color("f0dfaa")
 const TYPE_COLORS: Dictionary = {
 	"grudge": Color("cd938c"), "sorrow": Color("83bfca"), "rage": Color("d6b276")
 }
@@ -251,12 +251,13 @@ func _draw_intro() -> void:
 	UI.panel(screen, Rect2(621, 42, 617, 635), Color("050505ed"))
 	UI.label(screen, "第一夜　妹の声", Rect2(662, 77, 527, 52), 31, UI.GOLD)
 	UI.label(screen, Story.INTRO.title, Rect2(661, 145, 532, 70), 36)
-	UI.label(screen, Story.INTRO.text, Rect2(662, 229, 522, 278), 22, UI.GHOST)
+	var intro_text: String = String(Story.INTRO.text).replace("\n\n", "\n")
+	UI.label(screen, intro_text, Rect2(662, 224, 522, 281), 19, UI.GHOST)
 	UI.label(
 		screen,
 		"手帳の最初の頁：\n通りを歩く → 墓地へ入る → 霊を迎える → 霊戦",
-		Rect2(662, 485, 522, 71),
-		18,
+		Rect2(662, 512, 522, 58),
+		16,
 		UI.RED
 	)
 	_button("BeginJourney", "懐中電灯を握り、通りへ", Rect2(662, 582, 521, 62), run.begin_journey)
@@ -267,7 +268,7 @@ func _header(title: String, subtitle: String = "") -> void:
 	UI.label(screen, title, Rect2(47, 31, 560, 40), 29)
 	UI.label(screen, subtitle, Rect2(49, 72, 550, 24), 14, UI.GHOST)
 	_button("OpenCodex", "黒い手帳", Rect2(1081, 29, 166, 52), _open_overlay.bind("codex"))
-	_button("Pause", "…", Rect2(1013, 29, 51, 52), _open_overlay.bind("pause"))
+	_button("Pause", "休", Rect2(1013, 29, 51, 52), _open_overlay.bind("pause"))
 	first_focus = null
 
 
@@ -474,36 +475,42 @@ func _draw_battle() -> void:
 	for index: int in range(run.enemies.size()):
 		var enemy: Dictionary = run.enemies[index]
 		var definition: Dictionary = Catalog.spirit(enemy.species)
-		var x: float = 850 + index * 195
+		var cell_width: float = 390.0 / float(run.enemies.size())
+		var left: float = 801.0 + index * cell_width
+		var x: float = left + cell_width * 0.5
 		var node: Node2D = _actor(
-			enemy.species, Vector2(x + 38, 329), 1.10 if enemy.species == "boss" else 0.84
+			enemy.species, Vector2(x, 329), 1.10 if enemy.species == "boss" else 0.84
 		)
 		node.set_meta("uid", enemy.uid)
 		node.scale.x = -absf(node.scale.x)
 		enemy_nodes.append(node)
-		var selected: String = "灯が照らす ● " if target_index == index else "暗がり　"
+		var target_rect := Rect2(left + 5, 397, cell_width - 10, 65)
+		var selected: bool = target_index == index
+		if selected:
+			UI.panel(screen, target_rect.grow(5), Color("ffd4472a"))
 		_button(
 			"Target%d" % index,
-			selected + str(definition.name),
-			Rect2(x - 59, 399, 218, 49),
+			("灯が照らす　" if selected else "暗がり　") + str(definition.name)
+			+ "\n" + ("この影を狙う" if selected else "灯を向ける"),
+			target_rect,
 			_target.bind(index)
 		)
 		_health_labels[enemy.uid] = UI.label(
 			screen,
 			"%s / 速 %d / HP %d" % [Catalog.TYPES[definition.type], definition.speed, enemy.hp],
-			Rect2(x - 55, 457, 228, 28),
-			17,
+			Rect2(left + 8, 469, cell_width - 16, 27),
+			14,
 			TYPE_COLORS[definition.type]
 		)
 		_health_labels[enemy.uid].set_meta("species", enemy.species)
 		_health_bars[enemy.uid] = UI.bar(
-			screen, Rect2(x - 52, 491, 202, 8), enemy.hp, definition.hp, UI.RED
+			screen, Rect2(left + 8, 500, cell_width - 16, 8), enemy.hp, definition.hp, UI.RED
 		)
 		UI.label(
 			screen,
 			"予告：%s" % Catalog.MOVES[definition.moves[int(run.turn % 3 == 0)]].name,
-			Rect2(x - 55, 509, 230, 30),
-			16,
+			Rect2(left + 8, 513, cell_width - 16, 30),
+			14,
 			UI.MUTED
 		)
 	_button("ResolveTurn", "手帳を閉じ、命令する", Rect2(823, 572, 388, 64), _resolve)
