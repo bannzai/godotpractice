@@ -210,16 +210,24 @@ func _check_cpu() -> void:
 
 
 func _check_records() -> void:
-	var empty: Dictionary = {"high_score": 0, "best_chain": 0}
+	var empty: Dictionary = {"high_score": 0, "best_chain": 0, "tutorial_seen": false}
 	_check(Rules.parse_records(null) == empty, "保存: 未作成")
 	_check(Rules.parse_records([]) == empty, "保存: 不正形式")
 	_check(Rules.parse_records({"high_score": "100", "best_chain": -2}) == empty, "保存: 不正型と負数")
 	_check(
 		(
 			Rules.parse_records({"high_score": 240.0, "best_chain": 3.0})
-			== {"high_score": 240, "best_chain": 3}
+			== {"high_score": 240, "best_chain": 3, "tutorial_seen": false}
 		),
 		"保存: JSONの浮動小数を解釈"
+	)
+	_check(
+		Rules.parse_records({"tutorial_seen": true}).tutorial_seen,
+		"保存: 初回チュートリアル完了を解釈"
+	)
+	_check(
+		not Rules.parse_records({"tutorial_seen": 1}).tutorial_seen,
+		"保存: チュートリアル完了の不正型を拒否"
 	)
 	_check(Rules.parse_records({"high_score": INF, "best_chain": NAN}) == empty, "保存: 非有限値")
 	_check(Rules.parse_records({"best_chain": 999}).best_chain == 18, "保存: 盤面上の連鎖上限")

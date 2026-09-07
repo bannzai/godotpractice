@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://t40064lork2x"
-path="res://.godot/imported/NotoSansJP.ttf-2659246e986fc2d136c17e42de851678.fontdata"
+uid="uid://cpmef27ls8vmy"
+path="res://.godot/imported/Murecho[wght].ttf-bf0355e775d9f68ed5169b36b1a78c78.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/NotoSansJP.ttf"
-dest_files=["res://.godot/imported/NotoSansJP.ttf-2659246e986fc2d136c17e42de851678.fontdata"]
+source_file="res://assets/fonts/Murecho[wght].ttf"
+dest_files=["res://.godot/imported/Murecho[wght].ttf-bf0355e775d9f68ed5169b36b1a78c78.fontdata"]
 
 [params]
 

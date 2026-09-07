@@ -4,10 +4,11 @@ extends Node
 
 const SCENES: Array[String] = ["title", "play", "danger", "result"]
 const EFFECTS: Array[String] = [
-	"move", "rotate", "land", "clear", "chain", "garbage", "victory", "defeat",
+	"move", "rotate", "land", "clear", "chain", "garbage", "victory", "defeat", "select",
 ]
 
 var _music: AudioStreamPlayer
+var _ambient: AudioStreamPlayer
 var _effects: Array[AudioStreamPlayer] = []
 var _scene: String = ""
 var _next_voice: int = 0
@@ -22,6 +23,14 @@ func set_scene(scene: String) -> void:
 	if scene not in SCENES or scene == _scene:
 		return
 	_ensure_players()
+	if not _ambient.playing:
+		var ambient_stream: AudioStreamWAV = load("res://assets/audio/ambient.wav")
+		ambient_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		ambient_stream.loop_begin = 0
+		ambient_stream.loop_end = ambient_stream.data.size() / 2
+		_ambient.stream = ambient_stream
+		_ambient.volume_db = -25.0
+		_ambient.play()
 	_scene = scene
 	_music.stop()
 	var stream: AudioStreamWAV = load("res://assets/audio/bgm_%s.wav" % scene)
@@ -57,6 +66,9 @@ func stop_audio() -> void:
 	if is_instance_valid(_music):
 		_music.stop()
 		_music.stream = null
+	if is_instance_valid(_ambient):
+		_ambient.stop()
+		_ambient.stream = null
 	for player: AudioStreamPlayer in _effects:
 		if is_instance_valid(player):
 			player.stop()
@@ -79,6 +91,9 @@ func _ensure_players() -> void:
 	_music = AudioStreamPlayer.new()
 	_music.name = "Music"
 	add_child(_music)
+	_ambient = AudioStreamPlayer.new()
+	_ambient.name = "Ambient"
+	add_child(_ambient)
 	for i: int in range(8):
 		var player: AudioStreamPlayer = AudioStreamPlayer.new()
 		player.name = "Effect%d" % i

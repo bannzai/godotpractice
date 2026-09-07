@@ -19,8 +19,20 @@ func _run() -> void:
 	root.add_child(main)
 	await _frames(3)
 	_check(state.screen == "title", "タイトルを表示")
+	state.records.tutorial_seen = false
 	await _tap_key(KEY_ENTER)
-	_check(state.screen == "play" and state.mode == "cpu", "Enterで対戦開始")
+	_check(
+		state.screen == "play" and state.mode == "cpu" and main.tutorial_step == 0,
+		"Enterで対戦と初回チュートリアルを開始"
+	)
+	_check(state.paused, "チュートリアル中は盤面を停止")
+	await _tap_key(KEY_ENTER)
+	_check(main.tutorial_step == 1, "Enterでチュートリアルを進める")
+	await _click_button("tutorial_skip")
+	_check(
+		main.tutorial_step == -1 and not state.paused and state.records.tutorial_seen,
+		"チュートリアルをスキップして操作を開始"
+	)
 	await _check_piece_inputs()
 	await _check_pause()
 	await _check_results()

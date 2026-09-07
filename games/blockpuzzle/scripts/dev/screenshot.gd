@@ -36,24 +36,62 @@ func _capture_scenes() -> bool:
 
 
 func _opening() -> bool:
+	if not await _title_and_help():
+		return false
+	if not await _tutorial():
+		return false
+	_populate()
+	if not await _capture("play"):
+		return false
+	state.boards[0].phase = "clear"
+	state.boards[0].timer = 100.0
+	await create_timer(0.05).timeout
+	if not await _capture("wait-reason"):
+		return false
+	state.boards[0].phase = "falling"
+	return await _pause_and_fullscreen()
+
+
+func _title_and_help() -> bool:
 	await create_timer(0.12).timeout
 	if not await _capture("transition"):
 		return false
 	await create_timer(0.25).timeout
 	if not await _capture("title"):
 		return false
+	main.content.get_node("solo").grab_focus()
+	await process_frame
+	if not await _capture("modes"):
+		return false
+	main.content.get_node("cpu").grab_focus()
 	main._help()
 	if not await _capture("help"):
 		return false
 	main._render()
+	return true
+
+
+func _tutorial() -> bool:
+	state.records.tutorial_seen = false
 	await _key(KEY_ENTER)
-	await create_timer(0.5).timeout
-	if not _check(state.screen == "play", "Enterでプレイ開始"):
+	await create_timer(0.25).timeout
+	if not _check(state.screen == "play" and main.tutorial_step == 0, "Enterで案内を開始"):
 		return false
-	_populate()
-	if not await _capture("play"):
+	if not await _capture("tutorial-position"):
 		return false
-	return await _pause_and_fullscreen()
+	await _key(KEY_ENTER)
+	await create_timer(0.25).timeout
+	if not await _capture("tutorial-preview"):
+		return false
+	await _key(KEY_ENTER)
+	await create_timer(0.25).timeout
+	if not await _capture("tutorial-chain"):
+		return false
+	await _key(KEY_ENTER)
+	await create_timer(0.25).timeout
+	if not _check(main.tutorial_step == -1 and not state.paused, "案内からプレイ開始"):
+		return false
+	return true
 
 
 func _pause_and_fullscreen() -> bool:
@@ -170,8 +208,8 @@ func _gallery(kind: int) -> bool:
 	for child: Node in main.content.get_children():
 		main.content.remove_child(child)
 		child.queue_free()
-	main._panel(Rect2(60, 35, 1160, 650), Color("102b3c"))
-	main._label("精霊 %d · 動作の連続フレーム" % kind, Rect2(100, 57, 960, 50), 30)
+	main._panel(Rect2(60, 35, 1160, 650), Color("ffffff"))
+	main._label("図形 %d / Tween 動作の連続フレーム" % kind, Rect2(100, 57, 960, 50), 30)
 	var poses: Array[String] = ["idle", "move", "land", "hurt", "clear"]
 	var captions: Array[String] = ["待機", "移動", "着地", "被害", "消去"]
 	for col: int in range(3):
@@ -183,7 +221,7 @@ func _gallery(kind: int) -> bool:
 			main.content.add_child(actor)
 			actor.position = Vector2(459 + col * 260, 192 + row * 97)
 			actor.setup(kind, 92)
-			var duration: float = actor.animator.get_animation(poses[row]).length
+			var duration: float = actor.pose_duration(poses[row])
 			actor.seek_pose(poses[row], duration * [0.0, 0.5, 1.0][col])
 	await create_timer(0.35).timeout
 	return await _capture("character-%d" % kind)
