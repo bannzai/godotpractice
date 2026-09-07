@@ -18,6 +18,7 @@ const BASE := preload("res://assets/models/base.tscn")
 const CREAM := Color("f5e8be")
 const TEAL := Color("339b9c")
 const ORANGE := Color("ed8753")
+const GOLD := Color("d3a449")
 const INK := Color("233e42")
 
 var camera: Camera3D
@@ -26,6 +27,7 @@ var crew_meshes: Dictionary = {}
 var cargo_meshes: Array[Node3D] = []
 var enemy_meshes: Array[Node3D] = []
 var aim_ring: MeshInstance3D
+var aim_note: Label3D
 var font: Font
 var elapsed: float = 0.0
 var whistle_time: float = 0.0
@@ -50,6 +52,11 @@ func setup(model: Node, ui_font: Font) -> void:
 	add_child(leader_mesh)
 	aim_ring = _ring(ORANGE, 0.8)
 	add_child(aim_ring)
+	aim_note = _label("", Vector3.ZERO)
+	aim_note.font_size = 34
+	aim_note.outline_size = 0
+	aim_note.modulate = INK
+	add_child(aim_note)
 	camera = Camera3D.new()
 	camera.fov = 48
 	camera.far = 150
@@ -79,8 +86,51 @@ func sync(model: Node, delta: float, target: Vector3) -> void:
 	aim_ring.visible = model.phase == "playing"
 	aim_ring.position = Vector3(target.x, 0.08, target.z)
 	aim_ring.rotation.y = elapsed
+	var context: String = describe_target(model, target)
+	var selected: bool = not context.begins_with("照準")
+	aim_note.visible = model.phase == "playing" and selected
+	aim_note.position = Vector3(target.x, 1.25, target.z)
+	aim_note.text = context
+	aim_ring.scale = Vector3.ONE * (1.28 if selected else 1.0)
+	var ring_material: ShaderMaterial = aim_ring.material_override
+	ring_material.set_shader_parameter("tint", GOLD if selected else ORANGE)
 	whistle_time = maxf(0.0, whistle_time - delta)
 	_base_mesh.beacon.rotation.y = elapsed * 0.45
+
+
+func describe_target(model: Node, target: Vector3) -> String:
+	for index: int in range(model.cargo.size()):
+		var item: Dictionary = model.cargo[index]
+		if item.delivered or target.distance_to(item.position) > 2.2:
+			continue
+		var workers: int = 0
+		for member: Dictionary in model.crew:
+			if member.state == "carry" and member.target == index:
+				workers += 1
+		if workers >= int(item.weight):
+			return "運搬中　基地へ向かいます"
+		if _selected_followers(model) == 0:
+			return "投げられる仲間がいません\n笛で呼ぶか Tab / X で切替"
+		return "結晶 %d / %d\n投げると あと %d 人で運搬" % [
+			workers, item.weight, maxi(0, int(item.weight) - workers)]
+	for index: int in range(model.enemies.size()):
+		var enemy: Dictionary = model.enemies[index]
+		if enemy.hp <= 0.0 or target.distance_to(enemy.position) > 2.2:
+			continue
+		if _selected_followers(model) == 0:
+			return "投げられる仲間がいません\n笛で呼び戻す"
+		return "%s　体力 %d\n%sを投げると攻撃" % [
+			"庭甲虫" if index == 0 else "トゲ甲虫", ceili(enemy.hp),
+			"朱の仲間" if model.selected_kind == 0 else "青の仲間"]
+	return "照準を結晶か敵へ重ねる\n近づくと次の一手を表示"
+
+
+func _selected_followers(model: Node) -> int:
+	var count: int = 0
+	for member: Dictionary in model.crew:
+		if member.state == "follow" and member.kind == model.selected_kind:
+			count += 1
+	return count
 
 
 func reset_view(model: Node) -> void:
@@ -285,5 +335,5 @@ func _ring(color: Color, radius: float) -> MeshInstance3D:
 	mesh.rings = 24
 	mesh.ring_segments = 6
 	instance.mesh = mesh
-	instance.material_override = Shapes.material(color)
+	instance.material_override = Shapes.material(color).duplicate()
 	return instance

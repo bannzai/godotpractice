@@ -9,6 +9,8 @@ const OBSTACLE_RADIUS: float = 1.7
 const FLIGHT_SECONDS: float = 0.55
 
 var phase: String = "title"
+var tutorial_page: int = -1
+var tutorial_seen: bool = false
 var leader: Vector3 = Vector3.ZERO
 var crew: Array[Dictionary] = []
 var cargo: Array[Dictionary] = []
@@ -25,6 +27,7 @@ var _next_id: int = 0
 
 func start_day() -> void:
 	phase = "playing"
+	tutorial_page = -1 if tutorial_seen else 0
 	leader = Vector3(0, 0, 11)
 	remaining = DAY_SECONDS
 	collected = 0
@@ -50,7 +53,30 @@ func start_day() -> void:
 
 func show_title() -> void:
 	phase = "title"
+	tutorial_page = -1
 	events.clear()
+
+
+func show_map() -> void:
+	phase = "map"
+	tutorial_page = -1
+	events.clear()
+
+
+func advance_tutorial() -> void:
+	if phase != "playing" or tutorial_page < 0:
+		return
+	if tutorial_page < 2:
+		tutorial_page += 1
+	else:
+		skip_tutorial()
+
+
+func skip_tutorial() -> void:
+	if phase != "playing":
+		return
+	tutorial_page = -1
+	tutorial_seen = true
 
 
 ## 時間と操作を積算するため非冪等。大きな delta は分割して衝突・死亡順を安定させる。
