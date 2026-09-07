@@ -228,7 +228,7 @@ func _refresh_tutorial(page: int) -> void:
 	var pages: Array[Dictionary] = [
 		{
 			"title": "1頁目　隊長を歩かせる",
-			"body": "　W A S D　　　　　　Q　E\n　　↑　　　　　　　↶　↷\n"
+			"body": "　W A S D　　　　　　Q　E\n　　↑　　　　　　　←　→\n"
 				+ "　←　→　で移動　　 見回す\n　　↓\n\nまずは足もとの橙色の照準を、\n"
 				+ "近くの結晶へ重ねてみよう。",
 		},
