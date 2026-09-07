@@ -48,24 +48,24 @@
 
 ## 独自素材 (audio) (`assets/audio/`)
 
-- **素材名**: 暁の境界 BGMと効果音 (`attack.ogg`, `battle.ogg`, `confirm.ogg`, `heal.ogg`, `level.ogg`, `result.ogg`, `stage.ogg`, `title.ogg`)
+- **素材名**: 暁の境界 BGM・環境音・効果音 (`ambience.ogg`, `attack.ogg`, `battle.ogg`, `confirm.ogg`, `fan.ogg`, `heal.ogg`, `level.ogg`, `result.ogg`, `stage.ogg`, `title.ogg`)
 - **作者**: bannzai（Codexを用いた独自制作）
 - **入手 URL**: https://github.com/bannzai/godotpractice
 - **ライセンス**: 本プロジェクト用の独自制作物（第三者素材・楽譜を使用していない）
 - **クレジット表記**: **不要**
 - **改変**: なし
 - **備考**: 再生成: python3 games/tactics/scripts/art/generate_audio.py
-- **生成**: Codexによるコード記述、Python標準ライブラリによる決定的生成、ffmpeg Ogg Vorbis変換 / プロンプトの要点: タイトル、出撃、戦闘、結果の四曲。独自旋律の笛、撥弦、持続弦、ベルと打楽器を倍音合成し左右定位を与える。攻撃、回復、成長、決定の四SE。
+- **生成**: Codexによるコード記述、Python標準ライブラリによる決定的生成、ffmpeg Ogg Vorbis変換 / プロンプトの要点: タイトル、出撃、戦闘、結果の四曲。独自旋律の笛、撥弦、持続弦、ベルと打楽器を倍音合成し左右定位を与える。風・水・遠い鈴の環境音、和紙と扇骨が開く音、攻撃・回復・成長・決定の効果音。
 
 ## フォント (`assets/fonts/`)
 
-- **素材名**: Zen Old Mincho Regular (`ZenOldMincho-Regular.ttf`, `OFL.txt`)
-- **作者**: The Zen Old Mincho Project Authors
-- **入手 URL**: https://github.com/googlefonts/zen-oldmincho
+- **素材名**: Shippori Mincho B1 (`ShipporiMinchoB1-Regular.ttf`, `ShipporiMinchoB1-SemiBold.ttf`, `OFL.txt`)
+- **作者**: Copyright 2021 The Shippori Mincho Project Authors (https://github.com/fontdasu/ShipporiMincho)
+- **入手 URL**: https://fonts.google.com/specimen/Shippori+Mincho+B1
 - **ライセンス**: SIL Open Font License 1.1
 - **クレジット表記**: **必要**
 - **改変**: なし
-- **備考**: 既存deckrogueの未改変フォントをコピー。著作権表示とライセンス全文をfonts/OFL.txtへ同梱。
+- **備考**: Google Fontsから取得。著作権表示とライセンス全文をfonts/OFL.txtへ同梱し、全export presetのinclude_filterへ含める
 
 ## 独自シェーダ (`assets/shaders/`)
 
@@ -76,3 +76,22 @@
 - **クレジット表記**: **不要**
 - **改変**: なし
 - **生成**: CodexによるGodotシェーダ記述 / プロンプトの要点: 深紺と翡翠の谷に漂う低速の薄霧と淡い金の光。最大透明度0.075、GL Compatibility対応。
+
+- **素材名**: 金雲と人物の金縁 (`gold_clouds.gdshader`, `gold_outline.gdshader`)
+- **作者**: bannzai（Codexを用いた独自制作）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクト用の独自制作物（第三者素材を使用していない）
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **生成**: CodexによるGodotシェーダ記述 / プロンプトの要点: GL Compatibility向けCanvasItem。和紙の繊維、四曲屏風の折り目、すやり霞の金縁を背景へ重ね、透過人物画の外周へ解像度追従の金線を描く。
+
+## 画像生成による大和絵 (`assets/generated/`)
+
+- **素材名**: 屏風絵の人物画と地形絵 (`allies-atlas.png`, `enemies-atlas.png`, `yamato-landscape.png`)
+- **作者**: bannzai（OpenAI built-in image generationを使用）
+- **入手 URL**: https://openai.com/policies/services-agreement/
+- **ライセンス**: OpenAI利用規約の範囲で本プロジェクトが利用する生成物。第三者素材を入力に使用していない
+- **クレジット表記**: **不要**
+- **改変**: 敵兵アトラスのみ背景抽出で市松模様を透明alphaへ置換。拡縮・クロマキー加工なし
+- **備考**: 人物アトラスはGodotのAtlasTextureで領域参照し、生成PNG自体は後加工していない。四隅alphaをImageMagickで検査済み
+- **生成**: OpenAI built-in image_gen / プロンプトの要点: 大和絵・屏風・平面的な全身人物・墨線・鉱物顔料・金箔。味方5兵種と敵5兵種を横一列の透過人物画にし、俯瞰の平原・森・山・川・砦を金雲入りの横長地形絵にした。既存作品名や原作素材は指定していない

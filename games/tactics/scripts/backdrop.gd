@@ -1,30 +1,27 @@
 extends Control
-## 空・山稜・手前の草を独立して動かす遠景。
+## 大和絵に屏風の折り目・和紙・金雲を重ねた遠景。
 
 const UI := preload("res://scripts/ui.gd")
-var layers: Array[TextureRect] = []
+const GOLD_CLOUDS := preload("res://assets/shaders/gold_clouds.gdshader")
+
+var landscape: TextureRect
 var elapsed: float = 0.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UI.panel(self, Rect2(0, 0, 1280, 720), Color("172d3d"), Color.TRANSPARENT)
-	for layer: String in ["sky", "mountains", "foreground"]:
-		layers.append(UI.art(self, "backgrounds/%s.svg" % layer, Rect2(-24, -16, 1328, 752)))
-
-	var mist := ColorRect.new()
-	mist.size = Vector2(1280, 720)
-	mist.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var atmosphere := ShaderMaterial.new()
-	atmosphere.shader = load("res://assets/shaders/atmosphere.gdshader")
-	mist.material = atmosphere
-	add_child(mist)
+	size = Vector2(1280, 720)
+	clip_contents = true
+	landscape = UI.art_cover(
+		self, "generated/yamato-landscape.png", Rect2(-14, -8, 1308, 736)
+	)
+	var material := ShaderMaterial.new()
+	material.shader = GOLD_CLOUDS
+	landscape.material = material
 
 
-# 雲と草の連続的な時間変化を表す。
+# 原画を見失わない範囲で、屏風絵がわずかに息づくように動かす。
 func _process(delta: float) -> void:
 	elapsed += delta
-	for index: int in layers.size():
-		var depth: float = float(index + 1)
-		layers[index].position.x = -24 + sin(elapsed * 0.12) * depth * 5
-		layers[index].position.y = -16 + cos(elapsed * 0.17) * depth * 2
+	landscape.position.x = -14.0 + sin(elapsed * 0.09) * 2.5
+	landscape.position.y = -8.0 + cos(elapsed * 0.07) * 1.5

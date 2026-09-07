@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://bjw7duigil7x"
-path="res://.godot/imported/ZenOldMincho-Regular.ttf-e7055a0acadd3a588e50ecda288362af.fontdata"
+uid="uid://771ckbjejicg"
+path="res://.godot/imported/ShipporiMinchoB1-Regular.ttf-171d6efaa8655516ccf458decb10e91d.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/ZenOldMincho-Regular.ttf"
-dest_files=["res://.godot/imported/ZenOldMincho-Regular.ttf-e7055a0acadd3a588e50ecda288362af.fontdata"]
+source_file="res://assets/fonts/ShipporiMinchoB1-Regular.ttf"
+dest_files=["res://.godot/imported/ShipporiMinchoB1-Regular.ttf-171d6efaa8655516ccf458decb10e91d.fontdata"]
 
 [params]
 
