@@ -73,16 +73,21 @@ movie: import
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
 	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
-# 実入力で探索・隊長戦・結果・タイトル復帰を26秒録画する。
+# 実入力でチュートリアル・地方図・探索・隊長戦・結果・タイトル復帰を録画する。
 movie-play: import
+	rm -f $(LOG_DIR)/movie-play.avi $(LOG_DIR)/movie-play.mp4 $(LOG_DIR)/movie-play-frame-*.png
 	"$(GODOT)" --path . $(WINDOWED_FLAGS) --write-movie $(LOG_DIR)/movie-play.avi --fixed-fps 30 --script res://scripts/dev/demo.gd > $(LOG_DIR)/movie-play.log 2>&1; \
 	echo "exit=$$?" >> $(LOG_DIR)/movie-play.log; \
 	tail -n 1 $(LOG_DIR)/movie-play.log | grep -q '^exit=0$$'
-	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
+	! grep -i -e 'WARNING' -e 'ERROR' -e 'resources still in use' $(LOG_DIR)/movie-play.log | grep -v $(WINDOWED_LOG_NOISE) | grep -q .
 	grep -q 'プレイ録画 OK' $(LOG_DIR)/movie-play.log
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie-play.mp4
 	rm -f $(LOG_DIR)/movie-play.avi
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie-play.mp4 -vf fps=1/2 $(LOG_DIR)/movie-play-frame-%02d.png
+	test -s $(LOG_DIR)/movie-play.mp4
+	ls $(LOG_DIR)/movie-play-frame-*.png >/dev/null
+	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie-play.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
+	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
 
 # 短時間の強制終了と再生中の通常終了を別々に検証し、リーク警告を除外しない。
 check-shutdown: import
@@ -96,32 +101,48 @@ check-shutdown: import
 
 # エディタなしでゲームを起動する (ローカルの手動確認用)
 run: import
-	"$(GODOT)" --path .
+	"$(GODOT)" --path . > $(LOG_DIR)/run.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/run.log; \
+	tail -n 1 $(LOG_DIR)/run.log | grep -q '^exit=0$$'
+	grep -q '^monsterquest boot$$' $(LOG_DIR)/run.log
+	! grep -i -e 'WARNING' -e 'ERROR' -e 'resources still in use' $(LOG_DIR)/run.log
 
 # エクスポート。プリセット名は export_presets.cfg と一致させる。
 # 実行には Godot 4.7 の export templates (Godot_v4.7-stable_export_templates.tpz) の展開が必要
 # (AGENTS.md「検証方法」参照)
 build-macos: import
 	@mkdir -p build/macos
-	"$(GODOT)" --headless --path . --export-release "macOS" build/macos/monsterquest.zip
+	"$(GODOT)" --headless --path . --export-release "macOS" build/macos/monsterquest.zip > $(LOG_DIR)/build-macos.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-macos.log; \
+	tail -n 1 $(LOG_DIR)/build-macos.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-macos.log
 	test -f build/macos/monsterquest.zip
 
 build-windows: import
 	@mkdir -p build/windows
-	"$(GODOT)" --headless --path . --export-release "Windows Desktop" build/windows/monsterquest.exe
+	"$(GODOT)" --headless --path . --export-release "Windows Desktop" build/windows/monsterquest.exe > $(LOG_DIR)/build-windows.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-windows.log; \
+	tail -n 1 $(LOG_DIR)/build-windows.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-windows.log
 	test -f build/windows/monsterquest.exe
 	test -f build/windows/monsterquest.pck
 
 build-linux: import
 	@mkdir -p build/linux
-	"$(GODOT)" --headless --path . --export-release "Linux" build/linux/monsterquest.x86_64
+	"$(GODOT)" --headless --path . --export-release "Linux" build/linux/monsterquest.x86_64 > $(LOG_DIR)/build-linux.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-linux.log; \
+	tail -n 1 $(LOG_DIR)/build-linux.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-linux.log
 	test -f build/linux/monsterquest.x86_64
 	test -f build/linux/monsterquest.pck
 
 # Web エクスポート (動作確認専用。配布はデスクトップ 3 種)。webtunnel での確認に使う
 build-web: import
 	@mkdir -p build/web
-	"$(GODOT)" --headless --path . --export-release "Web" build/web/index.html
+	"$(GODOT)" --headless --path . --export-release "Web" build/web/index.html > $(LOG_DIR)/build-web.log 2>&1; \
+	echo "exit=$$?" >> $(LOG_DIR)/build-web.log; \
+	tail -n 1 $(LOG_DIR)/build-web.log | grep -q '^exit=0$$'
+	! grep -i -e 'WARNING' -e 'ERROR' $(LOG_DIR)/build-web.log
 	test -f build/web/index.html
 	test -f build/web/index.wasm
 	test -f build/web/index.pck

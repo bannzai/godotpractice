@@ -4,13 +4,22 @@
 
 ## フォント (`assets/fonts/`)
 
+- **素材名**: DotGothic16 Regular (`DotGothic16-Regular.ttf`, `OFL.txt`)
+- **作者**: The DotGothic16 Project Authors / Fontworks Inc.
+- **入手 URL**: https://fonts.google.com/specimen/DotGothic16
+- **上流リポジトリ**: https://github.com/fontworks-fonts/DotGothic16/
+- **ライセンス**: OFL-1.1
+- **クレジット表記**: **必要**（フォントと著作権表示・OFL全文を同梱）
+- **改変**: なし
+- **備考**: Copyright 2020 The DotGothic16 Project Authors (https://github.com/fontworks-fonts/DotGothic16/). Google Fonts の配布ファイルを `game-asset-search` の取得スクリプトで取得。`fonts/OFL.txt` に著作権表示とライセンス全文を同梱。
+
 - **素材名**: M PLUS Rounded 1c Regular (`MPLUSRounded1c-Regular.ttf`, `OFL.txt`)
 - **作者**: The Rounded M+ Project Authors
 - **入手 URL**: https://fonts.google.com/specimen/M+PLUS+Rounded+1c
 - **ライセンス**: OFL-1.1
 - **クレジット表記**: **必要**
 - **改変**: なし
-- **備考**: Copyright 2016 The Rounded M+ Project Authors. フォント内の著作権表示を確認し、fonts/OFL.txt に著作権表示とライセンス全文を同梱。フォント本体は取得時のまま。
+- **備考**: Copyright 2016 The Rounded M+ Project Authors. フォント内の著作権表示を確認し、fonts/OFL.txt に著作権表示とライセンス全文を同梱。フォント本体は取得時のまま。第3ラウンド以降の画面では使用せず、過去素材として保持。
 
 ## オリジナル画像 (`assets/`)
 
@@ -97,3 +106,79 @@
 - **クレジット表記**: **不要**
 - **改変**: 第1ラウンドのコード描画を独立画像へ置換
 - **生成**: scripts/dev/generate_world_assets.py、Python 3 標準ライブラリ。森の絵本、暖色木造建築、青緑の回復施設、木工家具、花・睡蓮、草・石畳・樹木・水・床を個別に作図。外部素材・既存作品の素材は使わない。
+
+## 第3ラウンドのCC0原典 (`assets/pixel/source/`)
+
+- **素材名**: TinyRpg Stranger Forest Pack (`spritesheet_58.png`)
+- **作者**: ansimuz
+- **入手 URL**: https://opengameart.org/content/tinyrpg-stranger-forest-pack
+- **ライセンス**: CC0
+- **クレジット表記**: **不要**（作者の任意表記: by ansimuz）
+- **改変**: 原典ファイルは変更なし。`scripts/dev/generate_pixel_assets.py` が先頭行の歩行4コマを最近傍で18×25 pxへ縮小し、緑がかった4色へ減色して `characters/player.png` の基礎部分に使用。
+- **備考**: SHA-256 `27e1d8a583a84a88b17e5e79a1b822ef0022ef3073da8dca84c76c51a545f890`。取得とライセンス確認は game-asset-search skill の `fetch-asset.sh` を使用。
+
+- **素材名**: 16x16 8-bit RPG character set (`rpg_16x16_0.png`)
+- **作者**: devurandom
+- **入手 URL**: https://opengameart.org/content/16x16-8-bit-rpg-character-set
+- **ライセンス**: CC0
+- **クレジット表記**: **不要**
+- **改変**: 原典ファイルは変更なし。`scripts/dev/generate_pixel_assets.py` が16×24 pxの人物コマを切り出し、緑がかった4色へ減色して `characters/captain.png` と `characters/healer.png` の基礎部分に使用。帽子・口ひげ・記章・回復係の外套と印は直接描画で追加。
+- **備考**: SHA-256 `edaf9cbd192f52778caa6c0818d050042ea8d3356a8a2f0d77b112d7c55c0e2d`。取得とライセンス確認は game-asset-search skill の `fetch-asset.sh` を使用。
+
+## 第3ラウンドの4階調キャラクター (`assets/pixel/characters/`)
+
+- **素材名**: 10体の4階調アニメーション (`captain.png`, `crab.png`, `crab_captain.png`, `ember.png`, `healer.png`, `moth.png`, `owl.png`, `player.png`, `sprout.png`, `tide.png`)
+- **作者**: 本プロジェクトで制作（Codex支援。player・captain・healerの基礎部分のみ上記CC0原典を加工）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクトのオリジナル生成部分にはCC0を付与しない。原典由来部分はCC0
+- **クレジット表記**: **不要**
+- **改変**: CC0人物コマは最近傍縮小・4色減色・装備の加筆。その他7体は32×32 pxの直接描画。
+- **生成**: `scripts/dev/generate_pixel_assets.py`、Python 3標準ライブラリ。透過を除く色は `#0F380F`、`#306230`、`#8BAC0F`、`#9BBC0F` の4色。32×32 pxを6列×5行に並べ、待機・移動・攻撃・被弾・戦闘不能を各6フレーム維持。アンチエイリアスなし。
+- **備考**: `python3 scripts/dev/generate_pixel_assets.py` で再生成し、`--check` で原典SHA-256・寸法・色・再生成一致を検査する。
+
+## 第3ラウンドの4階調背景・地方図 (`assets/pixel/backgrounds/`, `assets/pixel/world/`)
+
+- **素材名**: 森の三層背景とタイトル原画 (`forest_far.png`, `forest_mid.png`, `forest_near.png`, `title_keyart.png`)
+- **作者**: 本プロジェクトで制作（Codex支援）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクトのオリジナル生成物（CC0の付与なし）
+- **クレジット表記**: **不要**
+- **改変**: 第2ラウンドのSVGと同じ三層構成を、4階調ピクセル画像として新規作成。
+- **生成**: `scripts/dev/generate_pixel_assets.py`、Python 3標準ライブラリ。背景は329×180 px、タイトル原画は160×143 px。アンチエイリアスを使わずピクセル単位で描画。
+
+- **素材名**: 4階調フィールド・建物・家具・地方図 (`bed.png`, `bench.png`, `canopy_shadow.png`, `captain_plaza.png`, `clinic.png`, `flowers.png`, `healing_table.png`, `home.png`, `lily.png`, `pollen.png`, `region_map.png`, `room_walls.png`, `rug.png`, `sign.png`, `storage_shelf.png`, `tile_grass.png`, `tile_hedge.png`, `tile_meadow.png`, `tile_path.png`, `tile_water.png`, `tile_wood.png`)
+- **作者**: 本プロジェクトで制作（Codex支援）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクトのオリジナル生成物（CC0の付与なし）
+- **クレジット表記**: **不要**
+- **改変**: 第2ラウンドのSVGと同じ役割を保ち、16×16 pxタイルとピクセル小物として新規作成。地方図は町からルート・隊長の目的地までを1枚で示す画像として追加。
+- **生成**: `scripts/dev/generate_pixel_assets.py`、Python 3標準ライブラリ。緑がかった4色のみを使い、アンチエイリアスなしで直接描画。
+
+## 第3ラウンドの4階調UI・戦闘演出 (`assets/pixel/ui/`, `assets/pixel/effects/`)
+
+- **素材名**: 道具・属性・紋章・ロゴ (`capture_ball.png`, `emblem.png`, `logo.png`, `potion.png`, `type_fire.png`, `type_leaf.png`, `type_water.png`)
+- **作者**: 本プロジェクトで制作（Codex支援）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクトのオリジナル生成物（CC0の付与なし）
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **生成**: `scripts/dev/generate_pixel_assets.py`、Python 3標準ライブラリ。16×16 pxを基本とする4階調ピクセル画像。ロゴのみ96×48 px。
+
+- **素材名**: 戦闘時の属性弾と光 (`projectile_fire.png`, `projectile_leaf.png`, `projectile_water.png`, `spark.png`)
+- **作者**: 本プロジェクトで制作（Codex支援）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクトのオリジナル生成物（CC0の付与なし）
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **生成**: `scripts/dev/generate_pixel_assets.py`、Python 3標準ライブラリ。16×16 px。基本4色に加え、戦闘時だけ表示する炎と光へ差し色 `#C3423F` を使用。
+
+## 第3ラウンドの8-bit風環境音 (`assets/audio/`)
+
+- **素材名**: 町とルートの環境音 (`town_ambience.wav`, `route_ambience.wav`)
+- **作者**: 本プロジェクトで制作（Codex支援）
+- **入手 URL**: https://github.com/bannzai/godotpractice
+- **ライセンス**: 本プロジェクトのオリジナル生成物（CC0の付与なし）
+- **クレジット表記**: **不要**
+- **改変**: なし
+- **生成**: `scripts/dev/generate_pixel_audio.py`、Python 3標準ライブラリ。32,000 Hz・16 bit・stereo PCM・8秒。町は矩形波の時計・チャイム・左右の短い会話音・足音、ルートは固定LFSRの草音・三角波・鳥の矩形波を合成。既存の曲・録音・サンプルを使用していない。
+- **備考**: `python3 scripts/dev/generate_pixel_audio.py` で再生成し、`--check` でフォーマット・非無音・最大振幅・クリップ・ループ端点・再生成一致を数値検査する。
