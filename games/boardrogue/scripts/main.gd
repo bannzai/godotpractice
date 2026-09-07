@@ -32,6 +32,8 @@ var seed_input: LineEdit
 var hand_page: int = 0
 var result_count: float = 0
 var detail_id: String = ""
+var tutorial_active: bool = false
+var tutorial_step: int = 0
 var _quitting: bool = false
 var _last_focus: String = ""
 
@@ -88,9 +90,11 @@ func _render() -> void:
 	enemy_actor = null
 	hero_actor = null
 	speech_label = null
-	var changed: bool = last_stage != run.stage
+	var visual_key: String = _visual_scene_key()
+	var stage_marker: String = "%s|%s" % [run.stage, visual_key]
+	var changed: bool = last_stage != stage_marker
 	if changed:
-		backdrop.setup(run.stage)
+		backdrop.setup(visual_key)
 		var music: String = run.stage
 		if run.stage == "battle":
 			music = "boss" if run.battle.enemy_id in ["general", "final"] else "battle"
@@ -99,7 +103,8 @@ func _render() -> void:
 		elif run.stage != "title":
 			music = "map"
 		sound.play_music(music)
-		last_stage = run.stage
+		sound.play_ambience(_ambience_key(visual_key))
+		last_stage = stage_marker
 		content.modulate.a = 0.0
 		create_tween().tween_property(content, "modulate:a", 1.0, 0.28)
 	Views.render(self)
@@ -125,6 +130,8 @@ func start_run() -> void:
 	run.new_run(chosen_seed)
 	_save_progress()
 	speech = ""
+	tutorial_active = false
+	tutorial_step = 0
 	_clear_selection()
 	_render()
 
@@ -137,6 +144,8 @@ func resume_run() -> void:
 		_clear_selection()
 		if run.stage == "battle":
 			speech = Catalog.ENEMIES[run.battle.enemy_id].lines.start
+			tutorial_active = run.depth == 0 and run.battle.turn_number <= 2
+			tutorial_step = 0
 		_render()
 		if run.stage == "battle" and run.battle.turn == 1:
 			busy = true
@@ -157,6 +166,9 @@ func choose_node(index: int) -> void:
 	if run.stage == "battle":
 		speech = Catalog.ENEMIES[run.battle.enemy_id].lines.start
 		note = "手札 → 自陣の空きマス。選んだ伏せ札は「登場」で表に。"
+		tutorial_active = run.depth == 0
+		tutorial_step = 0
+		sound.play_sfx("shakuhachi")
 	_render()
 	if run.stage == "battle" and run.battle.enemy_id in ["general", "final"]:
 		busy = true
@@ -183,6 +195,8 @@ func _select_hand(index: int) -> void:
 	mode = "select"
 	detail_id = str(run.battle.hands[0][index])
 	note = "「%s」を潜伏させる自陣の空きマスを選択。" % Catalog.CARDS[detail_id].name
+	if tutorial_active:
+		tutorial_step = maxi(tutorial_step, 1)
 	_render()
 
 
@@ -220,7 +234,12 @@ func _click_cell(pos: Vector2i) -> void:
 	else:
 		selected_uid = unit.uid if unit.side == 0 else -1
 		detail_id = unit.card if unit.side == 0 or unit.face else ""
-		note = "敵の伏せ札は攻撃するまで分かりません。" if detail_id.is_empty() else "札を選択しました。左側の説明と操作を確認してください。"
+		if detail_id.is_empty():
+			note = "敵の伏せ札は攻撃するまで分かりません。"
+		elif unit.side == 0 and run.battle.phase == "battle":
+			note = _attack_selection_note(unit)
+		else:
+			note = "札を選択しました。左の墨書きと光るマスを確認してください。"
 	mode = "select"
 	_render()
 
@@ -230,8 +249,19 @@ func _drag_card(data: Dictionary, pos: Vector2i) -> void:
 		return
 	selected_hand = int(data.hand)
 	selected_uid = int(data.uid)
-	mode = "move" if selected_uid >= 0 else "select"
+	# 戦闘中の盤上ドラッグは移動ではなく、ドロップ先への攻撃として扱う。
+	mode = "move" if selected_uid >= 0 and run.battle.phase == "standby" else "select"
 	_click_cell(pos)
+
+
+func _attack_selection_note(unit: Dictionary) -> String:
+	if not unit.face:
+		return "伏せ札は攻撃できません。準備中に「登場」させてください。"
+	if unit.moved:
+		return "この札は移動済みのため、この手番は攻撃できません。"
+	if unit.attacked:
+		return "この札は攻撃済みです。別の表向き札を選んでください。"
+	return "朱に脈打つ敵札、または届く位置の敵王を選ぶと攻撃します。"
 
 
 func _select_mode(next_mode: String) -> void:
@@ -278,6 +308,12 @@ func _advance_phase() -> void:
 		_apply_event(run.battle.end_turn())
 
 
+func _skip_tutorial() -> void:
+	tutorial_active = false
+	note = "手札・盤上の札を選ぶと、できる操作と届くマスが墨書きで示されます。"
+	_render()
+
+
 func _player_ready() -> bool:
 	return not busy and overlay.is_empty() and run.stage == "battle" and run.battle.turn == 0
 
@@ -293,6 +329,7 @@ func _apply_event(event: Dictionary) -> void:
 		_invalid("その操作はできません。フェーズ・隣接・行動済みの状態を確認してください。")
 		return
 	busy = true
+	_tutorial_after_event(event)
 	await _animate_event(event)
 	if _quitting:
 		return
@@ -380,7 +417,7 @@ func _animate_event(event: Dictionary) -> void:
 			note = "札の効果を発動しました。"
 		"phase", "turn":
 			sound.play_sfx("drum")
-			note = "表向きの札 → 敵札または敵王で攻撃。終了は E / Y。"
+			note = "表向きの札を選び、朱に光る敵札または敵王を選んで攻撃。"
 	await get_tree().create_timer(0.30 if kind == "attack" else 0.16).timeout
 
 
@@ -626,3 +663,44 @@ func _show_boss_banner() -> void:
 	tween.tween_interval(1.0)
 	tween.tween_property(banner, "position:x", 1280.0, 0.23).set_trans(Tween.TRANS_CUBIC)
 	tween.tween_callback(banner.queue_free)
+
+
+func _tutorial_after_event(event: Dictionary) -> void:
+	if not tutorial_active:
+		return
+	match str(event.get("type", "")):
+		"deploy":
+			tutorial_step = maxi(tutorial_step, 2)
+		"reveal":
+			tutorial_step = maxi(tutorial_step, 3)
+		"phase":
+			tutorial_step = maxi(tutorial_step, 4)
+		"attack":
+			tutorial_step = 5
+			tutorial_active = false
+			note = "初陣の手ほどきは完了。攻撃済みの札は墨印で分かります。"
+			sound.play_sfx("shakuhachi")
+
+
+func _visual_scene_key() -> String:
+	if run.stage != "battle":
+		return run.stage
+	if run.current_node.get("type", "") == "final":
+		return "battle-castle"
+	if run.current_node.get("type", "") == "general":
+		return "battle-night-camp"
+	return "battle-snow" if run.depth % 3 == 2 else "battle-river"
+
+
+func _ambience_key(visual_key: String) -> String:
+	match visual_key:
+		"battle-river":
+			return "river"
+		"battle-snow":
+			return "snow"
+		"battle-night-camp", "rest":
+			return "insects"
+		"battle-castle", "map":
+			return "wind"
+		_:
+			return ""

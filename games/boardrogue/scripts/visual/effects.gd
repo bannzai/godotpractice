@@ -3,7 +3,7 @@ extends Control
 
 signal impact_requested(strength: float)
 
-const FONT := preload("res://assets/fonts/ZenOldMincho-Regular.ttf")
+const FONT := preload("res://assets/fonts/YujiSyuku-Regular.ttf")
 const INK := preload("res://assets/art/fx_ink.svg")
 const SPARK := preload("res://assets/art/fx_spark.svg")
 const GLOW := preload("res://assets/art/fx_glow.svg")
