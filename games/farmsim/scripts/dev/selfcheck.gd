@@ -20,7 +20,7 @@ func _run() -> void:
 	_check_assets_credited()
 	_check(image_count > 0, "画像素材が空ではない")
 	_check(audio_count > 0, "音声素材が空ではない")
-	_check_svg_import_colors()
+	_check_print_assets()
 	await _check_animations()
 
 	if failed:
@@ -124,14 +124,21 @@ func _check_animations() -> void:
 		await process_frame
 
 
-## SVG の半透明色がインポート時に黒へ化けた不具合の回帰検証。
-func _check_svg_import_colors() -> void:
-	var sky: Texture2D = load("res://assets/backgrounds/far.svg")
-	var cloud: Color = sky.get_image().get_pixel(130, 105)
-	_check(cloud.r > 0.8 and cloud.g > 0.75 and cloud.b > 0.65, "雲が黒い塊にならない")
-	var house: Texture2D = load("res://assets/props/house.svg")
-	var shadow: Color = house.get_image().get_pixel(123, 181)
-	_check(shadow.a > 0.10 and shadow.a < 0.20, "家の影が半透明である")
-	var merchant: Texture2D = load("res://assets/characters/merchant.svg")
-	var lens: Color = merchant.get_image().get_pixel(51, 47)
-	_check(lens.r > 0.6 and lens.g > 0.4 and lens.b > 0.25, "商店主の眼鏡から肌が透けて見える")
+## 写真由来の版画 PNG と指定フォントが実際に読めることを検証する。
+func _check_print_assets() -> void:
+	var landscape: Texture2D = load("res://assets/backgrounds/far.png")
+	_check(landscape != null and landscape.get_size() == Vector2(1280, 720),
+		"CC0農村写真の版画背景が1280×720である")
+	var village_map: Texture2D = load("res://assets/backgrounds/village_map.png")
+	_check(village_map != null and village_map.get_size() == Vector2(1280, 720),
+		"村の地図が1280×720である")
+	for crop: String in ["turnip", "carrot", "tomato", "corn"]:
+		var texture: Texture2D = load("res://assets/crops/%s_ripe.png" % crop)
+		_check(texture != null and texture.get_size() == Vector2(64, 64),
+			crop + ": 写真を減色した収穫画像が64×64である")
+	_check(not FileAccess.file_exists("res://assets/characters/farmer.svg"),
+		"旧SVG素材を使っていない")
+	_check(FileAccess.file_exists("res://assets/fonts/Yomogi-Regular.ttf"),
+		"Yomogiフォントを同梱している")
+	_check(not FileAccess.file_exists("res://assets/fonts/MPLUSRounded1c-Regular.ttf"),
+		"禁止されたM PLUS Rounded 1cを同梱していない")

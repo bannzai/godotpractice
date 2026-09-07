@@ -3,6 +3,7 @@ extends Node
 
 var music: AudioStreamPlayer
 var effects: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var current: String = ""
 var stopped: bool = false
 
@@ -14,6 +15,9 @@ func _ready() -> void:
 	effects = AudioStreamPlayer.new()
 	effects.volume_db = -9
 	add_child(effects)
+	ambience = AudioStreamPlayer.new()
+	ambience.volume_db = -25
+	add_child(ambience)
 
 
 func track(id: String) -> void:
@@ -36,9 +40,23 @@ func play(id: String) -> void:
 	effects.play()
 
 
+func set_ambience(enabled: bool) -> void:
+	if stopped or not is_instance_valid(ambience):
+		return
+	if enabled and not ambience.playing:
+		var stream := load("res://assets/audio/rural_ambience.wav") as AudioStreamWAV
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_end = int(stream.get_length() * stream.mix_rate)
+		ambience.stream = stream
+		ambience.play()
+	elif not enabled and ambience.playing:
+		ambience.stop()
+		ambience.stream = null
+
+
 func stop_audio() -> void:
 	stopped = true
-	for player: AudioStreamPlayer in [music, effects]:
+	for player: AudioStreamPlayer in [music, effects, ambience]:
 		if is_instance_valid(player):
 			player.stop()
 			player.stream = null

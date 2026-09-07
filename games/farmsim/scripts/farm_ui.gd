@@ -1,18 +1,20 @@
 extends RefCounted
-## 紙と深緑の共通 UI。進行状態を保持せず Control の組み立てだけを担う。
+## 版木の墨と日記帳の紙を使う UI。進行状態を保持せず Control の組み立てだけを担う。
 
-const INK := Color("244c41")
-const MUTED := Color("71816b")
-const CREAM := Color("fff8e9")
-const GOLD := Color("e9b760")
+const INK := Color("332c26")
+const MUTED := Color("765f45")
+const CREAM := Color("ead7ab")
+const GOLD := Color("c98b32")
 
 
-static func box(color: Color, radius: int = 16) -> StyleBoxFlat:
+static func box(color: Color, radius: int = 4) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
 	style.set_corner_radius_all(radius)
 	style.content_margin_left = 18
 	style.content_margin_right = 18
+	style.border_color = Color("59402c")
+	style.set_border_width_all(2)
 	return style
 
 

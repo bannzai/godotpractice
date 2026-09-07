@@ -112,6 +112,61 @@ func crop_stage(index: int) -> int:
 	return 1 if tile.watered else 0
 
 
+func tool_preview(index: int) -> Dictionary:
+	if phase != "playing":
+		return {"ok": false, "text": "今季の農場は終了しています"}
+	if index < 0 or index >= tiles.size():
+		return {"ok": false, "text": "畑の一マスを向くと、ここに結果が出ます"}
+	var tile: Dictionary = tiles[index]
+	var preview: Dictionary = {"ok": false, "text": "日記から道具を選んでください"}
+	match selected_tool:
+		0:
+			preview = _hoe_preview(tile)
+		1:
+			preview = _water_preview(tile)
+		2:
+			preview = _plant_preview(tile)
+		3:
+			preview = _harvest_preview(tile)
+	return preview
+
+
+func _hoe_preview(tile: Dictionary) -> Dictionary:
+	if tile.withered:
+		return {"ok": true, "text": "クワで枯れ株を片づける"}
+	if tile.crop != "":
+		return {"ok": false, "text": "作物があるので耕せません"}
+	return {"ok": not tile.tilled,
+		"text": "クワで耕し、種を植えられる土にする" if not tile.tilled else "耕し済み。次は種を選びます"}
+
+
+func _water_preview(tile: Dictionary) -> Dictionary:
+	if not tile.tilled or tile.withered:
+		return {"ok": false, "text": "先にクワで土を耕します"}
+	return {"ok": not tile.watered,
+		"text": "水をあげ、明朝に作物を育てる" if not tile.watered else "今日は水やり済みです"}
+
+
+func _plant_preview(tile: Dictionary) -> Dictionary:
+	if not tile.tilled or tile.crop != "":
+		return {"ok": false, "text": "空いた耕し済みの土が必要です"}
+	if CROPS[selected_crop].season != season():
+		return {"ok": false, "text": "この種は今の季節には育ちません"}
+	if seeds[selected_crop] <= 0:
+		return {"ok": false, "text": "種がないので村の種屋へ行きます"}
+	return {"ok": true, "text": "%sの種を植える（残り%d袋）" % [
+		CROPS[selected_crop].name, seeds[selected_crop]]}
+
+
+func _harvest_preview(tile: Dictionary) -> Dictionary:
+	if tile.withered:
+		return {"ok": false, "text": "枯れ株はクワで片づけます"}
+	var ready: bool = tile.crop != "" and tile.growth >= CROPS[tile.crop].days
+	return {"ok": ready,
+		"text": "%sを収穫し、出荷できるようにする" % CROPS[tile.crop].name if ready
+		else "実った作物だけ収穫できます"}
+
+
 func use_tool(index: int) -> Dictionary:
 	if phase != "playing":
 		return _result(false, "notice", "農場の記録を振り返りましょう")

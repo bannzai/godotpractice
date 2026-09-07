@@ -8,7 +8,7 @@ var elapsed: float = 0.0
 func _ready() -> void:
 	for id: String in ["far", "mid", "near"]:
 		var sprite := Sprite2D.new()
-		sprite.texture = load("res://assets/backgrounds/%s.svg" % id)
+		sprite.texture = load("res://assets/backgrounds/%s.png" % id)
 		sprite.centered = false
 		sprite.scale = Vector2(1320, 720) / sprite.texture.get_size()
 		add_child(sprite)

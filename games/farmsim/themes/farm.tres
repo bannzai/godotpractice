@@ -1,27 +1,37 @@
 [gd_resource type="Theme" load_steps=6 format=3]
 
-[ext_resource type="FontFile" path="res://assets/fonts/MPLUSRounded1c-Regular.ttf" id="1"]
+[ext_resource type="FontFile" path="res://assets/fonts/Yomogi-Regular.ttf" id="1"]
 
 [sub_resource type="StyleBoxFlat" id="Normal"]
-bg_color = Color(0.15, 0.30, 0.25, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_left = 12
-corner_radius_bottom_right = 12
+bg_color = Color(0.20, 0.17, 0.14, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.79, 0.55, 0.20, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 7
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 2
 
 [sub_resource type="StyleBoxFlat" id="Hover"]
-bg_color = Color(0.26, 0.42, 0.31, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_left = 12
-corner_radius_bottom_right = 12
+bg_color = Color(0.38, 0.22, 0.16, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.91, 0.78, 0.53, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 7
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 2
 
 [sub_resource type="StyleBoxFlat" id="Pressed"]
-bg_color = Color(0.61, 0.43, 0.21, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_left = 12
-corner_radius_bottom_right = 12
+bg_color = Color(0.66, 0.25, 0.18, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 7
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 2
 
 [sub_resource type="StyleBoxFlat" id="Focus"]
 bg_color = Color(0, 0, 0, 0)
@@ -29,16 +39,16 @@ border_width_left = 3
 border_width_top = 3
 border_width_right = 3
 border_width_bottom = 3
-border_color = Color(0.96, 0.72, 0.32, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_left = 12
-corner_radius_bottom_right = 12
+border_color = Color(0.96, 0.79, 0.46, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 7
+corner_radius_bottom_left = 5
+corner_radius_bottom_right = 2
 
 [resource]
 default_font = ExtResource("1")
 default_font_size = 21
-Button/colors/font_color = Color(1, 0.97, 0.88, 1)
+Button/colors/font_color = Color(0.96, 0.88, 0.69, 1)
 Button/colors/font_hover_color = Color(1, 1, 0.96, 1)
 Button/colors/font_pressed_color = Color(1, 0.94, 0.76, 1)
 Button/styles/normal = SubResource("Normal")

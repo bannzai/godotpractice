@@ -20,10 +20,13 @@ var stamina_bar: ProgressBar
 var tool_buttons: Array[Button] = []
 var seed_button: Button
 var context_label: Label
+var preview_label: Label
 var objective_label: Label
 var journal_label: Label
 var money_shown: float = 120.0
 var modal_buttons: Array[Button] = []
+var tutorial_step: int = -1
+var tutorial_active: bool = false
 var _audio_started: bool = false
 var _ui_elapsed: float = 0.0
 var _notice_remaining: float = 0.0
@@ -73,6 +76,8 @@ func refresh() -> void:
 			_title()
 		"playing":
 			_field()
+		"map":
+			_village_map()
 		"result":
 			_result()
 	if _audio_started:
@@ -80,19 +85,20 @@ func refresh() -> void:
 
 
 func _title() -> void:
-	UI.picture(page, "res://assets/backgrounds/title.svg", Rect2(500, 80, 756, 590))
-	UI.panel(page, Rect2(62, 76, 522, 570), Color("fff8edf2"))
-	UI.label(page, "小さな畑と、季節の手紙", Rect2(104, 105, 400, 40), 20, UI.MUTED)
-	UI.picture(page, "res://assets/ui/logo.svg", Rect2(95, 158, 440, 125))
-	UI.label(page, "こもれび農園", Rect2(106, 281, 420, 62), 43)
-	UI.label(page, "種をまき、季節を育てる。\n春と夏をめぐる、二十日間の暮らし。",
-		Rect2(108, 352, 430, 84), 23)
-	UI.button(page, "新しい暮らしをはじめる", Rect2(108, 458, 426, 57), start_new).grab_focus()
-	var resume := UI.button(page, "つづきから", Rect2(108, 530, 202, 51), _resume)
+	UI.picture(page, "res://assets/backgrounds/title.png", Rect2(586, 54, 650, 612))
+	UI.panel(page, Rect2(55, 48, 566, 624), Color("ead7abf2"))
+	UI.label(page, "昭和の山里から届いた、母の便り", Rect2(92, 80, 470, 38), 20, UI.MUTED)
+	UI.picture(page, "res://assets/ui/logo.png", Rect2(86, 125, 195, 145))
+	UI.label(page, "こもれび農園日記", Rect2(251, 154, 330, 68), 39)
+	UI.label(page, "種をまき、村を歩き、季節を版に残す。\n春と夏、二十日間の農家暮らし。",
+		Rect2(93, 279, 466, 88), 24)
+	UI.panel(page, Rect2(92, 378, 470, 70), Color("f0dfb9e8"))
+	UI.label(page, "母より　『まず畑を一枚、耕してごらん。』", Rect2(109, 393, 434, 41), 20)
+	UI.button(page, "新しい日記をひらく", Rect2(92, 475, 470, 58), start_new).grab_focus()
+	var resume := UI.button(page, "つづきの頁", Rect2(92, 552, 224, 52), _resume)
 	resume.disabled = not FileAccess.file_exists(save_path)
-	UI.button(page, "遊び方", Rect2(328, 530, 206, 51), _help)
-	UI.label(page, "移動 WASD / 矢印 / 左スティック　　決定 Enter / A　　F11 全画面",
-		Rect2(94, 671, 1140, 32), 18, UI.CREAM)
+	UI.button(page, "母の手紙", Rect2(338, 552, 224, 52), _help)
+	UI.label(page, "F11　全画面", Rect2(1073, 671, 153, 30), 17, UI.CREAM)
 
 
 func start_new() -> void:
@@ -101,12 +107,65 @@ func start_new() -> void:
 	busy = false
 	money_shown = Farm.money
 	refresh()
-	_message("まずは目の前の畑へ。クワ → 種 → 水やりの順に育てよう。", 9)
+	tutorial_step = 0
+	tutorial_active = true
+	_tutorial_letter.call_deferred()
+
+
+func _tutorial_letter() -> void:
+	_open_modal("母からの手紙", "畑仕事は、いっぺんに覚えなくていいよ。\n光る一マスを見て、クワ、種、水の順に試してごらん。\n日記帳には、できることと、できない理由が出るからね。")
+	UI.button(modal, "手紙どおりに始める", Rect2(300, 414, 326, 58), _begin_tutorial).grab_focus()
+	UI.button(modal, "もう知っているので省く", Rect2(650, 414, 330, 58), _skip_tutorial)
+
+
+func _begin_tutorial() -> void:
+	close_modal()
+	tutorial_step = 1
+	tutorial_active = true
+	Farm.selected_tool = 0
+	_update_hud()
+	_message(_tutorial_hint(), 20)
+
+
+func _skip_tutorial() -> void:
+	close_modal()
+	tutorial_step = -1
+	tutorial_active = false
+	_message("日記の『次の一手』を見ながら、二十日間の農場を育てよう。", 7)
+
+
+func _tutorial_hint() -> String:
+	return {
+		1: "母の手紙 1/3　目の前の光る土へ、クワを使って耕そう。",
+		2: "母の手紙 2/3　同じマスへ、選ばれた種袋から種をまこう。",
+		3: "母の手紙 3/3　同じマスへ水をあげれば、明朝に育つよ。",
+	}.get(tutorial_step, "日記の『次の一手』を見て、光る対象へ向かおう。")
+
+
+func _advance_tutorial(tool: int) -> void:
+	if not tutorial_active:
+		return
+	if tutorial_step == 1 and tool == 0:
+		tutorial_step = 2
+		Farm.selected_tool = 2
+	elif tutorial_step == 2 and tool == 2:
+		tutorial_step = 3
+		Farm.selected_tool = 1
+	elif tutorial_step == 3 and tool == 1:
+		tutorial_step = -1
+		tutorial_active = false
+		_message("母の手紙どおりにできたね。眠ると作物が育ち、収穫後は出荷箱へ。", 12)
+		return
+	else:
+		return
+	_message(_tutorial_hint(), 20)
 
 
 func _resume() -> void:
 	if Farm.load_game(save_path):
 		mode = "playing" if Farm.phase == "playing" else "result"
+		tutorial_step = -1
+		tutorial_active = false
 		money_shown = Farm.money
 		refresh()
 		_message("おかえりなさい。前回の農場から再開しました。")
@@ -132,32 +191,32 @@ func _field() -> void:
 	page.add_child(world_layer)
 	world = load("res://scripts/farm_world.gd").new()
 	world_layer.add_child(world)
-	UI.panel(page, Rect2(30, 20, 1220, 88))
-	UI.label(page, "こもれび農園", Rect2(53, 31, 237, 40), 29)
-	UI.label(page, "季節を育てる二十日間", Rect2(56, 72, 240, 22), 15, UI.MUTED)
-	clock_label = UI.label(page, "", Rect2(316, 39, 350, 49), 25)
-	money_label = UI.label(page, "", Rect2(675, 39, 206, 47), 30)
-	stamina_label = UI.label(page, "", Rect2(935, 29, 240, 32), 19)
+	UI.panel(page, Rect2(938, 18, 322, 684), Color("e4c890f4"))
+	UI.label(page, "農家の日記", Rect2(961, 31, 270, 45), 30)
+	clock_label = UI.label(page, "", Rect2(961, 77, 274, 62), 23)
+	money_label = UI.label(page, "", Rect2(961, 139, 274, 38), 23)
+	stamina_label = UI.label(page, "", Rect2(961, 177, 274, 30), 17)
 	stamina_bar = ProgressBar.new()
 	stamina_bar.show_percentage = false
-	stamina_bar.add_theme_stylebox_override("background", UI.box(Color("e1e7ce"), 7))
-	stamina_bar.add_theme_stylebox_override("fill", UI.box(Color("94ac64"), 7))
+	stamina_bar.add_theme_stylebox_override("background", UI.box(Color("ad895d"), 2))
+	stamina_bar.add_theme_stylebox_override("fill", UI.box(Color("315c43"), 2))
 	page.add_child(stamina_bar)
-	stamina_bar.position = Vector2(937, 72)
-	stamina_bar.size = Vector2(278, 12)
+	stamina_bar.position = Vector2(961, 207)
+	stamina_bar.size = Vector2(274, 10)
 	_field_labels()
 	_journal()
 	_toolbar()
-	notice = UI.label(page, "", Rect2(40, 570, 916, 31), 17, UI.CREAM)
+	UI.panel(page, Rect2(27, 629, 891, 65), Color("332c26e8"))
+	notice = UI.label(page, "", Rect2(49, 640, 850, 44), 19, UI.CREAM)
 	_update_hud()
 
 
 func _field_labels() -> void:
-	_tag("おうち・ベッド", Vector2(95, 282), 173)
-	_tag("井戸", Vector2(275, 259), 66)
-	_tag("町の商店", Vector2(817, 281), 116)
-	_tag("出荷箱", Vector2(824, 432), 98)
-	_tag("あなたの畑", Vector2(514, 202), 149)
+	_tag("おうち・ベッド", Vector2(87, 283), 173)
+	_tag("井戸", Vector2(271, 260), 66)
+	_tag("村への道", Vector2(810, 278), 118)
+	_tag("出荷箱", Vector2(818, 432), 98)
+	_tag("今日の畑", Vector2(514, 269), 132)
 
 
 func _tag(text: String, at: Vector2, width: float) -> void:
@@ -167,58 +226,57 @@ func _tag(text: String, at: Vector2, width: float) -> void:
 
 
 func _journal() -> void:
-	UI.panel(page, Rect2(980, 128, 270, 431))
-	UI.label(page, "季節の手帳", Rect2(1003, 148, 220, 43), 28)
-	UI.label(page, "今季の目標", Rect2(1005, 203, 200, 30), 17, UI.MUTED)
-	objective_label = UI.label(page, "", Rect2(1005, 242, 225, 88), 23)
-	journal_label = UI.label(page, "", Rect2(1005, 342, 223, 88), 18, UI.MUTED)
-	UI.button(page, "手帳・持ちもの", Rect2(1003, 448, 222, 44), open_menu)
-	UI.button(page, "遊び方", Rect2(1003, 505, 222, 35), _help)
+	UI.label(page, "今季の目標", Rect2(961, 228, 264, 29), 17, UI.MUTED)
+	objective_label = UI.label(page, "", Rect2(961, 256, 274, 58), 19)
+	journal_label = UI.label(page, "", Rect2(961, 310, 274, 53), 16, UI.MUTED)
+	preview_label = UI.label(page, "", Rect2(961, 365, 274, 58), 17)
 
 
 func _toolbar() -> void:
-	UI.panel(page, Rect2(30, 608, 1220, 92))
 	for index: int in 4:
-		var at := Vector2(46 + index * 121, 620)
+		var at := Vector2(956 + index % 2 * 145, 429 + index / 2 * 54)
 		var button: Button = UI.button(page, "%d  %s" % [index + 1, Farm.TOOLS[index]],
-			Rect2(at, Vector2(111, 65)), _select_tool.bind(index))
-		button.add_theme_font_size_override("font_size", 16)
-		button.icon = load("res://assets/ui/%s.svg" % TOOL_ICONS[index])
+			Rect2(at, Vector2(137, 46)), _select_tool.bind(index))
+		button.add_theme_font_size_override("font_size", 15)
+		button.icon = load("res://assets/ui/%s.png" % TOOL_ICONS[index])
 		button.expand_icon = true
-		button.add_theme_constant_override("icon_max_width", 26)
+		button.add_theme_constant_override("icon_max_width", 24)
 		tool_buttons.append(button)
-	seed_button = UI.button(page, "", Rect2(542, 621, 177, 63), _cycle_crop)
-	seed_button.add_theme_font_size_override("font_size", 17)
-	UI.button(page, "使う  Space / X", Rect2(735, 621, 211, 63), use_tool)
-	UI.button(page, "調べる  F / A", Rect2(962, 621, 267, 63), interact)
-	context_label = UI.label(page, "", Rect2(987, 566, 258, 32), 16, UI.CREAM)
+	seed_button = UI.button(page, "", Rect2(956, 539, 282, 43), _cycle_crop)
+	seed_button.add_theme_font_size_override("font_size", 15)
+	UI.button(page, "道具を使う", Rect2(956, 590, 137, 43), use_tool)
+	UI.button(page, "調べる", Rect2(1101, 590, 137, 43), interact)
+	UI.button(page, "手帳・保存", Rect2(956, 642, 282, 40), open_menu)
+	context_label = UI.label(page, "", Rect2(962, 684, 270, 18), 13, UI.MUTED)
 
 
 func _update_hud() -> void:
 	if mode != "playing" or not is_instance_valid(clock_label):
 		return
-	clock_label.text = "%s %d日　%s" % [Farm.season_name(), (Farm.day - 1) % 10 + 1,
+	clock_label.text = "%s　%d日目　%s" % [Farm.season_name(), (Farm.day - 1) % 10 + 1,
 		Farm.clock_text()]
-	money_label.text = "%d G" % roundi(money_shown)
+	money_label.text = "所持金　%d G" % roundi(money_shown)
 	stamina_label.text = "体力　%d / 100" % Farm.stamina
 	stamina_bar.value = Farm.stamina
-	objective_label.text = "所持金 %d / %d G\nまたは 全4種を出荷" % [Farm.money, Farm.TARGET_MONEY]
+	objective_label.text = "%d / %d G　または全4種出荷" % [Farm.money, Farm.TARGET_MONEY]
 	var shipped_types: int = 0
 	var pending: int = 0
 	for id: String in Farm.CROPS:
 		if int(Farm.shipped[id]) > 0:
 			shipped_types += 1
 		pending += int(Farm.shipping[id]) * int(Farm.CROPS[id].sell)
-	journal_label.text = "出荷した作物　%d / 4種\n明朝の売上　%d G\n季節の終わりまで　%d日" % [
+	journal_label.text = "出荷 %d / 4種　明朝 +%d G\n季節の終わりまで %d日" % [
 		shipped_types, pending, 11 - ((Farm.day - 1) % 10 + 1)]
-	seed_button.text = "%sの種 ×%d\nR / Y で切替" % [
+	seed_button.text = "種袋　%s ×%d　（R / Y）" % [
 		Farm.CROPS[Farm.selected_crop].name, Farm.seeds[Farm.selected_crop]]
 	for index: int in tool_buttons.size():
-		tool_buttons[index].modulate = Color("ffdb8c") if index == Farm.selected_tool else Color.WHITE
+		tool_buttons[index].modulate = Color("df984d") if index == Farm.selected_tool else Color.WHITE
 	var near: String = _nearby()
-	context_label.text = {"bed": "F / A　ベッドで休む", "shop": "F / A　町の商店へ",
-		"shipping": "F / A　作物を出荷", "well": "F / A　井戸を調べる"}.get(near,
-		"Q・E / LB・RB　道具切替")
+	context_label.text = {"bed": "F / A　眠って翌朝へ", "shop": "F / A　村の地図へ",
+		"shipping": "F / A　作物を明朝の売上へ", "well": "F / A　井戸の話を読む"}.get(
+		near, "Space / X　向いたマスへ実行")
+	var preview: Dictionary = Farm.tool_preview(world.target_index())
+	preview_label.text = ("○ " if preview.ok else "× ") + str(preview.text)
 
 
 func _state_changed() -> void:
@@ -242,7 +300,7 @@ func _process(delta: float) -> void:
 		_ui_elapsed = 0
 		_update_hud()
 		if _notice_remaining <= 0 and is_instance_valid(notice):
-			notice.text = "移動 WASD / 矢印　　向いているマスに道具を使います　　Tab / Start 手帳"
+			notice.text = _tutorial_hint() if tutorial_active else "日記の『次の一手』を見て、光る対象へ向かおう。"
 	if busy or is_instance_valid(modal):
 		return
 	var result: Dictionary = Farm.tick(delta)
@@ -264,6 +322,8 @@ func _input(event: InputEvent) -> void:
 			close_modal()
 		elif mode == "playing" and not busy:
 			open_menu()
+		elif mode == "map":
+			_return_to_field()
 		get_viewport().set_input_as_handled()
 		return
 	if mode != "playing" or busy or is_instance_valid(modal):
@@ -314,6 +374,7 @@ func use_tool() -> void:
 	if not result.ok:
 		sound.play("fail")
 		return
+	_advance_tutorial(tool)
 	busy = true
 	world.player.animate(TOOL_ANIMATIONS[tool])
 	world.effect(TOOL_ICONS[tool], world.cell_center(index))
@@ -358,13 +419,13 @@ func interact() -> void:
 			if result.ok:
 				_popup("明朝 +%d G" % result.amount, world.SHIPPING, UI.GOLD)
 		"shop":
-			open_shop()
+			_open_village_map()
 		"well":
 			_message("井戸の清水。ジョウロの水はいつでも満タンです。")
 			world.effect("water", world.WELL)
 			sound.play("water")
 		_:
-			_message("家のベッド・出荷箱・町の商店・井戸の近くで調べよう。")
+			_message("版画の札が光る場所まで歩くと、調べられます。")
 
 
 ## 睡眠を確定した一回の操作で日を進めるため非冪等。
@@ -457,7 +518,7 @@ func _inventory() -> void:
 	for index: int in 4:
 		var id: String = Farm.CROPS.keys()[index]
 		var y: int = 213 + index * 62
-		UI.picture(modal, "res://assets/crops/%s_ripe.svg" % id, Rect2(304, y, 52, 52))
+		UI.picture(modal, "res://assets/crops/%s_ripe.png" % id, Rect2(304, y, 52, 52))
 		UI.label(modal, "%s　種 %d袋　収穫 %d個　出荷待ち %d個" % [Farm.CROPS[id].name,
 			Farm.seeds[id], Farm.harvested[id], Farm.shipping[id]], Rect2(374, y, 600, 51), 21)
 	UI.button(modal, "お弁当を食べる ×%d　体力 +30" % Farm.food,
@@ -478,7 +539,7 @@ func _catalogue() -> void:
 		var id: String = Farm.CROPS.keys()[index]
 		var data: Dictionary = Farm.CROPS[id]
 		var y: int = 211 + index * 77
-		UI.picture(modal, "res://assets/crops/%s_ripe.svg" % id, Rect2(307, y, 66, 66))
+		UI.picture(modal, "res://assets/crops/%s_ripe.png" % id, Rect2(307, y, 66, 66))
 		var shipped: String = "出荷済み" if Farm.shipped[id] > 0 else "未出荷"
 		UI.label(modal, "%s　%s　%s" % [data.name, "春" if data.season == "spring" else "夏", shipped],
 			Rect2(400, y, 520, 34), 23)
@@ -507,15 +568,54 @@ func _save_and_title() -> void:
 		_message("セーブできませんでした。農場に戻りました。")
 
 
+func _open_village_map() -> void:
+	mode = "map"
+	busy = false
+	refresh()
+	sound.play("map")
+
+
+func _village_map() -> void:
+	UI.picture(page, "res://assets/backgrounds/village_map.png", Rect2(0, 0, 1280, 720))
+	UI.panel(page, Rect2(70, 65, 1140, 93), Color("332c26df"))
+	UI.label(page, "木版・こもれび村の道しるべ", Rect2(103, 80, 620, 42), 31, UI.CREAM)
+	UI.label(page, "行き先を選ぶと、そこでできることが日記に記されます。",
+		Rect2(104, 122, 790, 27), 18, UI.CREAM)
+	var farm_button := UI.button(page, "農場へ戻る", Rect2(170, 522, 286, 58), _return_to_field)
+	UI.label(page, "畑仕事・出荷・就寝をつづける", Rect2(171, 587, 333, 31), 19)
+	var shop_button := UI.button(page, "リラの種屋へ", Rect2(823, 309, 286, 58), open_shop)
+	UI.label(page, "種と弁当を買う　所持金 %d G" % Farm.money,
+		Rect2(824, 374, 350, 31), 19)
+	UI.panel(page, Rect2(485, 519, 310, 113), Color("ead7abeb"))
+	UI.label(page, "村まで歩く", Rect2(515, 536, 250, 34), 24)
+	UI.label(page, "赤い道をたどって種屋へ。\n帰りはこの地図から農場を選ぶ。",
+		Rect2(514, 570, 252, 52), 17)
+	var walker := UI.label(page, "●", Rect2(296, 447, 40, 40), 31, Color("f2d174"))
+	var route := create_tween().set_loops()
+	route.tween_property(walker, "position", Vector2(590, 398), 1.4)
+	route.tween_property(walker, "position", Vector2(948, 208), 1.4)
+	route.tween_interval(0.45)
+	route.tween_property(walker, "position", Vector2(296, 447), 0.01)
+	shop_button.grab_focus()
+	farm_button.focus_neighbor_right = shop_button.get_path()
+	shop_button.focus_neighbor_left = farm_button.get_path()
+
+
+func _return_to_field() -> void:
+	mode = "playing"
+	refresh()
+	_message("農場へ戻りました。日記の『次の一手』を確認しよう。", 5)
+
+
 func open_shop() -> void:
-	_open_modal("町の種屋 ― リラの店")
-	UI.label(modal, "育つ季節を確かめて選んでね。　所持金 %d G" % Farm.money,
+	_open_modal("村の地図 → リラの種屋")
+	UI.label(modal, "この季節に買える種だけ版が濃くなります。　所持金 %d G" % Farm.money,
 		Rect2(300, 195, 680, 37), 19, UI.MUTED)
 	for index: int in 4:
 		var id: String = Farm.CROPS.keys()[index]
 		var data: Dictionary = Farm.CROPS[id]
 		var y: int = 240 + index * 62
-		UI.picture(modal, "res://assets/crops/%s_ripe.svg" % id, Rect2(301, y, 50, 50))
+		UI.picture(modal, "res://assets/crops/%s_ripe.png" % id, Rect2(301, y, 50, 50))
 		UI.label(modal, "%s　%s・%d日" % [data.name, "春" if data.season == "spring" else "夏", data.days],
 			Rect2(369, y, 350, 46), 22)
 		var buy: Button = UI.button(modal, "%d G　購入" % data.seed_price,
@@ -544,23 +644,23 @@ func _buy_food() -> void:
 
 
 func _help(extra: String = "") -> void:
-	_open_modal("暮らしのしおり")
-	var text: String = "①  移動：WASD / 矢印 / 左スティック・十字キー\n"
-	text += "②  道具：1〜4 / Q・E / LB・RB　種の切替：R / Y\n"
-	text += "③  向いたマスへ：Space / X　調べる：F・Enter / A\n"
+	_open_modal("母からの手紙")
+	var text: String = "歩くときは WASD・矢印、または左スティック。\n"
+	text += "日記の道具を 1〜4、Q・E、LB・RB で選べます。\n"
+	text += "向いたマスへ Space・X。札のそばでは F・Enter・A。\n"
 	text += "\n"
-	text += "畑は クワ → 種 → 水。毎日水をあげた日だけ成長します。\n"
-	text += "収穫したら出荷箱へ。家で眠ると翌朝、代金が届きます。\n"
-	text += "深夜2時・体力0で翌朝へ。無理をすると所持金の10%を失います。\n"
-	text += "Tab / Start で手帳とセーブ。お弁当で体力回復。"
+	text += "畑はクワ、種、水の順。水をあげた日だけ育ちます。\n"
+	text += "収穫したら出荷箱へ。眠った翌朝、代金が届きます。\n"
+	text += "村へは右上の道しるべから。Tab・Start は手帳とセーブ。\n"
+	text += "F11 で全画面。深夜二時や体力切れは所持金が減るので早寝してね。"
 	if not extra.is_empty():
 		text = extra
 	UI.label(modal, text, Rect2(300, 208, 696, 327), 20)
 
 
 func _result() -> void:
-	UI.picture(page, "res://assets/backgrounds/title.svg", Rect2(604, 77, 650, 575))
-	UI.panel(page, Rect2(102, 72, 654, 565), Color("fff8edf5"))
+	UI.picture(page, "res://assets/backgrounds/title.png", Rect2(604, 77, 650, 575))
+	UI.panel(page, Rect2(102, 72, 654, 565), Color("ead7abf5"))
 	var won: bool = Farm.phase == "win"
 	UI.label(page, "農場から届いた手紙", Rect2(144, 104, 552, 40), 22, UI.MUTED)
 	UI.label(page, "実りの季節、おめでとう！" if won else "二十日間の、暮らしの記録",
@@ -596,6 +696,7 @@ func _popup(text: String, at: Vector2, color: Color) -> void:
 
 
 func _update_music() -> void:
+	sound.set_ambience(mode in ["playing", "map"])
 	if mode == "title":
 		sound.track("title")
 	elif mode == "result":
