@@ -275,8 +275,7 @@ func _check_animation_images(kind: String, animation: StringName, frames: Sprite
 		var pixels: Image = frame.atlas.get_image().get_region(Rect2i(frame.region))
 		_check(pixels.get_used_rect().has_area(), label + ": 透明な空画像ではない")
 		distinct[hash(pixels.get_data())] = true
-	var expected_distinct: int = 5 if kind == "walker" else 6
 	_check(
-		distinct.size() == expected_distinct,
-		"%s %s: 6フレームを%d枚の異なる絵で構成" % [kind, animation, expected_distinct]
+		distinct.size() == 6,
+		"%s %s: 6枚すべての描画が異なる" % [kind, animation]
 	)

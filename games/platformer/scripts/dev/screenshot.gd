@@ -158,8 +158,7 @@ func _capture_window_modes() -> bool:
 	event.physical_keycode = KEY_F11
 	event.pressed = true
 	Input.parse_input_event(event)
-	await create_timer(0.5).timeout
-	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+	if not await _wait_for_window_mode(DisplayServer.WINDOW_MODE_FULLSCREEN):
 		push_error("F11 で全画面に切り替わらない")
 		quit(1)
 		return false
@@ -167,30 +166,55 @@ func _capture_window_modes() -> bool:
 		return false
 	event.pressed = false
 	Input.parse_input_event(event)
-	await process_frame
+	await create_timer(0.25).timeout
 	event.pressed = true
 	Input.parse_input_event(event)
-	await create_timer(0.5).timeout
-	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:
+	if not await _wait_for_window_mode(DisplayServer.WINDOW_MODE_WINDOWED):
 		push_error("F11 でウィンドウに戻らない")
 		quit(1)
 		return false
 	event.pressed = false
 	Input.parse_input_event(event)
+	await create_timer(0.75).timeout
 	DisplayServer.window_set_size(Vector2i(960, 540))
-	await create_timer(0.3).timeout
+	await create_timer(0.75).timeout
 	return await _capture("tmp/screenshot-resized.png")
+
+
+func _wait_for_window_mode(expected_mode: int) -> bool:
+	# macOS の全画面遷移時間には幅があるため、固定待機ではなく最大2秒だけ状態を観測する。
+	for attempt: int in 20:
+		if DisplayServer.window_get_mode() == expected_mode:
+			return true
+		await create_timer(0.1).timeout
+	return false
 
 
 func _capture(path: String) -> bool:
 	await process_frame
 	await process_frame
-	var status: Error = root.get_viewport().get_texture().get_image().save_png(path)
+	var image: Image = root.get_viewport().get_texture().get_image()
+	if _image_is_black(image):
+		push_error("スクリーンショットが黒一色: %s" % path)
+		quit(1)
+		return false
+	var status: Error = image.save_png(path)
 	if status != OK:
 		push_error("スクリーンショット保存失敗: %s (%s)" % [path, error_string(status)])
 		quit(1)
 		return false
 	print("screenshot: " + path)
+	return true
+
+
+func _image_is_black(image: Image) -> bool:
+	var x_step: int = maxi(1, image.get_width() / 16)
+	var y_step: int = maxi(1, image.get_height() / 9)
+	for y: int in range(0, image.get_height(), y_step):
+		for x: int in range(0, image.get_width(), x_step):
+			var pixel: Color = image.get_pixel(x, y)
+			if maxf(pixel.r, maxf(pixel.g, pixel.b)) > 0.05:
+				return false
 	return true
 
 

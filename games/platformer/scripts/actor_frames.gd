@@ -15,7 +15,7 @@ static func build(kind: String) -> SpriteFrames:
 	var result: SpriteFrames = SpriteFrames.new()
 	result.remove_animation("default")
 	var sheet: Texture2D = load(_sheet_path(kind))
-	var columns: int = 5 if kind == "walker" else FRAME_COUNT
+	var columns: int = FRAME_COUNT
 	var states: Array[String] = PLAYER_STATES if kind == "player" else ENEMY_STATES
 	for row: int in states.size():
 		var state: String = states[row]
@@ -23,10 +23,9 @@ static func build(kind: String) -> SpriteFrames:
 		result.set_animation_speed(state, 9.0 if state == "idle" else 14.0)
 		result.set_animation_loop(state, state not in ["hurt", "death", "stomp"])
 		for frame_index: int in FRAME_COUNT:
-			var column: int = _source_column(kind, state, frame_index)
 			var frame: AtlasTexture = AtlasTexture.new()
 			frame.atlas = sheet
-			frame.region = _cell_region(sheet, column, row, columns, states.size())
+			frame.region = _cell_region(sheet, frame_index, row, columns, states.size())
 			result.add_frame(state, frame)
 	return result
 
@@ -43,6 +42,7 @@ static func build_comic_material() -> ShaderMaterial:
 	var result: ShaderMaterial = ShaderMaterial.new()
 	result.shader = load(COMIC_SHADER) as Shader
 	result.set_shader_parameter("key_checker_background", true)
+	result.set_shader_parameter("key_chroma_background", true)
 	return result
 
 
@@ -55,15 +55,6 @@ static func _sheet_path(kind: String) -> String:
 		"shell":
 			return SHELL_SHEET
 	return ""
-
-
-static func _source_column(kind: String, state: String, frame_index: int) -> int:
-	if kind != "walker":
-		return frame_index
-	if state in ["hurt", "death"]:
-		return mini(frame_index, 4)
-	var round_trip: Array[int] = [0, 1, 2, 3, 4, 3]
-	return round_trip[frame_index]
 
 
 static func _cell_region(
