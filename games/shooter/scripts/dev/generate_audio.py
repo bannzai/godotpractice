@@ -28,7 +28,7 @@ SCORES = {
     "result": (100, ((48, 4), (53, 4), (45, 3), (43, 4)),
                (0, 4, 7, 12, 11, 7, 4, 2)),
 }
-EFFECTS = {"shot": 0.11, "explosion": 0.55, "item": 0.48, "bomb": 1.2}
+EFFECTS = {"shot": 0.11, "explosion": 0.55, "item": 0.48, "bomb": 1.2, "scan": 0.82}
 
 
 @lru_cache(maxsize=256)
@@ -204,7 +204,13 @@ def effect(name, duration):
     for index in range(round(duration * RATE)):
         t = index / RATE
         progress = t / duration
-        if name == "shot":
+        if name == "scan":
+            sweep = 310 + 980 * progress * progress
+            phase = 2 * pi * sweep * t
+            ping = sin(phase + 1.8 * sin(phase * 0.25)) * exp(-progress * 3.4)
+            carrier = sin(2 * pi * 71 * t) * (0.35 + 0.65 * sin(pi * progress))
+            sound = ping * 0.44 + carrier * 0.12
+        elif name == "shot":
             phase = 2 * pi * (1500 * t - 4200 * t * t)
             sound = (sin(phase) + 0.25 * sin(phase * 2)) * exp(-t * 36) * 0.44
             sound += rng.uniform(-1, 1) * exp(-t * 130) * 0.08
@@ -246,7 +252,7 @@ def check():
                 and abs(duration - expected) < 0.01):
             raise ValueError(f"音声検証失敗: {name}, peak={peak}, rms={rms}, seam={seam}")
         print(f"{path.name}: {duration:.3f} 秒、ピーク {peak:.4f}、RMS {rms:.4f}、境界差 {seam:.6f}")
-    print("音声検証 OK: BGM 4 曲、効果音 4 種（試聴の代替にはならない）")
+    print("音声検証 OK: BGM 4 曲、効果音 5 種（試聴の代替にはならない）")
 
 
 def main():
