@@ -6,6 +6,7 @@ const CUES: Array[String] = [
 ]
 
 var music: AudioStreamPlayer
+var ambience: AudioStreamPlayer
 var sound_players: Array[AudioStreamPlayer] = []
 var sounds: Dictionary = {}
 var tracks: Dictionary = {}
@@ -14,6 +15,7 @@ var enabled: bool = false
 var state: Node
 var _music_players: Array[AudioStreamPlayer] = []
 var _target_gain: float = 0.0
+var _ambience_target_gain: float = 0.0
 var _closed: bool = false
 var _movie_quit_frame: int = 0
 
@@ -46,6 +48,15 @@ func setup(run_state: Node) -> void:
 			add_child(player)
 			_music_players.append(player)
 		music = _music_players[0]
+		var ambience_stream: AudioStreamWAV = load("res://assets/audio/ambience.wav")
+		ambience_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		ambience_stream.loop_end = roundi(ambience_stream.get_length() * ambience_stream.mix_rate)
+		ambience = AudioStreamPlayer.new()
+		ambience.stream = ambience_stream
+		ambience.volume_linear = 0.0
+		add_child(ambience)
+		if enabled:
+			ambience.play()
 		for i: int in range(8):
 			var player := AudioStreamPlayer.new()
 			# 最大音量の SE が 8 音重なっても、BGM と合計して振幅 1 未満に収める。
@@ -66,6 +77,7 @@ func set_scene(phase: String, boss: bool = false) -> void:
 	if not tracks.has(next_scene):
 		return
 	_target_gain = db_to_linear(-17.0 if phase in ["paused", "upgrade"] else -10.0)
+	_ambience_target_gain = db_to_linear(-30.0 if phase in ["paused", "upgrade"] else -23.0)
 	if next_scene == current_scene:
 		return
 	current_scene = next_scene
@@ -102,6 +114,10 @@ func _process(delta: float) -> void:
 		if player != music and is_zero_approx(player.volume_linear) and player.playing:
 			player.stop()
 			player.stream = null
+	if is_instance_valid(ambience):
+		ambience.volume_linear = move_toward(
+			ambience.volume_linear, _ambience_target_gain, delta * 0.35
+		)
 
 
 func shutdown() -> void:
@@ -113,6 +129,9 @@ func shutdown() -> void:
 	for player: AudioStreamPlayer in _music_players + sound_players:
 		player.stop()
 		player.stream = null
+	if is_instance_valid(ambience):
+		ambience.stop()
+		ambience.stream = null
 	sounds.clear()
 	tracks.clear()
 	# --quit-after では次フレームが来ないため、音声スレッドの停止反映をここで待つ。

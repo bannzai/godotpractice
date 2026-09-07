@@ -58,19 +58,20 @@ func _check_frames(actor: Node2D, kind: int) -> void:
 	for animation: String in Actor.ANIMATIONS:
 		_check(frames.has_animation(animation), "各キャラが " + animation + " を持つ")
 		_check(frames.get_frame_count(animation) == Actor.FRAME_COUNT, "各動作が6フレームを持つ")
-		var regions: Array[Rect2] = []
+		var poses: Array[Vector4] = []
 		for index: int in range(Actor.FRAME_COUNT):
-			var texture: AtlasTexture = frames.get_frame_texture(animation, index)
-			_check(texture.atlas == Actor.SHEETS[kind + 1], "キャラ固有の画像を使用する")
-			_check(not regions.has(texture.region), "各フレームは異なる領域を使う")
-			regions.append(texture.region)
+			var texture: Texture2D = frames.get_frame_texture(animation, index)
+			_check(texture == Actor.SHEETS[kind + 1], "画像生成したキャラ固有の素材を使用する")
+			var pose: Vector4 = actor.pose_signature(animation, index)
+			_check(not poses.has(pose), "各フレームは異なるポーズ変形を使う")
+			poses.append(pose)
 	actor.setup(kind)
 	_check(actor.sprite.sprite_frames == frames, "同じキャラの setup は素材を作り直さない")
 
 
 func _check_effect_cleanup() -> void:
 	var effects: Node2D = Effects.new()
-	effects.face = load("res://assets/fonts/font.ttf")
+	effects.face = load("res://assets/fonts/RocknRollOne-Regular.ttf")
 	root.add_child(effects)
 	for kind: String in ["hit", "death", "pulse", "heal", "level", "magnet"]:
 		effects.emit_effect(Vector2(400, 300), kind, "24", 150.0)

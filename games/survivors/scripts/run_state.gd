@@ -102,7 +102,6 @@ func step(delta: float, movement: Vector2) -> void:
 		finish_run(true)
 		return
 	player_pos += movement.limit_length() * move_speed * dt
-	player_pos = player_pos.clamp(Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT)
 	invulnerable = maxf(0.0, invulnerable - dt)
 	orbit_angle = fmod(orbit_angle + dt * 2.8, TAU)
 	_advance_effects(dt)
@@ -237,21 +236,11 @@ func _spawn_wave(dt: float) -> void:
 		_supply_cooldown = 25.0
 		for kind: String in ["heal", "magnet"]:
 			var at: Vector2 = player_pos + Vector2.from_angle(_random.randf() * TAU) * 120.0
-			items.append(
-				{
-					"pos":
-					at.clamp(Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT),
-					"kind": kind
-				}
-			)
+			items.append({"pos": at, "kind": kind})
 
 
 func _spawn_position() -> Vector2:
-	var at: Vector2 = player_pos + Vector2.from_angle(_random.randf() * TAU) * 760.0
-	at = at.clamp(Vector2.ONE * -Rules.WORLD_LIMIT, Vector2.ONE * Rules.WORLD_LIMIT)
-	if at.distance_squared_to(player_pos) < 550.0 * 550.0:
-		at = player_pos.move_toward(Vector2.ZERO, 760.0)
-	return at
+	return player_pos + Vector2.from_angle(_random.randf() * TAU) * 760.0
 
 
 func _move_enemies(dt: float) -> void:

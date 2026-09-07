@@ -20,7 +20,30 @@ func _run() -> void:
 	_check(state.phase == "title", "タイトルから開始")
 	await _key(KEY_ENTER)
 	_check(state.phase == "playing", "Enter で開始")
+	_check(main.tutorial_active and main.tutorial_step == 0, "初回プレイでチュートリアルを開始")
 	var origin: Vector2 = state.player_pos
+	await _key(KEY_D, 0.25)
+	_check(state.player_pos.x > origin.x + 42, "移動入力がチュートリアルの移動段階を進める")
+	_check(main.tutorial_step == 1, "移動後に光片回収の案内へ進む")
+	state.gain_xp(1)
+	await create_timer(0.1).timeout
+	_check(main.tutorial_step == 2, "光片取得後にレベルアップの案内へ進む")
+	state.gain_xp(11)
+	await create_timer(0.7).timeout
+	_check(not main.tutorial_active and state.phase == "upgrade", "強化選択で案内を完了")
+	await _key(KEY_ENTER)
+	_check(state.phase == "playing", "チュートリアル完了後に強化を選べる")
+	main.tutorial_seen = false
+	main.tutorial_active = true
+	main.call("_refresh_screen")
+	await _key(KEY_T)
+	_check(not main.tutorial_active and main.tutorial_seen, "T でチュートリアルをスキップ")
+	main.tutorial_seen = false
+	main.tutorial_active = true
+	main.call("_refresh_screen")
+	await _pad(JOY_BUTTON_Y)
+	_check(not main.tutorial_active and main.tutorial_seen, "Y でチュートリアルをスキップ")
+	origin = state.player_pos
 	await _key(KEY_D, 0.15)
 	_check(state.player_pos.x > origin.x + 10, "D で右移動")
 	await _key(KEY_ESCAPE)
@@ -41,10 +64,28 @@ func _run() -> void:
 	axis.axis_value = 0.0
 	Input.parse_input_event(axis)
 	_check(state.player_pos.x < origin.x - 10, "左スティックで左移動")
-	state.gain_xp(12)
+	state.gain_xp(17)
 	await create_timer(0.7).timeout
 	_check(state.phase == "upgrade", "経験値で強化選択")
+	state.choices.assign(["bolt", "orbit", "pulse"])
+	main.call("_refresh_screen")
+	await process_frame
 	var first: Control = root.gui_get_focus_owner()
+	var motion := InputEventMouseMotion.new()
+	motion.position = Vector2(642, 550)
+	Input.parse_input_event(motion)
+	await process_frame
+	_check(root.gui_get_focus_owner() != first, "マウスを載せた看板へ選択位置を移す")
+	var orbit_before: int = int(state.weapons.orbit)
+	await _key(KEY_ENTER)
+	_check(
+		state.phase == "playing" and int(state.weapons.orbit) == orbit_before + 1,
+		"マウスでハイライトした強化を Enter で決定"
+	)
+	state.gain_xp(22)
+	await create_timer(0.7).timeout
+	_check(state.phase == "upgrade", "次のレベルでも強化選択")
+	first = root.gui_get_focus_owner()
 	await _pad(JOY_BUTTON_DPAD_RIGHT)
 	_check(root.gui_get_focus_owner() != first, "十字キーで選択肢を移動")
 	await _pad(JOY_BUTTON_A)
@@ -74,13 +115,13 @@ func _run() -> void:
 
 func _check_mouse_and_multiple_levels() -> void:
 	var click := InputEventMouseButton.new()
-	click.position = Vector2(265, 465)
+	click.position = Vector2(245, 520)
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	Input.parse_input_event(click)
 	await process_frame
 	click = InputEventMouseButton.new()
-	click.position = Vector2(265, 465)
+	click.position = Vector2(245, 520)
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = false
 	Input.parse_input_event(click)
