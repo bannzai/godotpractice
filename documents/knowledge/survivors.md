@@ -142,3 +142,19 @@ game-asset-search の共通スタイル用テンプレートに沿い、元作�
 - game-asset-searchへ、画像生成の「完全なポーズシート」と「キャラクターごとの一枚絵」を別の難度として示し、後者をコード側のポーズ変形でアニメーションさせる選択肢と限界を記録する。
 - godot-developmentへ、マウスホバーとキーボード/ゲームパッドフォーカスを同じ状態にそろえるUI回帰テスト、`hint_screen_texture` の全画面シェーダをGL CompatibilityとWebの両方で検査する項目を追加する。
 - godot-developmentへ、無限平面の遠方座標ではVector2の浮動小数点誤差が増えるため、距離のテストに適切な許容差を持たせる例を追加する。
+
+### 最終検証結果（2026-09-07）
+
+- `make test GAMES=survivors` はexit 0。lint、起動、入力、5体×5動作、演出、チュートリアルの実進行、マウスホバー後のEnter選択、音声を含むselfcheckがすべて成功し、ログ全文にWARNING / ERROR / リーク診断はなかった。
+- `make screenshot GAMES=survivors` はexit 0で28枚を生成した。タイトル、場面内チュートリアル3段階、通常プレイ、選択中の変化が読める強化看板、休止、敗北、強敵、クリア、5体の連続動作を目視し、文字切れ、重なり、透過画像の市松模様、VHS効果の崩れがないことを確認した。
+- `make movie GAMES=survivors` はexit 0。タイトルからの5秒間に黒画面や描画崩れはなく、平均音量は-28.2dBだった。`make -C games/survivors movie-play` もexit 0で、26.067秒の全フレーム一覧と末尾を目視し、タイトル、チュートリアル、移動、攻撃、回復、強化、強敵、クリア、タイトル復帰を確認した。平均音量は-27.7dBだった。
+- `make -C games/survivors audiocheck` はCoreAudioでexit 0。環境音、場面別BGM、SE、ループ、終了時の停止と参照解放を確認した。
+- `make -C games/survivors benchmark` はApple M4 Max / GL Compatibility / 1280×720でexit 0。暖機後10.001秒、952フレーム、平均95.19fps、p95 15.555ms、敵336〜360体、画面内最小307体、ゲーム時間9.650秒だった。生成PNGと全画面シェーダを組み合わせた今回の描画で取り直した値であり、全機種での性能保証ではない。
+- `make -C games/survivors playthrough` は通常ルールの600秒生存に成功した。seed 42、レベル91、撃破5809、HP100/100、最大敵数223、実行16.13秒でexit 0。回避botによる受け入れ条件の検査であり、人間の初見難度評価とは区別する。
+- `make build-all GAMES=survivors` と `make build-web GAMES=survivors` はexit 0。macOS、Windows、Linux、Webを生成し、ビルドログ全文にエンジンのWARNING / ERRORはなかった。全成果物で旧 `font.ttf` が除外され、RocknRoll OneとOFLが含まれることを確認した。
+- `SURVIVORS_RUN_CAPTURE=1 make survivors-run` と `make -C games/survivors runcheck` はexit 0 / runcheck OK。通常のゲーム起動経路でタイトルが描画され、終了時のリーク診断はなかった。
+- webtunnelを `up survivors --software-webgl --ref fix/survivors --wait` で起動し、runnerのChromiumで状態注入なしにタイトルから開始した。初回チュートリアル、斜め移動、光片の回収、レベル2の強化選択、休止と再開、その後の強化、通常敗北、タイトル復帰を実入力で確認した。敗北時は生存1分24秒、レベル7、撃破132。各場面のPNGを目視し、WebGL描画と入力に崩れはなく、最後に `down survivors` でrunnerを解放した。
+- 変更前後はタイトル、何もない方向へ進んだ地図、敵が多いプレイ中の3役割で並べた。識別テストはghostrogue、roguelike、shooterの同じ役割の画面と比較した。survivorsだけが大きな生成タイトル絵、縞状太陽と無限グリッド、画面四辺の経験値光、ラスターキャラクター、中央を空けた最小HUDを組み合わせており、色だけでなく構図と情報配置でも別のゲームと判別できた。
+- コードを含むコミット `2148538` のCI run 34104236777は、survivorsを含む全ゲームのlint、起動・エクスポート、スクリーンショット・動画がすべて成功した。最終文書コミット後のCI成果物もPRをreadyにする前に目視する。
+
+実機ゲームパッド、音色の主観的な聴き心地、人間の初見難度、全機種での性能は自動検証の結果として扱わない。ユーザーの判断を要する仕様分岐は残していない。
