@@ -1,6 +1,6 @@
 extends SceneTree
 ## 28 秒の実入力録画。待ち時間を縮めるため、この検証だけ日暮れを22秒後に設定する。
-## 移動・照準・種類切替・投擲・笛・解散・結果画面の決定は InputEvent だけで行う。
+## 地図・チュートリアル・移動・照準・投擲・笛・解散・結果の決定は InputEvent だけで行う。
 
 const FPS: int = 30
 const DURATION: int = 28
@@ -45,46 +45,62 @@ func _operate(seconds: float) -> void:
 		_key(KEY_ENTER, true)
 	if _at(seconds, 1.1):
 		_key(KEY_ENTER, false)
-		main.model.remaining = 22.0
-	if _at(seconds, 1.8):
+	if _at(seconds, 1.6):
+		_key(KEY_ENTER, true)
+	if _at(seconds, 1.7):
+		_key(KEY_ENTER, false)
+	if _at(seconds, 2.2):
+		_key(KEY_ENTER, true)
+	if _at(seconds, 2.3):
+		_key(KEY_ENTER, false)
+	if _at(seconds, 2.8):
+		_key(KEY_ENTER, true)
+	if _at(seconds, 2.9):
+		_key(KEY_ENTER, false)
+	if _at(seconds, 3.4):
+		_key(KEY_ENTER, true)
+	if _at(seconds, 3.5):
+		_key(KEY_ENTER, false)
+		main.model.remaining = 19.5
+	if _at(seconds, 4.2):
 		_key(KEY_TAB, true)
-	if _at(seconds, 1.9):
+	if _at(seconds, 4.3):
 		_key(KEY_TAB, false)
 		_point(main.model.cargo[0].position)
 		_key(KEY_SPACE, true)
-	if _at(seconds, 2.45):
+	if _at(seconds, 4.85):
 		_key(KEY_SPACE, false)
-	if _at(seconds, 5.8):
+	if _at(seconds, 8.2):
 		_key(KEY_A, true)
 		_key(KEY_W, true)
-	if _at(seconds, 7.4):
+	if _at(seconds, 9.8):
 		_key(KEY_A, false)
-	if _at(seconds, 8.0):
+	if _at(seconds, 10.4):
 		_key(KEY_W, false)
 		_key(KEY_TAB, true)
-	if _at(seconds, 8.1):
+	if _at(seconds, 10.5):
 		_key(KEY_TAB, false)
-	if _at(seconds, 8.6):
+	if _at(seconds, 11.0):
 		_point(main.model.enemies[0].position)
 		_key(KEY_SPACE, true)
-	if _at(seconds, 10.1):
+	if _at(seconds, 12.5):
 		_key(KEY_SPACE, false)
-	if _at(seconds, 13.5):
+	if _at(seconds, 15.9):
 		_key(KEY_SHIFT, true)
-	if _at(seconds, 13.65):
+	if _at(seconds, 16.05):
 		_key(KEY_SHIFT, false)
 		_key(KEY_S, true)
-	if _at(seconds, 15.5):
+	if _at(seconds, 17.9):
 		_key(KEY_S, false)
 		_key(KEY_R, true)
-	if _at(seconds, 15.65):
+	if _at(seconds, 18.05):
 		_key(KEY_R, false)
-	if _at(seconds, 17.0):
+	if _at(seconds, 19.4):
 		_key(KEY_SHIFT, true)
-	if _at(seconds, 17.15):
+	if _at(seconds, 19.55):
 		_key(KEY_SHIFT, false)
 		_key(KEY_E, true)
-	if _at(seconds, 17.7):
+	if _at(seconds, 20.1):
 		_key(KEY_E, false)
 	if _at(seconds, 25.5):
 		_key(KEY_DOWN, true)
