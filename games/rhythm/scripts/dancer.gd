@@ -2,6 +2,7 @@ extends Node2D
 ## 各奏者の姿勢。演出の再生と時間経過は非冪等。
 
 const POSES: Array[String] = ["idle", "dance", "hit", "miss", "celebrate"]
+const ART_SCALE := 0.16
 var sprite: Sprite2D
 var animation: AnimationPlayer
 var character: String = "fox"
@@ -16,10 +17,17 @@ func setup(id: String) -> void:
 	character = id
 	sprite = Sprite2D.new()
 	sprite.name = "Art"
-	sprite.texture = load("res://assets/characters/%s-sheet.svg" % id)
-	sprite.hframes = 4
-	sprite.vframes = 5
-	sprite.offset = Vector2(0, -120)
+	var filenames: Dictionary = {
+		"fox": "fox-taiko",
+		"bird": "bird-flute",
+		"rabbit": "rabbit-shamisen",
+	}
+	sprite.texture = load("res://assets/generated/%s.png" % str(filenames[id]))
+	sprite.offset = Vector2(0, -sprite.texture.get_height() / 2.0)
+	sprite.scale = Vector2.ONE * ART_SCALE
+	var paper: ShaderMaterial = ShaderMaterial.new()
+	paper.shader = load("res://shaders/paper_shadow.gdshader")
+	sprite.material = paper
 	add_child(sprite)
 	animation = AnimationPlayer.new()
 	add_child(animation)
@@ -35,33 +43,53 @@ func _make_animation(kind: String) -> Animation:
 	anim.length = 0.6
 	anim.loop_mode = Animation.LOOP_LINEAR if kind in ["idle", "dance"] else Animation.LOOP_NONE
 	var direction: float = -1.0 if character == "bird" else 1.0
-	var rotations: Array = [0.0, 0.025, 0.0]
-	var positions: Array = [Vector2.ZERO, Vector2(0, -4), Vector2.ZERO]
-	var scales: Array = [Vector2.ONE, Vector2(1.02, 0.98), Vector2.ONE]
-	var colors: Array = [Color.WHITE, Color.WHITE, Color.WHITE]
+	var rotations: Array = [0.0, 0.025, -0.018, 0.0]
+	var positions: Array = [Vector2.ZERO, Vector2(0, -4), Vector2(0, -2), Vector2.ZERO]
+	var scales: Array = [
+		Vector2.ONE * ART_SCALE,
+		Vector2(1.02, 0.98) * ART_SCALE,
+		Vector2(0.99, 1.01) * ART_SCALE,
+		Vector2.ONE * ART_SCALE,
+	]
+	var colors: Array = [Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE]
 	match kind:
 		"dance":
-			rotations = [-0.09 * direction, 0.10 * direction, -0.09 * direction]
-			positions = [Vector2(-7, 0), Vector2(7, -18), Vector2(-7, 0)]
-			scales = [Vector2(1.04, 0.96), Vector2(0.95, 1.06), Vector2(1.04, 0.96)]
+			rotations = [-0.09 * direction, 0.10 * direction, -0.07 * direction, 0.08 * direction]
+			positions = [Vector2(-7, 0), Vector2(7, -18), Vector2(5, -7), Vector2(-6, -15)]
+			scales = [
+				Vector2(1.04, 0.96) * ART_SCALE,
+				Vector2(0.95, 1.06) * ART_SCALE,
+				Vector2(1.02, 0.98) * ART_SCALE,
+				Vector2(0.97, 1.04) * ART_SCALE,
+			]
 		"hit":
-			rotations = [-0.15 * direction, 0.16 * direction, 0.0]
-			positions = [Vector2(0, 5), Vector2(0, -30), Vector2.ZERO]
-			scales = [Vector2(1.16, 0.84), Vector2(0.91, 1.12), Vector2.ONE]
+			rotations = [-0.15 * direction, 0.16 * direction, -0.06 * direction, 0.0]
+			positions = [Vector2(0, 5), Vector2(0, -30), Vector2(0, -12), Vector2.ZERO]
+			scales = [
+				Vector2(1.16, 0.84) * ART_SCALE,
+				Vector2(0.91, 1.12) * ART_SCALE,
+				Vector2(1.04, 0.96) * ART_SCALE,
+				Vector2.ONE * ART_SCALE,
+			]
 		"miss":
-			rotations = [0.12, -0.13, 0.0]
-			positions = [Vector2(0, 8), Vector2(-10, 0), Vector2.ZERO]
-			scales = [Vector2(1.12, 0.88), Vector2(0.95, 1.0), Vector2.ONE]
-			colors = [Color("c1a6d5"), Color("e2d4e9"), Color.WHITE]
+			rotations = [0.12, -0.13, 0.08, 0.0]
+			positions = [Vector2(0, 8), Vector2(-10, 0), Vector2(7, 5), Vector2.ZERO]
+			scales = [
+				Vector2(1.12, 0.88) * ART_SCALE,
+				Vector2(0.95, 1.0) * ART_SCALE,
+				Vector2(1.04, 0.94) * ART_SCALE,
+				Vector2.ONE * ART_SCALE,
+			]
+			colors = [Color("c1a6d5"), Color("e2d4e9"), Color("eadff0"), Color.WHITE]
 		"celebrate":
-			rotations = [-0.2, 0.2, 0.0]
-			positions = [Vector2.ZERO, Vector2(0, -48), Vector2.ZERO]
-			scales = [Vector2(1.1, 0.9), Vector2(0.9, 1.12), Vector2.ONE]
-	var frames: int = anim.add_track(Animation.TYPE_VALUE)
-	anim.track_set_path(frames, NodePath("Art:frame"))
-	anim.value_track_set_update_mode(frames, Animation.UPDATE_DISCRETE)
-	for frame: int in range(4):
-		anim.track_insert_key(frames, frame * 0.15, POSES.find(kind) * 4 + frame)
+			rotations = [-0.2, 0.2, -0.16, 0.0]
+			positions = [Vector2.ZERO, Vector2(0, -48), Vector2(0, -26), Vector2.ZERO]
+			scales = [
+				Vector2(1.1, 0.9) * ART_SCALE,
+				Vector2(0.9, 1.12) * ART_SCALE,
+				Vector2(1.06, 0.94) * ART_SCALE,
+				Vector2.ONE * ART_SCALE,
+			]
 	_add_track(anim, "Art:rotation", rotations)
 	_add_track(anim, "Art:position", positions)
 	_add_track(anim, "Art:scale", scales)
@@ -72,8 +100,8 @@ func _make_animation(kind: String) -> Animation:
 func _add_track(anim: Animation, property: String, values: Array) -> void:
 	var track: int = anim.add_track(Animation.TYPE_VALUE)
 	anim.track_set_path(track, NodePath(property))
-	for index: int in range(3):
-		anim.track_insert_key(track, index * 0.3, values[index])
+	for index: int in range(4):
+		anim.track_insert_key(track, index * 0.15, values[index])
 
 
 func react(kind: String) -> void:

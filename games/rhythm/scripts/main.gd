@@ -3,10 +3,18 @@ extends Control
 ## 入力と音声再生・Tweenは時間に沿った操作のため非冪等。
 
 const Stage = preload("res://scripts/stage.gd")
+const FestivalMeter = preload("res://scripts/festival_meter.gd")
 const CREAM := Color("fff0cf")
-const MINT := Color("87dfcf")
-const CORAL := Color("ff8c89")
-const INK := Color("192d47")
+const MINT := Color("18b7b0")
+const CORAL := Color("ef3e2f")
+const SUN := Color("ffc62f")
+const INK := Color("17131d")
+const INDIGO := Color("172c58")
+const STALL_RECTS: Array[Rect2] = [
+	Rect2(62, 203, 352, 306),
+	Rect2(464, 203, 352, 306),
+	Rect2(866, 203, 352, 306),
+]
 var state: Node
 var stage: Node2D
 var page: Control
@@ -17,12 +25,13 @@ var score_label: Label
 var combo_label: Label
 var accuracy_label: Label
 var time_label: Label
-var gauge_bar: ProgressBar
+var gauge_bar: Control
 var progress_bar: ProgressBar
 var offset_label: Label
 var preview_button: Button
 var result_score: Label
 var song_buttons: Array[Button] = []
+var combo_lanterns: Array[TextureRect] = []
 var force_audio: bool = false
 var closing: bool = false
 var previewing: bool = false
@@ -37,11 +46,20 @@ var fever: bool = false
 var touches: Dictionary = {}
 var inputs: Array[Dictionary] = [{}, {}]
 var settings_panel: Panel
+var tutorial_panel: Panel
+var tutorial_message: Label
+var tutorial_hint: Label
+var tutorial_step: int = 0
+var tutorial_seen: bool = false
+var tutorial_active: bool = false
+var tutorial_hold_started: int = 0
+var tutorial_left: Button
+var tutorial_right: Button
 
 
 func _ready() -> void:
 	print("rhythm boot")
-	DisplayServer.window_set_title("星灯りのリズム便")
+	DisplayServer.window_set_title("星灯りの祭り囃子")
 	state = get_node("/root/RhythmState")
 	get_tree().auto_accept_quit = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -76,25 +94,25 @@ func _ready() -> void:
 
 func _build_theme() -> void:
 	theme = Theme.new()
-	theme.default_font = load("res://assets/fonts/MPLUSRounded1c-Regular.ttf")
+	theme.default_font = load("res://assets/fonts/RampartOne-Regular.ttf")
 	theme.default_font_size = 22
 	theme.set_color("font_color", "Label", CREAM)
 	for kind: String in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var color: Color = {
-			"normal": Color("29445c"),
-			"hover": Color("3b6375"),
-			"pressed": Color("172c43"),
+			"normal": Color("222033"),
+			"hover": Color("40324a"),
+			"pressed": Color("14121c"),
 			"focus": Color(0, 0, 0, 0),
-			"disabled": Color("263649")
+			"disabled": Color("38323a")
 		}[kind]
-		var border: Color = MINT if kind == "focus" else Color("65818d")
-		var box: StyleBoxFlat = _box(color, 16, border)
-		box.set_border_width_all(3 if kind == "focus" else 1)
+		var border: Color = SUN if kind == "focus" else INK
+		var box: StyleBoxFlat = _box(color, 6, border)
+		box.set_border_width_all(6 if kind == "focus" else 3)
 		theme.set_stylebox(kind, "Button", box)
 		theme.set_color("font_%s_color" % kind, "Button", CREAM)
 	theme.set_color("font_color", "Button", CREAM)
-	theme.set_stylebox("background", "ProgressBar", _box(Color("233f55"), 8))
-	theme.set_stylebox("fill", "ProgressBar", _box(MINT, 8))
+	theme.set_stylebox("background", "ProgressBar", _box(INK, 3))
+	theme.set_stylebox("fill", "ProgressBar", _box(SUN, 3))
 
 
 func _box(color: Color, radius: int = 18, border: Color = Color.TRANSPARENT) -> StyleBoxFlat:
@@ -107,6 +125,9 @@ func _box(color: Color, radius: int = 18, border: Color = Color.TRANSPARENT) -> 
 	box.content_margin_bottom = 8
 	box.border_color = border
 	box.set_border_width_all(1)
+	box.shadow_color = Color(INK, 0.55)
+	box.shadow_size = 5
+	box.shadow_offset = Vector2(7, 8)
 	return box
 
 
@@ -153,18 +174,36 @@ func _panel(rect: Rect2, color: Color = Color("192d47")) -> Panel:
 	return panel
 
 
+func _paper_texture(path: String, rect: Rect2) -> TextureRect:
+	var image: TextureRect = TextureRect.new()
+	image.texture = load(path)
+	image.position = rect.position
+	image.size = rect.size
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var paper: ShaderMaterial = ShaderMaterial.new()
+	paper.shader = load("res://shaders/paper_shadow.gdshader")
+	image.material = paper
+	page.add_child(image)
+	return image
+
+
 func _show_screen() -> void:
 	if state.screen == last_screen:
 		return
 	last_screen = state.screen
 	previewing = false
+	tutorial_active = false
 	touches.clear()
 	inputs = [{}, {}]
 	for child: Node in page.get_children():
 		page.remove_child(child)
 		child.queue_free()
 	song_buttons.clear()
+	combo_lanterns.clear()
 	settings_panel = null
+	tutorial_panel = null
 	match state.screen:
 		"title":
 			_title()
@@ -185,60 +224,83 @@ func _show_screen() -> void:
 
 
 func _title() -> void:
-	_label("夜空の音楽郵便局", Rect2(76, 65, 440, 36), 23, MINT)
-	_label("星灯りの\nリズム便", Rect2(72, 135, 680, 210), 76)
-	_label("ひとつのビートが、街の灯りになる。", Rect2(78, 364, 650, 40), 25)
-	_label("3つの夜。3人の奏者。あなたが届ける音楽。", Rect2(78, 411, 640, 40), 20, Color("b7ccd4"))
-	var start: Button = _button("曲を選ぶ  →", Rect2(78, 490, 400, 76), state.show_select)
-	start.add_theme_font_size_override("font_size", 27)
+	_panel(Rect2(46, 54, 620, 594), Color(INDIGO, 0.94))
+	_label("今夜の主役は、あなたの一打。", Rect2(82, 86, 510, 38), 22, SUN)
+	_label("星灯り\n祭り囃子", Rect2(76, 128, 540, 194), 67)
+	_label("三つの屋台をめぐり、\n太鼓と笛で花火を咲かせよう。", Rect2(82, 344, 520, 94), 25)
+	_label("初めての一曲は、場内の稽古から始まります。", Rect2(82, 454, 510, 44), 18, Color("f7cf86"))
+	var start: Button = _button("Enter / A　縁日へ歩き出す", Rect2(82, 514, 500, 78), state.show_select)
+	start.add_theme_font_size_override("font_size", 24)
 	start.grab_focus()
-	_button("終了", Rect2(500, 490, 150, 76), request_close)
-	_label("F / J ・ パッド X / B ・ 左右のタップ", Rect2(78, 614, 800, 36), 20, MINT)
-	_label("Enter / A で決定     F11 全画面", Rect2(78, 656, 800, 32), 18, Color("b7ccd4"))
-	var icon: TextureRect = TextureRect.new()
-	icon.texture = load("res://assets/ui/logo-mark.svg")
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.position = Vector2(890, 88)
-	icon.size = Vector2(166, 166)
-	page.add_child(icon)
+	_button("終了", Rect2(82, 607, 180, 48), request_close)
+	_paper_texture("res://assets/generated/combo-lantern.png", Rect2(605, 36, 90, 108))
 
 
 func _select() -> void:
-	_label("今日の配達曲", Rect2(64, 38, 780, 60), 42)
-	_label("夜の行き先を選んで、演奏しよう。", Rect2(66, 103, 700, 36), 21, MINT)
-	_button("タイトル", Rect2(1035, 48, 180, 52), state.show_title)
+	_panel(Rect2(38, 24, 1204, 145), Color(INDIGO, 0.93))
+	_label("屋台の並ぶ縁日を歩こう", Rect2(68, 40, 710, 52), 38)
+	_label("← → で歩く　　黄色い縁の屋台で Enter / A", Rect2(70, 102, 750, 38), 20, SUN)
+	_label("三つの屋台は、どれも開店中", Rect2(842, 106, 310, 32), 17, CREAM)
+	_button("タイトルへ", Rect2(1032, 46, 178, 48), state.show_title)
 	for index: int in range(state.songs.size()):
 		var song: Dictionary = state.songs[index]
 		var record: Dictionary = state.get_record(index, state.difficulty)
+		var selected: bool = index == state.selected_song
+		var outline: Panel = Panel.new()
+		outline.position = STALL_RECTS[index].position
+		outline.size = STALL_RECTS[index].size
+		var outline_box: StyleBoxFlat = _box(Color(INDIGO, 0.05), 5, SUN if selected else INK)
+		outline_box.set_border_width_all(8 if selected else 3)
+		outline.add_theme_stylebox_override("panel", outline_box)
+		outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		page.add_child(outline)
 		var best: String = (
-			"まだ演奏していません"
+			"初演奏"
 			if record.is_empty()
-			else ("最高 %06d   ランク %s" % [int(record.score), str(record.rank)])
+			else "最高 %06d / %s" % [int(record.score), str(record.rank)]
 		)
-		var text: String = (
-			"%02d    %s\n%d BPM  /  %d秒     %s"
-			% [index + 1, song.title, song.bpm, song.duration, best]
-		)
+		var text: String = "%s\n%s　%d BPM　%s" % [
+			str(song.title), _song_flavor(index), int(song.bpm), best
+		]
 		var button: Button = _button(
-			text, Rect2(64, 166 + index * 126, 668, 108), func() -> void: _choose_song(index)
+			text,
+			Rect2(STALL_RECTS[index].position + Vector2(10, 194), Vector2(332, 102)),
+			func() -> void: _activate_stall(index)
 		)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.add_theme_font_size_override("font_size", 22)
+		button.add_theme_font_size_override("font_size", 18)
 		song_buttons.append(button)
-		if index == state.selected_song:
-			button.add_theme_stylebox_override("normal", _box(Color("345e69"), 16, MINT))
-	_panel(Rect2(770, 166, 446, 256), Color(0.09, 0.16, 0.25, 0.94))
-	_label("演奏の準備", Rect2(795, 183, 380, 42), 28)
-	_button("やさしい", Rect2(795, 242, 183, 54), func() -> void: _difficulty("easy"))
-	_button("むずかしい", Rect2(990, 242, 201, 54), func() -> void: _difficulty("hard"))
-	_label("選択中：" + _difficulty_name(), Rect2(795, 310, 380, 34), 21, MINT)
-	preview_button = _button("試聴する ♪", Rect2(795, 353, 182, 46), _toggle_preview)
-	_button("音の調整", Rect2(990, 353, 201, 46), _settings)
-	var start: Button = _button("この曲を演奏する  →", Rect2(64, 576, 430, 68), start_song)
-	start.grab_focus()
-	_label("F：コーラル   J：ミント   尾のある音は長押し", Rect2(64, 663, 1040, 32), 19, Color("c0d4dc"))
+		if selected:
+			button.add_theme_stylebox_override("normal", _box(Color(INDIGO, 0.95), 4, SUN))
+			button.grab_focus()
+	var walker_x: float = STALL_RECTS[state.selected_song].position.x + 130.0
+	_paper_texture("res://assets/generated/fox-taiko.png", Rect2(walker_x, 472, 92, 96))
+	_label("▲ ここにいる", Rect2(walker_x - 20, 552, 150, 28), 16, SUN)
+	_panel(Rect2(38, 576, 1204, 112), Color(INDIGO, 0.95))
+	var selected_song: Dictionary = state.songs[state.selected_song]
+	_label(
+		"選択中　%s / %s" % [str(selected_song.title), _difficulty_name()],
+		Rect2(64, 590, 415, 34),
+		21,
+		SUN
+	)
+	_label("もう一度この屋台を選ぶと、場内の稽古へ", Rect2(64, 632, 445, 30), 16, CREAM)
+	_button("やさしい", Rect2(510, 598, 150, 58), func() -> void: _difficulty("easy"))
+	_button("むずかしい", Rect2(672, 598, 168, 58), func() -> void: _difficulty("hard"))
+	preview_button = _button("試聴 ♪", Rect2(852, 598, 150, 58), _toggle_preview)
+	_button("音の調整", Rect2(1014, 598, 188, 58), _settings)
 	if not state.error_message.is_empty():
-		_label(state.error_message, Rect2(64, 626, 700, 30), 18, CORAL)
+		_label(state.error_message, Rect2(66, 662, 700, 24), 16, CORAL)
+
+
+func _song_flavor(index: int) -> String:
+	return ["大太鼓", "風鈴", "花火"][index]
+
+
+func _activate_stall(index: int) -> void:
+	if state.selected_song == index:
+		start_song()
+	else:
+		_choose_song(index)
 
 
 func _choose_song(index: int) -> void:
@@ -283,44 +345,132 @@ func _offset(amount: int) -> void:
 	offset_label.text = "%+d ms" % state.offset_ms
 
 
+func _tutorial() -> void:
+	tutorial_active = true
+	tutorial_step = 0
+	tutorial_hold_started = 0
+	for child: Node in page.get_children():
+		if child is Button:
+			child.disabled = true
+	tutorial_panel = _panel(Rect2(104, 70, 1072, 580), Color(INDIGO, 0.98))
+	tutorial_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_paper_texture("res://assets/generated/combo-lantern.png", Rect2(142, 102, 128, 154))
+	_label("場内の稽古　1曲目だけ", Rect2(302, 100, 650, 48), 32, SUN)
+	tutorial_message = _label("", Rect2(300, 164, 744, 92), 30)
+	tutorial_hint = _label("", Rect2(300, 250, 744, 62), 20, Color("f7cf86"))
+	tutorial_left = _button("朱の面\nF / X / 左タップ", Rect2(180, 350, 420, 150), func() -> void: pass)
+	tutorial_right = _button("藍のふち\nJ / B / 右タップ", Rect2(680, 350, 420, 150), func() -> void: pass)
+	tutorial_left.add_theme_color_override("font_color", CORAL)
+	tutorial_right.add_theme_color_override("font_color", MINT)
+	tutorial_left.button_down.connect(func() -> void: _tutorial_press(0))
+	tutorial_left.button_up.connect(func() -> void: _tutorial_release(0))
+	tutorial_right.button_down.connect(func() -> void: _tutorial_press(1))
+	tutorial_right.button_up.connect(func() -> void: _tutorial_release(1))
+	_button("稽古をスキップして本番へ", Rect2(812, 565, 290, 50), _finish_tutorial)
+	_play_music(str(state.songs[state.selected_song].id))
+	_render_tutorial_step()
+
+
+func _render_tutorial_step() -> void:
+	match tutorial_step:
+		0:
+			tutorial_message.text = "一、流れてきた朱の音を、面でたたく"
+			tutorial_hint.text = "朱の太鼓を一度たたいてください。"
+			tutorial_left.grab_focus()
+		1:
+			tutorial_message.text = "二、藍の音は、太鼓のふちで返す"
+			tutorial_hint.text = "次は藍の太鼓を一度たたいてください。"
+			tutorial_right.grab_focus()
+		2:
+			tutorial_message.text = "三、尾の長い音は、終わりまで押さえる"
+			tutorial_hint.text = "朱の太鼓を少し長く押してから放してください。"
+			tutorial_left.grab_focus()
+		3:
+			tutorial_message.text = "稽古完了！　三つの打ち方を覚えました"
+			tutorial_hint.text = "提灯が灯ったら本番です。"
+			tutorial_left.disabled = true
+			tutorial_right.disabled = true
+			var start: Button = _button("Enter / A　本番の演奏へ", Rect2(314, 520, 520, 74), _finish_tutorial)
+			start.grab_focus()
+
+
+func _tutorial_press(lane: int) -> void:
+	if not tutorial_active:
+		return
+	if tutorial_step == 0 and lane == 0:
+		tutorial_step = 1
+		_play_sfx("hit-coral")
+		_render_tutorial_step()
+	elif tutorial_step == 1 and lane == 1:
+		tutorial_step = 2
+		_play_sfx("hit-mint")
+		_render_tutorial_step()
+	elif tutorial_step == 2 and lane == 0:
+		tutorial_hold_started = Time.get_ticks_msec()
+		tutorial_hint.text = "そのまま……尾が切れるところで放す！"
+	else:
+		tutorial_hint.text = "今、光っている太鼓をたたいてください。"
+
+
+func _tutorial_release(lane: int) -> void:
+	if tutorial_step != 2 or lane != 0 or tutorial_hold_started == 0:
+		return
+	if Time.get_ticks_msec() - tutorial_hold_started >= 350:
+		tutorial_step = 3
+		_play_sfx("hold")
+		_render_tutorial_step()
+	else:
+		tutorial_hint.text = "もう少し長く。尾の終わりまで押し続けます。"
+	tutorial_hold_started = 0
+
+
+func _finish_tutorial() -> void:
+	if not tutorial_active:
+		return
+	tutorial_seen = true
+	tutorial_active = false
+	state.start_song()
+
+
 func _play() -> void:
 	fever = false
 	last_combo = 0
 	shown_score = 0
-	_label(str(state.songs[state.selected_song].title), Rect2(64, 30, 610, 50), 32)
-	_label(_difficulty_name(), Rect2(67, 82, 460, 28), 19, MINT)
-	_button("中断  Esc", Rect2(1050, 35, 166, 52), state.abort_song)
-	_label("スコア", Rect2(565, 31, 220, 30), 17, MINT)
-	score_label = _label("0000000", Rect2(565, 63, 230, 55), 36)
-	accuracy_label = _label("精度 100.0%", Rect2(815, 68, 260, 40), 23)
+	_panel(Rect2(38, 22, 1204, 142), Color(INDIGO, 0.94))
+	_label(str(state.songs[state.selected_song].title), Rect2(64, 38, 500, 48), 31)
+	_label(_difficulty_name() + "　祭り本番", Rect2(67, 91, 330, 28), 18, SUN)
+	_button("Esc　中断", Rect2(1050, 44, 164, 50), state.abort_song)
+	_label("奉納点", Rect2(548, 37, 150, 26), 16, SUN)
+	score_label = _label("0000000", Rect2(545, 66, 230, 50), 34)
+	accuracy_label = _label("精度 100.0%", Rect2(792, 74, 242, 38), 21)
 	progress_bar = ProgressBar.new()
-	progress_bar.position = Vector2(64, 132)
-	progress_bar.size = Vector2(1152, 7)
+	progress_bar.position = Vector2(64, 131)
+	progress_bar.size = Vector2(1152, 8)
 	progress_bar.show_percentage = false
 	page.add_child(progress_bar)
-	time_label = _label("", Rect2(890, 155, 320, 30), 18, MINT)
-	_label("ここで叩く", Rect2(229, 157, 300, 30), 19, CREAM)
-	combo_label = _label("", Rect2(65, 456, 210, 65), 40)
-	_label("街の灯り", Rect2(67, 525, 210, 35), 21, MINT)
-	gauge_bar = ProgressBar.new()
-	gauge_bar.position = Vector2(65, 568)
-	gauge_bar.size = Vector2(525, 22)
-	gauge_bar.max_value = 1.0
-	gauge_bar.show_percentage = false
+	time_label = _label("", Rect2(914, 171, 292, 30), 17, CREAM)
+	_label("ここで打つ", Rect2(235, 170, 220, 30), 18, SUN)
+	gauge_bar = FestivalMeter.new()
+	gauge_bar.position = Vector2(48, 500)
+	gauge_bar.size = Vector2(188, 188)
+	gauge_bar.theme = theme
 	page.add_child(gauge_bar)
-	_label("60% で配達成功", Rect2(65, 602, 420, 32), 18, CREAM)
-	_label("│", Rect2(65 + 525 * 0.6 - 10, 566, 35, 30), 24, INK)
-	var left: Button = _button("F / パッド X　 コーラル", Rect2(64, 650, 552, 54), func() -> void: pass)
-	var right: Button = _button("J / パッド B　 ミント", Rect2(640, 650, 576, 54), func() -> void: pass)
-	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	left.focus_mode = Control.FOCUS_NONE
-	right.focus_mode = Control.FOCUS_NONE
-	left.add_theme_color_override("font_color", CORAL)
-	right.add_theme_color_override("font_color", MINT)
+	_label("太鼓の張り", Rect2(230, 514, 220, 32), 20, SUN)
+	_label("60% で花火が上がる", Rect2(230, 550, 300, 30), 17, CREAM)
+	combo_label = _label("0 連", Rect2(250, 594, 185, 52), 30)
+	_label("コンボ提灯", Rect2(250, 642, 185, 28), 17, SUN)
+	for index: int in range(6):
+		var lantern: TextureRect = _paper_texture(
+			"res://assets/generated/combo-lantern.png", Rect2(430 + index * 55, 574, 48, 58)
+		)
+		lantern.modulate = Color(0.4, 0.4, 0.45, 0.24)
+		combo_lanterns.append(lantern)
 
 
 func start_song() -> void:
+	if state.screen == "select" and not tutorial_seen:
+		_tutorial()
+		return
 	state.start_song()
 
 
@@ -348,9 +498,9 @@ func _process(delta: float) -> void:
 			return
 		shown_score = lerpf(shown_score, state.score, minf(1.0, delta * 15))
 		score_label.text = "%07d" % roundi(shown_score)
-		combo_label.text = "%d" % state.combo if state.combo > 0 else ""
+		combo_label.text = "%d 連" % state.combo
 		accuracy_label.text = "精度 %.1f%%" % (state.accuracy * 100)
-		gauge_bar.value = state.gauge
+		gauge_bar.set("value", state.gauge)
 		progress_bar.value = state.song_time / float(state.chart.duration) * 100
 		time_label.text = (
 			"%02d:%02d / %02d:%02d"
@@ -365,6 +515,11 @@ func _process(delta: float) -> void:
 			last_combo = state.combo
 			combo_label.scale = Vector2.ONE * 1.15
 			create_tween().tween_property(combo_label, "scale", Vector2.ONE, 0.18)
+			for index: int in range(combo_lanterns.size()):
+				combo_lanterns[index].modulate = (
+					Color.WHITE if index < mini(state.combo, combo_lanterns.size())
+					else Color(0.4, 0.4, 0.45, 0.24)
+				)
 		if state.gauge >= 0.999 and not fever:
 			fever = true
 			stage.celebrate()
@@ -376,16 +531,17 @@ func _process(delta: float) -> void:
 
 
 func _result() -> void:
-	_label("配達成功！" if state.cleared else "もう一度、届けよう。", Rect2(64, 42, 1150, 75), 48)
+	_panel(Rect2(42, 28, 1196, 126), Color(CORAL if state.cleared else INDIGO, 0.96))
+	_label("大花火！" if state.cleared else "祭りは、まだ終わらない。", Rect2(72, 48, 810, 62), 45)
 	_label(
 		str(state.songs[state.selected_song].title) + "  /  " + _difficulty_name(),
-		Rect2(66, 127, 1070, 40),
-		23,
-		MINT
+		Rect2(74, 112, 760, 34),
+		20,
+		SUN
 	)
-	_panel(Rect2(64, 194, 668, 353), Color(0.09, 0.16, 0.25, 0.95))
-	_label("今回のスコア", Rect2(97, 219, 380, 40), 22, MINT)
-	result_score = _label("0", Rect2(93, 264, 600, 75), 57)
+	_panel(Rect2(58, 184, 704, 364), Color(CREAM, 0.97))
+	_label("今回の奉納点", Rect2(94, 211, 380, 40), 21, CORAL)
+	result_score = _label("0", Rect2(90, 254, 610, 76), 55, INK)
 	var tween: Tween = create_tween()
 	tween.tween_method(
 		func(value: float) -> void:
@@ -397,24 +553,27 @@ func _result() -> void:
 	)
 	_label(
 		"最大コンボ  %d     精度  %.1f%%" % [state.max_combo, state.accuracy * 100],
-		Rect2(98, 357, 600, 40),
-		24
+		Rect2(94, 350, 620, 40),
+		23,
+		INK
 	)
 	_label(
 		(
 			"パーフェクト %d     グッド %d     ミス %d"
 			% [state.counts.Perfect, state.counts.Good, state.counts.Miss]
 		),
-		Rect2(98, 418, 620, 40),
-		21
+		Rect2(94, 411, 620, 40),
+		20,
+		INK
 	)
-	_label("街の灯り %.0f%%  /  クリア条件 60%%" % (state.gauge * 100), Rect2(98, 480, 610, 36), 21, MINT)
-	_label("ランク", Rect2(897, 203, 270, 40), 26, MINT)
-	_label(str(state.rank), Rect2(891, 230, 290, 170), 118)
-	var retry: Button = _button("もう一度演奏", Rect2(64, 582, 322, 68), start_song)
+	_label("太鼓の張り %.0f%%  /  花火 60%%" % (state.gauge * 100), Rect2(94, 474, 610, 36), 20, CORAL)
+	_paper_texture("res://assets/generated/combo-lantern.png", Rect2(832, 174, 238, 286))
+	_label("ランク", Rect2(893, 232, 180, 34), 22, INK)
+	_label(str(state.rank), Rect2(879, 273, 190, 132), 94, INK)
+	var retry: Button = _button("もう一度、太鼓をたたく", Rect2(58, 584, 392, 70), start_song)
 	retry.grab_focus()
-	_button("選曲に戻る", Rect2(408, 582, 324, 68), state.show_select)
-	_label("記録は曲・難易度ごとに保存されます。", Rect2(66, 673, 900, 28), 18, MINT)
+	_button("縁日の屋台へ戻る", Rect2(470, 584, 360, 70), state.show_select)
+	_label("提灯の記録は曲・難易度ごとに残ります。", Rect2(62, 674, 760, 28), 17, SUN)
 	if not state.error_message.is_empty():
 		_label(state.error_message, Rect2(780, 641, 450, 40), 18, CORAL)
 
@@ -423,31 +582,72 @@ func _input(event: InputEvent) -> void:
 	if closing:
 		return
 	if event.is_action_pressed("fullscreen"):
-		var current: int = DisplayServer.window_get_mode()
-		DisplayServer.window_set_mode(
-			(
-				DisplayServer.WINDOW_MODE_WINDOWED
-				if current == DisplayServer.WINDOW_MODE_FULLSCREEN
-				else DisplayServer.WINDOW_MODE_FULLSCREEN
-			)
-		)
-		get_viewport().set_input_as_handled()
+		_toggle_fullscreen()
+		return
+	if tutorial_active:
+		_tutorial_input(event)
+		return
+	if state.screen == "select" and _select_input(event):
 		return
 	if event.is_action_pressed("ui_cancel"):
-		if settings_panel != null:
-			_refresh_select()
-		elif state.screen == "play":
-			state.abort_song()
-		elif state.screen in ["result", "select"]:
-			if state.screen == "select":
-				state.show_title()
-			else:
-				state.show_select()
+		_cancel_screen()
+		return
+	if state.screen == "play":
+		_play_input(event)
+
+
+func _toggle_fullscreen() -> void:
+	var current: int = DisplayServer.window_get_mode()
+	DisplayServer.window_set_mode(
+		(
+			DisplayServer.WINDOW_MODE_WINDOWED
+			if current == DisplayServer.WINDOW_MODE_FULLSCREEN
+			else DisplayServer.WINDOW_MODE_FULLSCREEN
+		)
+	)
+	get_viewport().set_input_as_handled()
+
+
+func _tutorial_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		_finish_tutorial()
 		get_viewport().set_input_as_handled()
 		return
-	if state.screen != "play":
-		return
-	_play_input(event)
+	for lane: int in range(2):
+		var tutorial_action: String = "hit_coral" if lane == 0 else "hit_mint"
+		if event.is_action(tutorial_action):
+			if event.is_pressed():
+				_tutorial_press(lane)
+			else:
+				_tutorial_release(lane)
+			get_viewport().set_input_as_handled()
+			return
+
+
+func _select_input(event: InputEvent) -> bool:
+	var direction: int = 0
+	if event.is_action_pressed("ui_left"):
+		direction = -1
+	elif event.is_action_pressed("ui_right"):
+		direction = 1
+	if direction == 0:
+		return false
+	state.select_song(posmod(state.selected_song + direction, state.songs.size()))
+	_refresh_select()
+	get_viewport().set_input_as_handled()
+	return true
+
+
+func _cancel_screen() -> void:
+	if settings_panel != null:
+		_refresh_select()
+	elif state.screen == "play":
+		state.abort_song()
+	elif state.screen == "select":
+		state.show_title()
+	elif state.screen == "result":
+		state.show_select()
+	get_viewport().set_input_as_handled()
 
 
 func _play_input(event: InputEvent) -> void:

@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://bqgoggvag0jhe"
-path="res://.godot/imported/MPLUSRounded1c-Regular.ttf-c1fb9122389aafc31b52ab31bae2f90d.fontdata"
+uid="uid://dn4t2j2crwmcc"
+path="res://.godot/imported/RampartOne-Regular.ttf-382ae6a51ad0ed55378b5d4a169604e2.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/MPLUSRounded1c-Regular.ttf"
-dest_files=["res://.godot/imported/MPLUSRounded1c-Regular.ttf-c1fb9122389aafc31b52ab31bae2f90d.fontdata"]
+source_file="res://assets/fonts/RampartOne-Regular.ttf"
+dest_files=["res://.godot/imported/RampartOne-Regular.ttf-382ae6a51ad0ed55378b5d4a169604e2.fontdata"]
 
 [params]
 

@@ -4,8 +4,9 @@ extends Node2D
 const Dancer = preload("res://scripts/dancer.gd")
 const Rules = preload("res://scripts/rhythm_rules.gd")
 const CREAM := Color("fff0cf")
-const CORAL := Color("ff8c89")
-const MINT := Color("87dfcf")
+const CORAL := Color("ef3e2f")
+const MINT := Color("18b7b0")
+const INK := Color("17131d")
 const LINE_X: float = 275.0
 const SPEED: float = 340.0
 const LANE_Y: Array[float] = [260.0, 370.0]
@@ -27,18 +28,16 @@ var frozen_view: bool = false
 
 func _ready() -> void:
 	state = get_node("/root/RhythmState")
-	font = load("res://assets/fonts/MPLUSRounded1c-Regular.ttf")
-	for layer_name: String in ["sky", "city", "foreground"]:
-		var layer: Sprite2D = Sprite2D.new()
-		layer.texture = load("res://assets/backgrounds/%s.svg" % layer_name)
-		layer.centered = false
-		layer.show_behind_parent = true
-		add_child(layer)
-		layers.append(layer)
-		if layer_name == "sky":
-			var glow: ShaderMaterial = ShaderMaterial.new()
-			glow.shader = load("res://shaders/night_glow.gdshader")
-			layer.material = glow
+	font = load("res://assets/fonts/RampartOne-Regular.ttf")
+	var festival: Sprite2D = Sprite2D.new()
+	festival.texture = load("res://assets/generated/festival-night.png")
+	festival.centered = false
+	festival.show_behind_parent = true
+	festival.scale = Vector2(
+		1280.0 / festival.texture.get_width(), 720.0 / festival.texture.get_height()
+	)
+	add_child(festival)
+	layers.append(festival)
 	for key: String in ["coral", "mint", "long"]:
 		textures[key] = load("res://assets/ui/note-%s.svg" % key)
 	for index: int in range(3):
@@ -76,22 +75,24 @@ func _process(delta: float) -> void:
 	var beat: float = state.song_time * float(state.chart.get("bpm", 112)) / 60.0
 	if not playing:
 		beat = elapsed * 1.4
-	for index: int in range(layers.size()):
-		layers[index].position.x = sin(elapsed * 0.12) * index * 5
-		layers[index].modulate = Color.WHITE if not playing else Color(0.78, 0.82, 0.94)
-	for index: int in range(dancers.size()):
-		if playing:
-			dancers[index].position = Vector2(780 + index * 155, 633)
-			dancers[index].scale = Vector2.ONE * 0.66
-		elif state.screen == "title":
-			dancers[index].position = Vector2(800 + index * 150, 586 - (index % 2) * 32)
-			dancers[index].scale = Vector2.ONE * (1.0 if index == 0 else 0.84)
-		elif state.screen == "select":
-			dancers[index].position = Vector2(830 + index * 140, 612)
-			dancers[index].scale = Vector2.ONE * 0.7
+	for layer: Sprite2D in layers:
+		if state.screen == "select":
+			layer.modulate = Color(0.92, 0.92, 0.92)
+		elif playing:
+			layer.modulate = Color(0.48, 0.48, 0.56)
 		else:
-			dancers[index].position = Vector2(860 + index * 140, 610)
-			dancers[index].scale = Vector2.ONE * 0.7
+			layer.modulate = Color(0.66, 0.66, 0.72)
+	for index: int in range(dancers.size()):
+		dancers[index].visible = state.screen != "select"
+		if playing:
+			dancers[index].position = Vector2(815 + index * 170, 712)
+			dancers[index].scale = Vector2.ONE * 0.63
+		elif state.screen == "title":
+			dancers[index].position = Vector2(820 + index * 175, 707 - (index % 2) * 16)
+			dancers[index].scale = Vector2.ONE * (0.92 if index == 0 else 0.78)
+		else:
+			dancers[index].position = Vector2(820 + index * 170, 712)
+			dancers[index].scale = Vector2.ONE * 0.72
 		dancers[index].sync_beat(beat + index * 0.09, playing, delta)
 	shake = maxf(0.0, shake - delta)
 	position.x = sin(elapsed * 80.0) * shake * 20
@@ -123,19 +124,29 @@ func _draw_lanes() -> void:
 	for lane: int in range(2):
 		var color: Color = CORAL if lane == 0 else MINT
 		var y: float = LANE_Y[lane]
-		draw_style_box(_box(Color("1c3049"), 18, Color("476078")), Rect2(64, y - 47, 1152, 94))
-		draw_rect(Rect2(210, y - 43, 6, 86), color)
-		draw_line(Vector2(216, y), Vector2(1212, y), Color(0.7, 0.8, 0.9, 0.11), 2)
-		draw_circle(Vector2(LINE_X, y), 35 + pulses[lane] * 8, Color(color, 0.12))
-		draw_arc(Vector2(LINE_X, y), 33, 0, TAU, 64, color, 3, true)
-		draw_arc(Vector2(LINE_X, y), 25, 0, TAU, 64, Color(color, 0.4), 1, true)
+		draw_style_box(_box(Color(CREAM, 0.94), 7, INK), Rect2(48, y - 49, 1184, 98))
+		draw_rect(Rect2(215, y - 45, 9, 90), INK)
+		draw_line(Vector2(224, y), Vector2(1224, y), Color(INK, 0.14), 3)
+		draw_circle(Vector2(LINE_X + 6, y + 7), 38 + pulses[lane] * 8, Color(INK, 0.45))
+		draw_circle(Vector2(LINE_X, y), 37 + pulses[lane] * 8, Color(color, 0.25))
+		draw_arc(Vector2(LINE_X, y), 35, 0, TAU, 64, INK, 6, true)
+		draw_arc(Vector2(LINE_X, y), 27, 0, TAU, 64, color, 4, true)
 		draw_string(
 			font,
-			Vector2(91, y + 9),
-			"コーラル" if lane == 0 else "ミント",
+			Vector2(70, y - 5),
+			"朱の面" if lane == 0 else "藍のふち",
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1,
-			19,
+			20,
+			INK
+		)
+		draw_string(
+			font,
+			Vector2(70, y + 25),
+			"F・X・左をたたく" if lane == 0 else "J・B・右をたたく",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			15,
 			color
 		)
 		var beat_seconds: float = 60.0 / float(state.chart.bpm)
@@ -143,8 +154,8 @@ func _draw_lanes() -> void:
 		for beat: int in range(first_beat, first_beat + 8):
 			var x: float = LINE_X + (beat * beat_seconds - state.song_time) * SPEED
 			if x > 320 and x < 1200:
-				draw_line(Vector2(x, y - 32), Vector2(x, y + 32), Color(1, 1, 1, 0.06), 1)
-	draw_line(Vector2(LINE_X, 196), Vector2(LINE_X, 427), Color(CREAM, 0.6), 2)
+				draw_line(Vector2(x, y - 32), Vector2(x, y + 32), Color(INK, 0.08), 2)
+	draw_line(Vector2(LINE_X, 203), Vector2(LINE_X, 437), CREAM, 3)
 
 
 func _draw_notes() -> void:
@@ -206,7 +217,7 @@ func _box(color: Color, radius: int, border: Color) -> StyleBoxFlat:
 	var box: StyleBoxFlat = StyleBoxFlat.new()
 	box.bg_color = color
 	box.set_corner_radius_all(radius)
-	box.set_border_width_all(1)
+	box.set_border_width_all(4)
 	box.border_color = border
 	return box
 
