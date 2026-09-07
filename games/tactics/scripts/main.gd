@@ -22,6 +22,9 @@ var cursor := Vector2i(2, 5)
 var busy: bool = false
 var first_focus: Button
 var notice: String = ""
+var tutorial_active: bool = false
+var tutorial_step: int = 0
+var pending_save_notice: String = ""
 var _closing: bool = false
 var _enemy_running: bool = false
 
@@ -91,29 +94,38 @@ func show_title() -> void:
 	busy = false
 	_reset_screen()
 	_music("title")
-	UI.art(screen, "backgrounds/keyart.svg", Rect2(0, 0, 1280, 720))
-	UI.panel(screen, Rect2(50, 86, 505, 554), Color(0.05, 0.11, 0.17, 0.94))
-	UI.art(screen, "ui/crest.svg", Rect2(84, 112, 56, 56))
-	UI.label(screen, "五人の誓い、三つの戦場", Rect2(154, 124, 360, 36), 22, UI.GOLD)
-	UI.label(screen, "暁の境界", Rect2(83, 192, 440, 100), 64)
-	UI.label(screen, "失われた道に、もう一度灯を。", Rect2(87, 301, 440, 38), 22, UI.MUTED)
-	UI.label(screen, "地形を読み、仲間を守る戦術譚", Rect2(87, 342, 440, 38), 20)
-	first_focus = UI.button(screen, "新しい旅を始める", Rect2(86, 406, 428, 54), start_game)
-	var resume: Button = UI.button(screen, "記録から再開", Rect2(86, 474, 205, 48), resume_game)
+	UI.art_cover(screen, "generated/yamato-landscape.png", Rect2(0, 0, 1280, 720))
+	var wash := ColorRect.new()
+	wash.color = Color(0.16, 0.08, 0.03, 0.20)
+	wash.size = Vector2(1280, 720)
+	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	screen.add_child(wash)
+	UI.panel(screen, Rect2(46, 68, 500, 584), Color(0.96, 0.90, 0.72, 0.96), UI.INK)
+	UI.label(screen, "五人の誓い、三つの戦場", Rect2(82, 102, 410, 36), 22, UI.CORAL)
+	UI.label(screen, "暁の境界", Rect2(78, 150, 440, 100), 64, UI.INK)
+	UI.label(screen, "あかつき の きょうかい", Rect2(82, 237, 420, 34), 17, UI.MUTED)
+	UI.label(screen, "金雲の向こうへ、道をひらく。", Rect2(82, 292, 420, 38), 23, UI.JADE)
+	UI.label(screen, "地形を読み、五人を導く戦術絵巻", Rect2(82, 334, 420, 34), 19, UI.INK)
+	first_focus = UI.button(screen, "新しい絵巻をひらく", Rect2(82, 405, 428, 56), start_game)
+	var resume: Button = UI.button(screen, "続きから", Rect2(82, 478, 202, 50), resume_game)
 	resume.disabled = not campaign.has_save()
-	UI.button(screen, "遊び方", Rect2(305, 474, 209, 48), show_help)
-	UI.button(screen, "終了", Rect2(86, 542, 428, 44), request_quit)
-	UI.label(
-		screen, "矢印 / 左スティック  選択     決定 Enter / A     取消 Esc / B", Rect2(64, 665, 1150, 32), 18
+	UI.button(screen, "軍議の手引き", Rect2(300, 478, 210, 50), show_help)
+	UI.button(screen, "絵巻を閉じる", Rect2(82, 548, 428, 46), request_quit)
+	var allies: TextureRect = UI.art(
+		screen, "generated/allies-atlas.png", Rect2(525, 284, 740, 405)
 	)
+	if ResourceLoader.exists("res://assets/shaders/gold_outline.gdshader"):
+		var gold_material := ShaderMaterial.new()
+		gold_material.shader = load("res://assets/shaders/gold_outline.gdshader")
+		allies.material = gold_material
 	first_focus.grab_focus()
 
 
 func show_help() -> void:
 	campaign.screen = "help"
 	_reset_screen()
-	UI.panel(screen, Rect2(180, 60, 920, 595))
-	UI.label(screen, "旅の手引き", Rect2(220, 82, 800, 60), 36, UI.GOLD)
+	var scroll: Panel = UI.scroll_panel(screen, Rect2(142, 48, 996, 620))
+	UI.label(scroll, "軍議の手引き", Rect2(58, 36, 880, 55), 38, UI.CORAL)
 	var text: String = "味方を選ぶ → 青いマスへ移動 → 相手を選んで予測 → 戦闘を確定\n\n"
 	text += "剣は斧に、斧は槍に、槍は剣に有利。速さの差で追撃。\n"
 	text += "弓は２マス先だけに攻撃。祈り手は隣の味方を回復します。\n"
@@ -123,25 +135,83 @@ func show_help() -> void:
 	text += "敵全滅 → ボス撃破 → 目的地への到達、の全３章です。\n"
 	text += "S / Start で保存してタイトル。F11 で全画面切替。\n"
 	text += "マウスはマスとボタンをクリック。パッドは方向キーにも対応。"
-	UI.label(screen, text, Rect2(222, 156, 850, 420), 21)
-	first_focus = UI.button(screen, "タイトルへ", Rect2(420, 578, 440, 48), show_title)
+	text += "\n最初の戦場では、金雲の指南が盤面上で順番に案内します。"
+	UI.label(scroll, text, Rect2(58, 105, 880, 420), 21, UI.INK)
+	first_focus = UI.button(scroll, "表紙へ戻る", Rect2(274, 534, 450, 50), show_title)
 	first_focus.grab_focus()
 
 
 func start_game() -> void:
 	var saved: bool = campaign.new_game()
-	_begin_stage()
+	tutorial_active = true
+	tutorial_step = 0
 	if not saved:
-		notice = campaign.save_error
-		_refresh_sidebar()
+		pending_save_notice = campaign.save_error
+	show_chapter_scroll()
 
 
 func resume_game() -> void:
 	if campaign.load_game():
+		tutorial_active = false
 		_begin_stage()
 	else:
 		notice = "記録を読み込めませんでした"
 		effects.banner(notice, UI.CORAL)
+
+
+func show_chapter_scroll() -> void:
+	campaign.screen = "story"
+	selected = ""
+	target = ""
+	busy = false
+	_reset_screen()
+	_music("title")
+	var landscape: TextureRect = UI.art_cover(
+		screen, "generated/yamato-landscape.png", Rect2(-240, -45, 1760, 810)
+	)
+	landscape.create_tween().tween_property(landscape, "position:x", -80.0, 10.0)
+	for fold: int in range(1, 5):
+		var seam := ColorRect.new()
+		seam.color = Color(0.18, 0.11, 0.05, 0.32)
+		seam.position = Vector2(fold * 256 - 2, 0)
+		seam.size = Vector2(4, 720)
+		seam.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		screen.add_child(seam)
+	var chapter: Panel = UI.scroll_panel(screen, Rect2(58, 58, 500, 244))
+	UI.label(
+		chapter,
+		"第 %d 章　%s" % [campaign.stage_index + 1, campaign.stage().name],
+		Rect2(34, 30, 430, 48),
+		31,
+		UI.CORAL
+	)
+	var stories: Array[String] = [
+		"風の草原で、途絶えた街道を取り戻す。\n五人の印を重ね、最初の陣を破れ。",
+		"山峡の砦に、敵将の旗が上がる。\n深い森と高地を読み、包囲を解け。",
+		"川霧の向こうに、夜明けの門がある。\n失った仲間の思いも連れ、境界を越えよ。",
+	]
+	UI.label(chapter, stories[campaign.stage_index], Rect2(36, 96, 426, 105), 22, UI.INK)
+	first_focus = UI.button(screen, "戦場の屏風をひらく", Rect2(842, 576, 366, 58), _begin_stage)
+	if tutorial_active:
+		var guide: Panel = UI.scroll_panel(screen, Rect2(58, 523, 560, 124))
+		UI.label(guide, "初陣の指南は、戦場の金雲に現れます。", Rect2(28, 22, 500, 36), 20, UI.INK)
+		UI.button(guide, "指南を省く", Rect2(302, 66, 224, 38), skip_tutorial)
+	first_focus.grab_focus()
+
+
+func skip_tutorial() -> void:
+	tutorial_active = false
+	tutorial_step = 0
+	_sfx("fan")
+	show_chapter_scroll()
+
+
+func skip_play_tutorial() -> void:
+	tutorial_active = false
+	tutorial_step = 0
+	_sfx("fan")
+	notice = "指南を閉じました。金に光る仲間から自由に選べます"
+	_refresh_sidebar()
 
 
 func _begin_stage() -> void:
@@ -153,6 +223,10 @@ func _begin_stage() -> void:
 	var hero: Dictionary = campaign.unit_by_id("hero")
 	cursor = Vector2i(hero.x, hero.y)
 	show_play()
+	if not pending_save_notice.is_empty():
+		notice = pending_save_notice
+		pending_save_notice = ""
+		_refresh_sidebar()
 	effects.banner("第 %d 章  %s" % [campaign.stage_index + 1, campaign.stage().name])
 	if not campaign.outcome.is_empty():
 		show_result()
@@ -163,19 +237,19 @@ func _begin_stage() -> void:
 func show_play() -> void:
 	_reset_screen()
 	_music("stage")
-	UI.panel(screen, Rect2(34, 22, 1212, 68), Color(0.05, 0.11, 0.17, 0.97))
-	UI.label(screen, "暁の境界", Rect2(56, 28, 225, 54), 29, UI.GOLD)
+	UI.scroll_panel(screen, Rect2(28, 17, 1224, 76))
+	UI.label(screen, "暁の境界", Rect2(50, 27, 225, 54), 29, UI.CORAL)
 	UI.label(
 		screen,
 		"第 %d 章  %s" % [campaign.stage_index + 1, campaign.stage().name],
 		Rect2(283, 30, 520, 32),
-		23
+		23,
+		UI.INK
 	)
-	UI.label(screen, campaign.stage().objective_text, Rect2(285, 60, 510, 25), 16, UI.MUTED)
+	UI.label(screen, campaign.stage().objective_text, Rect2(285, 60, 560, 25), 16, UI.MUTED)
 	board = Board.new()
 	screen.add_child(board)
 	board.set_selection(selected, cursor)
-	UI.label(screen, "青：移動範囲    赤：移動後を含む射程    輪：味方 / 敵", Rect2(62, 651, 745, 26), 18)
 	_refresh_sidebar()
 
 
@@ -193,22 +267,31 @@ func _refresh_sidebar() -> void:
 	sidebar = Control.new()
 	sidebar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	screen.add_child(sidebar)
-	UI.panel(sidebar, Rect2(805, 108, 438, 536), Color(0.05, 0.11, 0.17, 0.96))
+	UI.panel(sidebar, Rect2(803, 104, 443, 541), Color(0.95, 0.88, 0.69, 0.97), UI.INK)
 	var phase_name: String = "自軍フェーズ" if campaign.phase == "player" else "敵軍フェーズ"
 	UI.label(
 		sidebar,
 		"%s  ·  %d ターン" % [phase_name, campaign.turn],
-		Rect2(827, 119, 390, 34),
+		Rect2(824, 115, 390, 34),
 		24,
-		UI.GOLD
+		UI.CORAL
 	)
+	if tutorial_active:
+		var tutorial: Panel = UI.scroll_panel(sidebar, Rect2(819, 154, 411, 82))
+		UI.label(tutorial, _tutorial_caption(), Rect2(18, 17, 300, 48), 18, UI.INK)
+		UI.button(tutorial, "省く", Rect2(321, 20, 72, 40), skip_play_tutorial)
 	var current: Dictionary = _unit(selected)
 	if current.is_empty():
 		current = campaign.unit_at(cursor)
 	if current.is_empty():
-		UI.label(sidebar, "仲間を選び、道を拓こう", Rect2(827, 186, 390, 40), 25)
+		UI.label(sidebar, "金に光る仲間を選ぶ", Rect2(827, 252, 390, 40), 25, UI.INK)
 		UI.label(
-			sidebar, "青い輪は味方、赤い輪は敵。\n地形と兵種の相性が勝敗を分けます。", Rect2(827, 240, 390, 75), 18, UI.MUTED
+			sidebar,
+			"カーソル先: %s\n%s"
+			% [BattleData.terrain(cursor, campaign.stage().map).name, campaign.stage().objective_text],
+			Rect2(827, 302, 390, 75),
+			18,
+			UI.MUTED
 		)
 	else:
 		_unit_panel(current)
@@ -216,7 +299,9 @@ func _refresh_sidebar() -> void:
 		_forecast()
 	else:
 		_actions(current)
-	var status: Label = UI.label(sidebar, notice, Rect2(825, 651, 410, 56), 16, UI.GOLD)
+	var status_scroll: Panel = UI.scroll_panel(sidebar, Rect2(803, 650, 443, 58))
+	var message: String = notice if not notice.is_empty() else _next_action_text()
+	var status: Label = UI.label(status_scroll, message, Rect2(18, 13, 408, 38), 16, UI.INK)
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	for button: Node in sidebar.find_children("*", "Button", true, false):
 		button.focus_mode = Control.FOCUS_NONE
@@ -225,33 +310,38 @@ func _refresh_sidebar() -> void:
 	UI.label(
 		sidebar,
 		(
-			"%s  /  移動 %s  /  守備 +%d  /  回避 +%d%%"
+			"カーソルの地形　%s　移動 %s　守備 +%d　回避 +%d%%"
 			% [ground.name, cost, ground.defense, ground.evasion]
 		),
-		Rect2(62, 681, 736, 28),
+		Rect2(842, 61, 386, 26),
 		17,
-		UI.GOLD
+		UI.MUTED
 	)
 	if is_instance_valid(board):
 		board.set_selection(selected, cursor)
 
 
 func _unit_panel(unit: Dictionary) -> void:
-	UI.art(sidebar, "units/%s.svg" % Board.art_kind(unit), Rect2(830, 165, 120, 145))
-	UI.label(sidebar, "%s  Lv.%d" % [unit.name, unit.level], Rect2(963, 172, 255, 34), 25)
-	UI.label(sidebar, JOBS[unit.job], Rect2(963, 211, 255, 28), 20, UI.JADE)
-	UI.label(sidebar, "HP  %d / %d" % [unit.hp, unit.max_hp], Rect2(963, 246, 255, 28), 20)
-	UI.meter(sidebar, Rect2(963, 282, 250, 10), unit.hp, unit.max_hp)
+	var portrait := preload("res://scripts/unit_actor.gd").new()
+	sidebar.add_child(portrait)
+	portrait.configure(Board.art_kind(unit), unit.team == "enemy")
+	portrait.position = Vector2(871, 305)
+	portrait.scale = Vector2.ONE * 0.48
+	UI.label(sidebar, "%s  Lv.%d" % [unit.name, unit.level], Rect2(963, 252, 255, 34), 25, UI.INK)
+	UI.label(sidebar, JOBS[unit.job], Rect2(963, 290, 255, 28), 20, UI.JADE)
+	UI.label(sidebar, "HP  %d / %d" % [unit.hp, unit.max_hp], Rect2(963, 324, 255, 28), 20, UI.INK)
+	UI.meter(sidebar, Rect2(963, 356, 250, 10), unit.hp, unit.max_hp)
 	UI.label(
 		sidebar,
 		"力 %d    守 %d    速 %d    技 %d" % [unit.strength, unit.defense, unit.speed, unit.skill],
-		Rect2(828, 318, 385, 30),
-		20
+		Rect2(828, 378, 385, 30),
+		20,
+		UI.INK
 	)
 	UI.label(
 		sidebar,
 		"移動 %d    経験 %d / 100    薬 %d" % [unit.move, unit.xp, unit.items],
-		Rect2(828, 353, 390, 30),
+		Rect2(828, 407, 390, 30),
 		18,
 		UI.MUTED
 	)
@@ -259,13 +349,15 @@ func _unit_panel(unit: Dictionary) -> void:
 
 func _actions(unit: Dictionary) -> void:
 	if not selected.is_empty() and not unit.is_empty():
-		UI.label(sidebar, "移動後、射程内の相手を選択", Rect2(828, 398, 390, 30), 19, UI.JADE)
-		UI.button(sidebar, "待機  W / X", Rect2(828, 443, 182, 44), wait_selected)
-		UI.button(sidebar, "薬  I / RB", Rect2(1024, 443, 193, 44), item_selected)
+		UI.label(sidebar, "扇を開き、行動を選ぶ", Rect2(828, 431, 390, 22), 16, UI.CORAL)
+		UI.fan_button(sidebar, "攻撃", Rect2(816, 478, 126, 62), -0.18, show_attack_hint)
+		UI.fan_button(sidebar, "待機", Rect2(906, 454, 126, 62), -0.06, wait_selected)
+		UI.fan_button(sidebar, "薬", Rect2(997, 454, 126, 62), 0.06, item_selected)
+		UI.fan_button(sidebar, "取消", Rect2(1087, 478, 126, 62), 0.18, cancel_selection)
 	else:
-		UI.label(sidebar, "剣 ＞ 斧 ＞ 槍 ＞ 剣\n弓：距離２  /  祈り：隣の味方", Rect2(828, 397, 390, 76), 21, UI.JADE)
-	UI.button(sidebar, "フェーズ終了  E / Y", Rect2(828, 504, 388, 44), end_phase)
-	UI.button(sidebar, "保存してタイトル  S / Start", Rect2(828, 566, 388, 44), save_to_title)
+		UI.label(sidebar, "剣 ＞ 斧 ＞ 槍 ＞ 剣\n弓は二升先　祈りは隣の味方", Rect2(828, 438, 390, 67), 20, UI.JADE)
+	UI.button(sidebar, "軍議を終えて敵軍へ", Rect2(828, 553, 388, 38), end_phase)
+	UI.button(sidebar, "記録して表紙へ", Rect2(828, 600, 388, 34), save_to_title)
 
 
 func _forecast() -> void:
@@ -274,15 +366,16 @@ func _forecast() -> void:
 		target = ""
 		return
 	var opponent: Dictionary = _unit(target)
-	UI.label(sidebar, "戦闘予測  →  " + opponent.name, Rect2(828, 395, 390, 32), 23, UI.GOLD)
+	var scroll: Panel = UI.scroll_panel(sidebar, Rect2(819, 430, 411, 204))
+	UI.label(scroll, "戦の見立て　→　" + opponent.name, Rect2(22, 22, 367, 32), 23, UI.CORAL)
 	var summary: String = (
 		"回復  +%d" % prediction.heal
 		if prediction.heal > 0
 		else "与ダメ %d × %d   命中 %d%%" % [prediction.damage, prediction.strikes, prediction.hit]
 	)
-	UI.label(sidebar, summary, Rect2(828, 437, 390, 30), 22)
+	UI.label(scroll, summary, Rect2(22, 64, 367, 30), 22, UI.INK)
 	UI.label(
-		sidebar,
+		scroll,
 		(
 			"反撃 %d × %d  /  命中 %d%%  /  必殺 %d%%"
 			% [
@@ -292,12 +385,38 @@ func _forecast() -> void:
 				prediction.critical
 			]
 		),
-		Rect2(828, 479, 390, 30),
+		Rect2(22, 99, 367, 30),
 		16,
 		UI.CORAL
 	)
-	UI.button(sidebar, "確定  Enter / A", Rect2(828, 527, 388, 44), confirm_attack)
-	UI.button(sidebar, "取消  Esc / B", Rect2(828, 581, 388, 40), cancel_selection)
+	UI.button(scroll, "この見立てで進む", Rect2(20, 140, 220, 42), confirm_attack)
+	UI.button(scroll, "巻物を戻す", Rect2(250, 140, 140, 42), cancel_selection)
+
+
+func _tutorial_caption() -> String:
+	var captions: Array[String] = [
+		"一ノ指南　金に光る仲間を選ぶ",
+		"二ノ指南　金枠の升へ進める",
+		"三ノ指南　赤い相手を選び、巻物を見る",
+		"四ノ指南　見立てを確定する",
+	]
+	return captions[clampi(tutorial_step, 0, captions.size() - 1)]
+
+
+func _next_action_text() -> String:
+	if campaign.phase == "enemy":
+		return "敵軍の動きを見届ける"
+	if not target.is_empty():
+		return "巻物の予測を読み、進むか戻すか選ぶ"
+	if not selected.is_empty():
+		return "金枠へ移動するか、扇から行動を選ぶ"
+	return "金に光る未行動の仲間を選ぶ"
+
+
+func show_attack_hint() -> void:
+	notice = "盤上の赤い相手を選ぶと、結果を巻物で確認できます"
+	_sfx("fan")
+	_refresh_sidebar()
 
 
 # 入力された移動・行動を一回だけ進行に反映する。
@@ -309,19 +428,45 @@ func choose_cell(cell: Vector2i) -> void:
 	cursor = cell
 	var clicked: Dictionary = campaign.unit_at(cell)
 	if selected.is_empty():
-		if not clicked.is_empty() and clicked.team == "player" and not clicked.acted:
+		if clicked.is_empty():
+			notice = "この升には誰もいません。金に光る仲間を選んでください"
+		elif clicked.team != "player":
+			notice = "敵兵です。先に金に光る仲間を選んでください"
+		elif clicked.acted:
+			notice = "%sはこの手番ですでに行動しました" % clicked.name
+		else:
 			selected = clicked.id
-			notice = "青いマスへ移動、赤い射程で相手を選択"
-			_sfx("confirm")
+			notice = "金枠の升へ移動できます。赤い相手は攻撃候補です"
+			tutorial_step = maxi(tutorial_step, 1)
+			_sfx("fan")
 	elif not clicked.is_empty() and clicked.id != selected:
 		if not campaign.preview(selected, clicked.id).is_empty():
 			target = clicked.id
+			notice = "巻物に、選んだ先の結果が出ました"
+			tutorial_step = maxi(tutorial_step, 3)
 			_sfx("confirm")
 		elif clicked.team == "player" and not clicked.acted:
 			campaign.undo_move(selected)
 			selected = clicked.id
 			target = ""
+			notice = "%sに選び直しました" % clicked.name
+			_sfx("fan")
+		elif clicked.team == "player":
+			notice = "%sはこの手番ですでに行動しました" % clicked.name
+		else:
+			notice = "%sは今いる升から射程外です。先に金枠へ移動してください" % clicked.name
 	elif target.is_empty():
+		var actor_unit: Dictionary = _unit(selected)
+		var movement: Array = campaign.movement(actor_unit)
+		if cell not in movement:
+			var terrain: Dictionary = BattleData.terrain(cell, campaign.stage().map)
+			notice = (
+				"%sは通れません。別の金枠を選んでください" % terrain.name
+				if terrain.cost >= 99
+				else "そこまでは移動できません。金枠の升を選んでください"
+			)
+			_refresh_sidebar()
+			return
 		var actor: Node2D = board.actors.get(selected)
 		var previous: Vector2 = actor.position if actor != null else Vector2.ZERO
 		if campaign.move_unit(selected, cell):
@@ -333,7 +478,8 @@ func choose_cell(cell: Vector2i) -> void:
 				tween.tween_property(actor, "position", Board.center(cell) + Vector2(0, -4), 0.3)
 				await tween.finished
 			busy = false
-			notice = "相手を選んで攻撃 / 待機 / 薬。取消で移動を戻せます"
+			notice = "赤い相手を選ぶか、扇から待機・薬・取消を選んでください"
+			tutorial_step = maxi(tutorial_step, 2)
 	_refresh_sidebar()
 	_check_progress()
 
@@ -362,6 +508,10 @@ func confirm_attack() -> void:
 	await _animate_events(events, initial_hp)
 	selected = ""
 	busy = false
+	if tutorial_active:
+		tutorial_active = false
+		tutorial_step = 0
+		notice = "指南は完了です。以後は金の光と巻物を頼りに進めます"
 	_refresh_sidebar()
 	_check_progress()
 
@@ -545,27 +695,27 @@ func show_result() -> void:
 	busy = false
 	_reset_screen()
 	_music("result")
-	UI.art(screen, "backgrounds/keyart.svg", Rect2(0, 0, 1280, 720))
-	UI.panel(screen, Rect2(112, 122, 685, 478), Color(0.05, 0.11, 0.17, 0.96))
+	UI.art_cover(screen, "generated/yamato-landscape.png", Rect2(0, 0, 1280, 720))
+	var scroll: Panel = UI.scroll_panel(screen, Rect2(104, 104, 720, 504))
 	var won: bool = campaign.outcome != "defeat"
 	var title: String = "道は、暁へ続く" if campaign.outcome == "ending" else "戦場を越えて"
 	if not won:
 		title = "灯はまだ、消えない"
 	UI.label(
-		screen,
+		scroll,
 		"全章踏破" if campaign.outcome == "ending" else ("章クリア" if won else "敗北"),
-		Rect2(154, 150, 600, 40),
+		Rect2(48, 34, 620, 40),
 		24,
-		UI.GOLD
+		UI.CORAL
 	)
-	UI.label(screen, title, Rect2(154, 205, 600, 75), 43)
+	UI.label(scroll, title, Rect2(48, 88, 620, 75), 43, UI.INK)
 	var text: String = "仲間と繋いだ道に、朝の光が満ちていく。\nその旅は、新しい物語として語り継がれる。"
 	if campaign.outcome == "victory":
 		text = "この勝利を胸に、次の戦場へ。\n失った仲間の想いも、ともに連れていく。"
 	elif not won:
 		text = "主人公が倒れ、旅は途切れました。\n地形と相性を見直し、もう一度挑みましょう。"
-	UI.label(screen, text, Rect2(155, 300, 615, 90), 23)
-	var count: Label = UI.label(screen, "", Rect2(155, 398, 600, 35), 23, UI.JADE)
+	UI.label(scroll, text, Rect2(49, 183, 615, 90), 23, UI.INK)
+	var count: Label = UI.label(scroll, "", Rect2(49, 288, 600, 35), 23, UI.JADE)
 	var tween: Tween = count.create_tween()
 	tween.tween_method(
 		func(value: float) -> void:
@@ -575,19 +725,18 @@ func show_result() -> void:
 		0.5
 	)
 	if campaign.outcome == "victory":
-		first_focus = UI.button(screen, "次の章へ", Rect2(154, 473, 283, 58), advance_stage)
+		first_focus = UI.button(scroll, "次の絵巻へ", Rect2(48, 368, 283, 58), advance_stage)
 	else:
-		first_focus = UI.button(screen, "新しい旅", Rect2(154, 473, 283, 58), start_game)
-	UI.button(screen, "タイトルへ", Rect2(457, 473, 283, 58), show_title)
+		first_focus = UI.button(scroll, "新しい絵巻", Rect2(48, 368, 283, 58), start_game)
+	UI.button(scroll, "表紙へ戻る", Rect2(351, 368, 283, 58), show_title)
 	first_focus.grab_focus()
 
 
 func advance_stage() -> void:
 	var saved: bool = campaign.next_stage()
-	_begin_stage()
 	if not saved:
-		notice = campaign.save_error
-		_refresh_sidebar()
+		pending_save_notice = campaign.save_error
+	show_chapter_scroll()
 
 
 func _unhandled_input(event: InputEvent) -> void:

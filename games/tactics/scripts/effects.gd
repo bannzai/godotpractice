@@ -38,7 +38,7 @@ func burst(at: Vector2, caption: String, tint: Color = UI.GOLD) -> void:
 
 # フェーズ通知は一度表示して退場する。
 func banner(caption: String, tint: Color = UI.JADE) -> void:
-	var strip: Panel = UI.panel(self, Rect2(-1280, 288, 1280, 120), UI.INK, tint)
+	var strip: Panel = UI.scroll_panel(self, Rect2(-1280, 288, 1280, 120))
 	var text: Label = UI.label(strip, caption, Rect2(0, 26, 1280, 70), 36, tint)
 	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var tween: Tween = strip.create_tween()
