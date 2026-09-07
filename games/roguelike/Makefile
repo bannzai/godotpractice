@@ -15,6 +15,8 @@ WINDOWED_FLAGS := --audio-driver Dummy --rendering-driver opengl3 --resolution 1
 WINDOWED_LOG_NOISE := -e 'Could not set V-Sync mode' -e 'IMKCFRunLoopWakeUpReliable'
 # movie target が録画するフレーム数 (30 fps 固定。150 = 5 秒)
 MOVIE_FRAMES ?= 150
+# 活字端末画面は大半が黒いため、limited range の完全な黒 (16) と区別できる最小平均輝度を使う
+MOVIE_MIN_YAVG ?= 16.5
 
 .PHONY: import check selfcheck integration lint test screenshot movie movie-play run build-macos build-windows build-linux build-web build-all clean
 
@@ -70,7 +72,7 @@ screenshot: import
 
 # 操作を伴わない起動〜メインシーン表示を Movie Maker モードで録画して mp4 にする (起動直後の描画崩れ・真っ黒を
 # 検出する。headless は dummy レンダラで落ちるため描画付きで起動する)。真っ黒な動画を成功と誤認しないよう、
-# 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) が 32 以上であることも検査する
+# 終了 1 秒前のフレームの輝度平均 (Y。limited range のため真っ黒 = 16) も検査する
 movie: import
 	rm -f $(LOG_DIR)/movie.avi $(LOG_DIR)/movie.mp4
 	"$(GODOT)" --path . --log-file $(abspath tmp/engine.log) $(WINDOWED_FLAGS) --script res://scripts/dev/movie.gd --write-movie $(LOG_DIR)/movie.avi --fixed-fps 30 -- --frames=$(MOVIE_FRAMES) > $(LOG_DIR)/movie.log 2>&1; \
@@ -80,7 +82,7 @@ movie: import
 	ffmpeg -loglevel error -y -i $(LOG_DIR)/movie.avi -c:v libx264 -threads 2 -pix_fmt yuv420p $(LOG_DIR)/movie.mp4
 	rm -f $(LOG_DIR)/movie.avi
 	ffmpeg -v error -sseof -1 -i $(LOG_DIR)/movie.mp4 -frames:v 1 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null - \
-	  | awk -F= '/YAVG/ { found = 1; exit ($$2 >= 32) ? 0 : 1 } END { if (!found) exit 1 }'
+	  | awk -F= -v min=$(MOVIE_MIN_YAVG) '/YAVG/ { found = 1; exit ($$2 >= min) ? 0 : 1 } END { if (!found) exit 1 }'
 
 # 30秒の実入力プレイ。終了前に音声を解放してから録画を閉じる。
 movie-play: import

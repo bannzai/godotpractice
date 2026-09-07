@@ -428,11 +428,11 @@ func _depth_diagram(current_depth: int) -> String:
 	for depth: int in range(1, Data.LAST_FLOOR + 1):
 		var line := "      │\n  ├── B%02d  %s" % [depth, "未知の層"]
 		if depth == current_depth:
-			line = "[color=#ffbd4a]      ▼\n  ╞══ B%02d  @ 到達[/color]" % depth
+			line = "[color=#ffbd4a]      v\n  ╞══ B%02d  @ 到達[/color]" % depth
 		elif current_depth > 0 and depth < current_depth:
 			line = "[color=#45f0b5]      │\n  ├── B%02d  記録済[/color]" % depth
 		lines.append(line)
-	lines.append("\n      ▼\n[color=#ff6174]  B05 の番人 / または > で脱出[/color]")
+	lines.append("\n      v\n[color=#ff6174]  B05 の番人 / または > で脱出[/color]")
 	return "\n".join(lines)
 
 

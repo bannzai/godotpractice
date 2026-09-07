@@ -59,11 +59,11 @@ func _demo_frame(frame: int) -> void:
 		180:
 			_key(KEY_I)
 		210:
-			_click("灯り草")
+			_click("木の実パン")
 		240:
 			_click("使う / 装備")
 		242:
-			_used_item = run.inventory.count("herb") == 1
+			_used_item = run.inventory.count("food") == 1
 		275, 315:
 			_key(KEY_M)
 		875:

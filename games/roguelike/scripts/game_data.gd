@@ -15,7 +15,7 @@ const ENEMIES: Dictionary = {
 		"ai": "sleep", "color": Color("c9a6dd")},
 	"swift": {"name": "影走り", "glyph": "v", "hp": 18, "attack": 7, "defense": 1, "xp": 15,
 		"ai": "swift", "color": Color("ea8899")},
-	"boss": {"name": "深淵の番人", "glyph": "Ω", "hp": 100, "attack": 13, "defense": 4, "xp": 80,
+	"boss": {"name": "深淵の番人", "glyph": "W", "hp": 100, "attack": 13, "defense": 4, "xp": 80,
 		"ai": "boss", "color": Color("f6cf7b")},
 }
 const FLOOR_ENEMIES: Array = [
@@ -32,7 +32,7 @@ const ITEMS: Dictionary = {
 		"description": "装備すると攻撃 +8。"},
 	"shield": {"glyph": "]", "name": "木の盾", "type": "shield", "power": 2,
 		"description": "装備すると防御 +2。"},
-	"ironshield": {"glyph": "▣", "name": "古鉄の盾", "type": "shield", "power": 5,
+	"ironshield": {"glyph": "H", "name": "古鉄の盾", "type": "shield", "power": 5,
 		"description": "装備すると防御 +5。"},
 	"herb": {"glyph": "!", "name": "灯り草", "type": "heal", "power": 35,
 		"description": "HP を 35 回復する。"},

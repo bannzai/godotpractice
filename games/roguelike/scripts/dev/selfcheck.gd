@@ -9,6 +9,8 @@ func _initialize() -> void:
 	preload("res://scripts/dev/logic_checks.gd").run(_check)
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_font_glyphs()
+	_check_no_picture_assets("res://assets")
 
 	if failed:
 		quit(1)
@@ -67,3 +69,28 @@ func _check_asset_directory(path: String, credits: String) -> void:
 		)
 	for subdirectory: String in directory.get_directories():
 		_check_asset_directory(path.path_join(subdirectory), credits)
+
+
+func _check_font_glyphs() -> void:
+	var font: Font = load("res://assets/fonts/MPLUS1Code[wght].ttf")
+	_check(font != null, "FONT: M PLUS 1 Code をロードできる")
+	if font == null:
+		return
+	var required := "@g}sOvW)!%?¿/H].#>·┌─┐│└┘├╞═╱╲灯守りの深層探索番人"
+	for index: int in range(required.length()):
+		var codepoint: int = required.unicode_at(index)
+		_check(font.has_char(codepoint), "FONT: U+%04X を表示できる" % codepoint)
+
+
+func _check_no_picture_assets(path: String) -> void:
+	var directory: DirAccess = DirAccess.open(path)
+	_check(directory != null, "GLYPH: %s を走査できる" % path)
+	if directory == null:
+		return
+	for filename: String in directory.get_files():
+		_check(
+			not filename.get_extension().to_lower() in ["svg", "png", "jpg", "jpeg", "webp"],
+			"GLYPH: 画像素材を使っていない (%s)" % path.path_join(filename)
+		)
+	for subdirectory: String in directory.get_directories():
+		_check_no_picture_assets(path.path_join(subdirectory))
