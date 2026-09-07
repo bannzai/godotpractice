@@ -25,18 +25,14 @@ func set_scene(scene: String) -> void:
 	_ensure_players()
 	if not _ambient.playing:
 		var ambient_stream: AudioStreamWAV = load("res://assets/audio/ambient.wav")
-		ambient_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		ambient_stream.loop_begin = 0
-		ambient_stream.loop_end = ambient_stream.data.size() / 2
+		_configure_full_loop(ambient_stream)
 		_ambient.stream = ambient_stream
 		_ambient.volume_db = -25.0
 		_ambient.play()
 	_scene = scene
 	_music.stop()
 	var stream: AudioStreamWAV = load("res://assets/audio/bgm_%s.wav" % scene)
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_begin = 0
-	stream.loop_end = stream.data.size() / 2
+	_configure_full_loop(stream)
 	_music.stream = stream
 	_music.volume_db = -10.0
 	_music.play()
@@ -99,6 +95,12 @@ func _ensure_players() -> void:
 		player.name = "Effect%d" % i
 		add_child(player)
 		_effects.append(player)
+
+
+static func _configure_full_loop(stream: AudioStreamWAV) -> void:
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
 
 
 func _exit_tree() -> void:

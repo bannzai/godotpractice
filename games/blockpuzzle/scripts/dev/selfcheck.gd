@@ -4,6 +4,7 @@ extends SceneTree
 
 const Rules = preload("res://scripts/puzzle_rules.gd")
 const Session = preload("res://scripts/session.gd")
+const SoundscapeScript = preload("res://scripts/soundscape.gd")
 
 var failed: bool = false
 
@@ -11,6 +12,7 @@ var failed: bool = false
 func _initialize() -> void:
 	_check_scenes("res://scenes")
 	_check_assets_credited()
+	_check_audio_loops()
 	_check_motion()
 	_check_clearing()
 	_check_chains()
@@ -77,6 +79,16 @@ func _check_asset_directory(path: String, credits: String) -> void:
 		)
 	for subdirectory: String in directory.get_directories():
 		_check_asset_directory(path.path_join(subdirectory), credits)
+
+
+func _check_audio_loops() -> void:
+	for filename: String in ["ambient", "bgm_title", "bgm_play", "bgm_danger", "bgm_result"]:
+		var stream: AudioStreamWAV = load("res://assets/audio/%s.wav" % filename)
+		SoundscapeScript._configure_full_loop(stream)
+		var sample_count: int = roundi(stream.get_length() * stream.mix_rate)
+		_check(stream.loop_mode == AudioStreamWAV.LOOP_FORWARD, "音声: %s を前方ループ" % filename)
+		_check(stream.loop_begin == 0, "音声: %s の先頭からループ" % filename)
+		_check(stream.loop_end == sample_count and sample_count > 0, "音声: %s の全サンプルをループ" % filename)
 
 
 func _board(bottom_rows: Array) -> Array:
